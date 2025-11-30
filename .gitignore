@@ -1,0 +1,60 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+build/
+out/
+release/
+*.asar
+
+# Electron / Packaging
+*.log
+logs/
+temp/
+tmp/
+.DS_Store
+
+# VS Code
+.vscode/
+.history/
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Environment / local configs
+.env
+.env.*
+*.local
+config.json
+
+# Coverage / tests
+coverage/
+.nyc_output/
+jest-cache/
+jest-html-reporters-*
+.cypress/
+
+# Cache
+.cache/
+.eslintcache
+bower_components/
+
+# Misc
+*.tgz
+*.orig
+*.tmp
+*.swp
+*.swo
+.idea/
+*.iml
