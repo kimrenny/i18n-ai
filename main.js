@@ -19,8 +19,7 @@ function readConfig() {
 function writeConfig(config) {
   try {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
-  } catch {
-  }
+  } catch {}
 }
 
 function createWindow() {
@@ -35,7 +34,6 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, "src", "index.html"));
-
   win.webContents.openDevTools();
 }
 
@@ -56,6 +54,22 @@ ipcMain.handle("get-saved-folder", async () => {
   return config.translationsFolder || null;
 });
 
+ipcMain.handle("get-folders", async () => {
+  const config = readConfig();
+  return config.folders || [];
+});
+
+ipcMain.handle("save-folders", async (event, folders) => {
+  try {
+    const config = readConfig();
+    config.folders = folders;
+    writeConfig(config);
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
+});
+
 ipcMain.handle("validate-folder", async (event, folderPath) => {
   try {
     if (!folderPath || typeof folderPath !== "string") {
@@ -73,32 +87,29 @@ ipcMain.handle("validate-folder", async (event, folderPath) => {
     }
 
     return { valid: true };
-  } catch (err) {
+  } catch {
     return { valid: false, error: "Error checking folder" };
   }
 });
 
 ipcMain.handle("save-folder", async (event, folderPath) => {
   try {
-    if (!folderPath || typeof folderPath !== "string") {
-      return { success: false, error: "Path is empty or invalid" };
-    }
-
     const normalized = path.resolve(folderPath);
     if (!fs.existsSync(normalized)) {
       return { success: false, error: "Folder does not exist" };
     }
 
-    const stats = fs.statSync(normalized);
-    if (!stats.isDirectory()) {
-      return { success: false, error: "Path is not a directory" };
-    }
-
     const config = readConfig();
     config.translationsFolder = normalized;
+
+    if (!config.folders) config.folders = [];
+    if (!config.folders.includes(normalized)) {
+      config.folders.push(normalized);
+    }
+
     writeConfig(config);
     return { success: true };
-  } catch (err) {
+  } catch {
     return { success: false, error: "Error saving folder" };
   }
 });

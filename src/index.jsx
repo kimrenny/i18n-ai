@@ -3,31 +3,37 @@ const { useEffect, useState, useRef } = React;
 const App = () => {
   const [folderPath, setFolderPath] = useState("");
   const [status, setStatus] = useState("");
+  const [savedFolders, setSavedFolders] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const [validation, setValidation] = useState({
     valid: false,
     checking: false,
     error: ""
   });
+
   const validateTimer = useRef(null);
 
   useEffect(() => {
-    const loadSavedFolder = async () => {
+    const loadInitial = async () => {
       try {
         const saved = await window.api.getSavedFolder();
         if (saved) {
           setFolderPath(saved);
-          setStatus("Saved folder loaded");
           runValidate(saved);
-        } else {
-          setStatus("No folder selected yet");
-          setValidation({ valid: false, checking: false, error: "" });
         }
+
+        const allFolders = await window.api.getFolders();
+        if (Array.isArray(allFolders)) {
+          setSavedFolders(allFolders);
+        }
+
       } catch (e) {
-        setStatus("Error loading saved folder");
+        setStatus("Error loading saved folders");
       }
     };
 
-    loadSavedFolder();
+    loadInitial();
   }, []);
 
   const runValidate = async (pathToCheck) => {
@@ -73,8 +79,8 @@ const App = () => {
         return;
       }
       setFolderPath(selected);
-      setStatus("Folder selected but not saved yet");
       runValidate(selected);
+
     } catch (e) {
       setStatus("Error selecting folder");
     }
@@ -97,6 +103,15 @@ const App = () => {
       const res = await window.api.saveFolder(folderPath);
       if (res && res.success) {
         setStatus("Folder path saved");
+
+        if (!savedFolders.includes(folderPath)) {
+          const newArr = [...savedFolders, folderPath];
+
+          setSavedFolders(newArr);
+
+          await window.api.saveFolders(newArr);
+        }
+
       } else {
         setStatus(
           `Error saving folder: ${
@@ -116,16 +131,23 @@ const App = () => {
     runValidate(val);
   };
 
+  const selectSaved = (p) => {
+    setFolderPath(p);
+    runValidate(p);
+    setSidebarOpen(false);
+  };
+
+  const deleteFolder = async (p) => {
+    const newArr = savedFolders.filter(x => x !== p);
+    setSavedFolders(newArr);
+
+    await window.api.saveFolders(newArr);
+  };
+
   const renderValidationMessage = () => {
     if (validation.checking) {
       return (
-        <div
-          style={{
-            marginTop: "6px",
-            fontSize: "12px",
-            color: "#555"
-          }}
-        >
+        <div style={{ marginTop: "6px", fontSize: "12px", color: "#555" }}>
           Checking...
         </div>
       );
@@ -133,13 +155,7 @@ const App = () => {
 
     if (!validation.valid && validation.error) {
       return (
-        <div
-          style={{
-            marginTop: "6px",
-            fontSize: "12px",
-            color: "red"
-          }}
-        >
+        <div style={{ marginTop: "6px", fontSize: "12px", color: "red" }}>
           {validation.error}
         </div>
       );
@@ -148,20 +164,76 @@ const App = () => {
     return null;
   };
 
+  const getFolderName = (p) =>
+    p.replace(/\\/g, "/").split("/").pop();
+
   return (
     <div
       style={{
-        padding: "24px",
+        display: "flex",
+        height: "100vh",
         fontFamily:
           "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        boxSizing: "border-box",
-        height: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
       }}
     >
-      <div style={{ width: "100%", maxWidth: "600px" }}>
+      <div
+        style={{
+          width: sidebarOpen ? "260px" : "0px",
+          transition: "0.25s",
+          overflow: "hidden",
+          background: "#f3f3f3",
+          borderRight: "1px solid #ccc",
+          padding: sidebarOpen ? "16px" : "0"
+        }}
+      >
+        <h3>Saved folders</h3>
+
+        {savedFolders.map((p) => (
+          <div
+            key={p}
+            style={{
+              padding: "6px 0",
+              display: "flex",
+              justifyContent: "space-between",
+              cursor: "pointer",
+              borderBottom: "1px solid #ddd"
+            }}
+          >
+            <span onClick={() => selectSaved(p)}>
+              {getFolderName(p)}
+            </span>
+            <button
+              onClick={() => deleteFolder(p)}
+              style={{ marginLeft: "10px" }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          padding: "24px",
+          boxSizing: "border-box"
+        }}
+      >
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          style={{
+            width: "42px",
+            height: "42px",
+            fontSize: "24px",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            marginBottom: "10px"
+          }}
+        >
+          ≡
+        </button>
+
         <h1 style={{ marginTop: 0, marginBottom: "8px" }}>
           Localization Helper
         </h1>
@@ -204,6 +276,7 @@ const App = () => {
           }}
         >
           <button onClick={handleBrowse}>Browse folder…</button>
+
           <button
             onClick={handleSave}
             disabled={!validation.valid}
