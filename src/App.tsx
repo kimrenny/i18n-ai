@@ -1,7 +1,11 @@
 import React, { useState } from 'react'
 import type { JsonFileInfo } from './types/electron'
-import type { FileParseResult } from './types/localization'
+import type {
+  FileParseResult,
+  LocalizationComparisonResult,
+} from './types/localization'
 import { parseLocalizationData } from './services/localizationParser'
+import { compareLocalizationFiles } from './services/localizationComparator'
 import './App.css'
 
 export const App: React.FC = () => {
@@ -9,6 +13,8 @@ export const App: React.FC = () => {
   const [jsonFiles, setJsonFiles] = useState<JsonFileInfo[]>([])
   const [checkedPaths, setCheckedPaths] = useState<Set<string>>(new Set())
   const [parseResults, setParseResults] = useState<FileParseResult[] | null>(null)
+  const [comparisonResult, setComparisonResult] =
+    useState<LocalizationComparisonResult | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [noSelectionWarning, setNoSelectionWarning] = useState<string | null>(null)
   const [isParsing, setIsParsing] = useState(false)
@@ -25,6 +31,7 @@ export const App: React.FC = () => {
         setSelectedDirectory(directory)
         setErrorMessage(null)
         setParseResults(null)
+        setComparisonResult(null)
         setNoSelectionWarning(null)
 
         if (window.electronAPI.getJsonFiles) {
@@ -74,6 +81,7 @@ export const App: React.FC = () => {
     }
 
     setNoSelectionWarning(null)
+    setComparisonResult(null)
     setIsParsing(true)
 
     const filesToParse = jsonFiles.filter((f) => checkedPaths.has(f.path))
@@ -101,6 +109,24 @@ export const App: React.FC = () => {
 
     setParseResults(results)
     setIsParsing(false)
+  }
+
+  const successfulParsedFiles = parseResults
+    ? parseResults
+        .filter((r): r is FileParseResult & { data: NonNullable<FileParseResult['data']> } =>
+          r.success && !!r.data
+        )
+        .map((r) => r.data)
+    : []
+
+  const canCompare = successfulParsedFiles.length >= 2
+
+  const handleCompareFiles = () => {
+    if (!canCompare) {
+      return
+    }
+    const result = compareLocalizationFiles(successfulParsedFiles)
+    setComparisonResult(result)
   }
 
   return (
@@ -210,6 +236,71 @@ export const App: React.FC = () => {
                     <span className="status-badge error-badge">✕ Invalid JSON</span>
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+
+          <div className="action-row comparison-action-row">
+            <button
+              type="button"
+              className="compare-button"
+              onClick={handleCompareFiles}
+              disabled={!canCompare}
+            >
+              Compare Selected Files
+            </button>
+            {!canCompare && parseResults.length > 0 && (
+              <span className="compare-hint">
+                At least 2 successfully parsed files required to compare
+              </span>
+            )}
+          </div>
+        </section>
+      )}
+
+      {comparisonResult && (
+        <section className="comparison-section" aria-label="Comparison Results">
+          <h2 className="comparison-title">Comparison</h2>
+          <div className="comparison-summary">
+            <div className="summary-item">
+              <span className="summary-label">Files compared:</span>
+              <span className="summary-value">{comparisonResult.comparedFileCount}</span>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Unique keys:</span>
+              <span className="summary-value">{comparisonResult.totalUniqueKeys}</span>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Complete keys:</span>
+              <span className="summary-value summary-complete">
+                {comparisonResult.completeKeysCount}
+              </span>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Keys with missing translations:</span>
+              <span className="summary-value summary-missing">
+                {comparisonResult.incompleteKeysCount}
+              </span>
+            </div>
+          </div>
+
+          <div className="comparison-keys-list" data-testid="comparison-keys-list">
+            {comparisonResult.keys.map((item) => (
+              <div
+                key={item.key}
+                className="comparison-key-card"
+                data-testid={`comparison-key-${item.key}`}
+              >
+                <div className="key-header">
+                  <span className="key-name">{item.key}</span>
+                  {item.isComplete ? (
+                    <span className="status-badge success-badge">Complete</span>
+                  ) : (
+                    <span className="status-badge missing-badge">
+                      Missing: {item.missingInFiles.join(', ')}
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
           </div>

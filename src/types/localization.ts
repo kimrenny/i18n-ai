@@ -19,3 +19,20 @@ export interface FileParseResult {
   data?: ParsedLocalizationFile
   error?: string
 }
+
+export interface KeyComparisonEntry {
+  key: string
+  isComplete: boolean
+  presentInFiles: string[]
+  missingInFiles: string[]
+  values: Record<string, JsonValue>
+}
+
+export interface LocalizationComparisonResult {
+  comparedFileCount: number
+  comparedFiles: { filename: string; path: string }[]
+  totalUniqueKeys: number
+  completeKeysCount: number
+  incompleteKeysCount: number
+  keys: KeyComparisonEntry[]
+}

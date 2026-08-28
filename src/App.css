@@ -1,5 +1,5 @@
 .app-container {
-  max-width: 640px;
+  max-width: 680px;
   margin: 0 auto;
   padding: 2.5rem;
   text-align: center;
@@ -154,7 +154,8 @@
 .action-row {
   margin-top: 1.25rem;
   display: flex;
-  justify-content: flex-start;
+  align-items: center;
+  gap: 1rem;
 }
 
 .parse-button {
@@ -180,6 +181,44 @@
 .parse-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.comparison-action-row {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.compare-button {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.compare-button:hover:not(:disabled) {
+  background: #059669;
+}
+
+.compare-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.compare-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #475569;
+}
+
+.compare-hint {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-style: italic;
 }
 
 .warning-message {
@@ -273,6 +312,11 @@
   background: rgba(52, 211, 153, 0.15);
 }
 
+.missing-badge {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+}
+
 .error-badge {
   color: #f87171;
   background: rgba(248, 113, 113, 0.15);
@@ -281,6 +325,87 @@
 .key-count {
   color: #94a3b8;
   font-size: 0.8rem;
+}
+
+.comparison-section {
+  margin: 1.5rem 0;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.comparison-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 1rem;
+}
+
+.comparison-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem 1.5rem;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.summary-label {
+  color: #94a3b8;
+}
+
+.summary-value {
+  font-weight: 600;
+  color: #f1f5f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.summary-complete {
+  color: #34d399;
+}
+
+.summary-missing {
+  color: #fbbf24;
+}
+
+.comparison-keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.comparison-key-card {
+  padding: 0.65rem 0.9rem;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+
+.key-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.key-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  word-break: break-all;
 }
 
 .status-box {

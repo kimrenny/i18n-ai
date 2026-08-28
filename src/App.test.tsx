@@ -25,6 +25,7 @@ describe('App', () => {
     expect(screen.getByText(/no folder selected/i)).toBeInTheDocument()
     expect(screen.queryByText(/json files:/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/parse results:/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/comparison/i)).not.toBeInTheDocument()
   })
 
   it('displays discovered JSON files with checkboxes and parse button', async () => {
@@ -59,7 +60,7 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
-  it('parses checked files and displays parse results including key count', async () => {
+  it('parses checked files, displays results, and enables comparison for >=2 files', async () => {
     const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
     const mockGetJsonFiles = vi.fn().mockResolvedValue([
       { name: 'en.json', path: 'C:/Projects/locales/en.json' },
@@ -111,21 +112,24 @@ describe('App', () => {
       expect(screen.getByText(/parse results:/i)).toBeInTheDocument()
     })
 
-    expect(mockReadJsonFile).toHaveBeenCalledWith('C:/Projects/locales/en.json')
-    expect(mockReadJsonFile).toHaveBeenCalledWith('C:/Projects/locales/ru.json')
+    const compareButton = screen.getByRole('button', { name: /compare selected files/i })
+    expect(compareButton).toBeEnabled()
 
-    const enResult = screen.getByTestId('parse-result-en.json')
-    expect(enResult).toHaveTextContent('en.json')
-    expect(enResult).toHaveTextContent('✓ Parsed')
-    expect(enResult).toHaveTextContent('2 keys')
+    // Trigger comparison
+    fireEvent.click(compareButton)
 
-    const ruResult = screen.getByTestId('parse-result-ru.json')
-    expect(ruResult).toHaveTextContent('ru.json')
-    expect(ruResult).toHaveTextContent('✓ Parsed')
-    expect(ruResult).toHaveTextContent('1 keys')
+    expect(screen.getByRole('heading', { level: 2, name: /^comparison$/i })).toBeInTheDocument()
+    expect(screen.getByText(/files compared:/i)).toBeInTheDocument()
+    expect(screen.getByText(/unique keys:/i)).toBeInTheDocument()
+
+    const titleKey = screen.getByTestId('comparison-key-ADMIN.PANEL.TITLE')
+    expect(titleKey).toHaveTextContent('Complete')
+
+    const buttonSaveKey = screen.getByTestId('comparison-key-ADMIN.PANEL.BUTTON.SAVE')
+    expect(buttonSaveKey).toHaveTextContent('Missing: ru.json')
   })
 
-  it('handles invalid JSON files gracefully alongside valid files', async () => {
+  it('keeps compare button disabled when only 1 file is successfully parsed', async () => {
     const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
     const mockGetJsonFiles = vi.fn().mockResolvedValue([
       { name: 'en.json', path: 'C:/Projects/locales/en.json' },
@@ -135,10 +139,7 @@ describe('App', () => {
       if (filePath.endsWith('en.json')) {
         return { HELLO: 'Hello' }
       }
-      if (filePath.endsWith('invalid.json')) {
-        throw new Error('SyntaxError: Unexpected token in JSON')
-      }
-      throw new Error('Unknown file')
+      throw new Error('SyntaxError: Unexpected token')
     })
 
     window.electronAPI = {
@@ -163,18 +164,29 @@ describe('App', () => {
       expect(screen.getByTestId('parse-result-en.json')).toHaveTextContent('✓ Parsed')
     })
 
-    const invalidResult = screen.getByTestId('parse-result-invalid.json')
-    expect(invalidResult).toHaveTextContent('invalid.json')
-    expect(invalidResult).toHaveTextContent('✕ Invalid JSON')
+    const compareButton = screen.getByRole('button', { name: /compare selected files/i })
+    expect(compareButton).toBeDisabled()
+    expect(
+      screen.getByText(/at least 2 successfully parsed files required to compare/i)
+    ).toBeInTheDocument()
   })
 
-  it('only parses checked files and ignores unchecked files', async () => {
+  it('excludes invalid files from comparison when >=2 other files succeed', async () => {
     const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
     const mockGetJsonFiles = vi.fn().mockResolvedValue([
       { name: 'en.json', path: 'C:/Projects/locales/en.json' },
       { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+      { name: 'invalid.json', path: 'C:/Projects/locales/invalid.json' },
     ])
-    const mockReadJsonFile = vi.fn().mockResolvedValue({ KEY: 'Value' })
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return { A: '1' }
+      }
+      if (filePath.endsWith('ru.json')) {
+        return { A: '1' }
+      }
+      throw new Error('SyntaxError')
+    })
 
     window.electronAPI = {
       isElectron: true,
@@ -192,20 +204,18 @@ describe('App', () => {
       expect(screen.getByText('en.json')).toBeInTheDocument()
     })
 
-    // Uncheck ru.json
-    const ruCheckbox = screen.getByRole('checkbox', { name: /select ru\.json/i })
-    fireEvent.click(ruCheckbox)
-    expect(ruCheckbox).not.toBeChecked()
-
     fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
 
     await waitFor(() => {
-      expect(screen.getByTestId('parse-result-en.json')).toBeInTheDocument()
+      expect(screen.getByTestId('parse-result-invalid.json')).toHaveTextContent('✕ Invalid JSON')
     })
 
-    expect(mockReadJsonFile).toHaveBeenCalledTimes(1)
-    expect(mockReadJsonFile).toHaveBeenCalledWith('C:/Projects/locales/en.json')
-    expect(screen.queryByTestId('parse-result-ru.json')).not.toBeInTheDocument()
+    const compareButton = screen.getByRole('button', { name: /compare selected files/i })
+    expect(compareButton).toBeEnabled()
+
+    fireEvent.click(compareButton)
+
+    expect(screen.getByTestId('comparison-key-A')).toHaveTextContent('Complete')
   })
 
   it('shows a warning message and does not parse if no files are checked', async () => {
