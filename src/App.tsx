@@ -6,6 +6,7 @@ import type {
 } from './types/localization'
 import { parseLocalizationData } from './services/localizationParser'
 import { compareLocalizationFiles } from './services/localizationComparator'
+import { LocalizationDiffViewer } from './components/localization/LocalizationDiffViewer'
 import './App.css'
 
 export const App: React.FC = () => {
@@ -259,52 +260,10 @@ export const App: React.FC = () => {
       )}
 
       {comparisonResult && (
-        <section className="comparison-section" aria-label="Comparison Results">
-          <h2 className="comparison-title">Comparison</h2>
-          <div className="comparison-summary">
-            <div className="summary-item">
-              <span className="summary-label">Files compared:</span>
-              <span className="summary-value">{comparisonResult.comparedFileCount}</span>
-            </div>
-            <div className="summary-item">
-              <span className="summary-label">Unique keys:</span>
-              <span className="summary-value">{comparisonResult.totalUniqueKeys}</span>
-            </div>
-            <div className="summary-item">
-              <span className="summary-label">Complete keys:</span>
-              <span className="summary-value summary-complete">
-                {comparisonResult.completeKeysCount}
-              </span>
-            </div>
-            <div className="summary-item">
-              <span className="summary-label">Keys with missing translations:</span>
-              <span className="summary-value summary-missing">
-                {comparisonResult.incompleteKeysCount}
-              </span>
-            </div>
-          </div>
-
-          <div className="comparison-keys-list" data-testid="comparison-keys-list">
-            {comparisonResult.keys.map((item) => (
-              <div
-                key={item.key}
-                className="comparison-key-card"
-                data-testid={`comparison-key-${item.key}`}
-              >
-                <div className="key-header">
-                  <span className="key-name">{item.key}</span>
-                  {item.isComplete ? (
-                    <span className="status-badge success-badge">Complete</span>
-                  ) : (
-                    <span className="status-badge missing-badge">
-                      Missing: {item.missingInFiles.join(', ')}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <LocalizationDiffViewer
+          comparisonResult={comparisonResult}
+          parsedFiles={successfulParsedFiles}
+        />
       )}
 
       <div className="status-box">

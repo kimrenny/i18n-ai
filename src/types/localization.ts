@@ -36,3 +36,27 @@ export interface LocalizationComparisonResult {
   incompleteKeysCount: number
   keys: KeyComparisonEntry[]
 }
+
+export type TreeNodeType = 'folder' | 'leaf' | 'conflict'
+
+export interface LocalizationTreeNode {
+  id: string
+  segment: string
+  fullKey: string
+  type: TreeNodeType
+  children: LocalizationTreeNode[]
+  isPresent: boolean
+  isMissing: boolean
+  isConflict: boolean
+  value?: JsonValue
+  missingInFiles: string[]
+  presentInFiles: string[]
+}
+
+export interface FileTreeData {
+  filename: string
+  totalKeys: number
+  presentKeysCount: number
+  missingKeysCount: number
+  rootNodes: LocalizationTreeNode[]
+}
