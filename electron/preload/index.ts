@@ -1,0 +1,24 @@
+import { contextBridge, ipcRenderer } from 'electron'
+
+export interface JsonFileInfo {
+  name: string
+  path: string
+}
+
+console.log('[preload] Initializing Electron preload bridge...')
+
+// Custom APIs for renderer
+export const electronAPI = {
+  isElectron: true,
+  platform: process.platform,
+  selectDirectory: (): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:selectDirectory'),
+  getJsonFiles: (directoryPath: string): Promise<JsonFileInfo[]> =>
+    ipcRenderer.invoke('fs:getJsonFiles', directoryPath),
+  readJsonFile: (filePath: string): Promise<unknown> =>
+    ipcRenderer.invoke('fs:readJsonFile', filePath),
+}
+
+contextBridge.exposeInMainWorld('electronAPI', electronAPI)
+
+console.log('[preload] Electron preload bridge exposed successfully on window.electronAPI')
