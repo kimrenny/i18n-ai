@@ -9,6 +9,7 @@ export interface ElectronAPI {
   selectDirectory: () => Promise<string | null>
   getJsonFiles: (directoryPath: string) => Promise<JsonFileInfo[]>
   readJsonFile: (filePath: string) => Promise<unknown>
+  writeJsonFiles: (files: { path: string; content: string }[]) => Promise<{ success: boolean }>
 }
 
 declare global {

@@ -1,46 +1,28 @@
-import React, { useState } from 'react'
+import React from 'react'
 import type { LocalizationTreeNode as TreeNodeType } from '../../types/localization'
 import { LocalizationTreeNode } from './LocalizationTreeNode'
 
 interface LocalizationTreeProps {
   rootNodes: TreeNodeType[]
+  collapsedSet: Set<string>
+  activeMissingKey: string | null
+  treeBodyRef: React.RefObject<HTMLDivElement | null>
+  onToggleCollapse: (id: string) => void
+  onExpandAll: () => void
+  onCollapseAll: () => void
+  onSelectRow: (fullKey: string, isMissing: boolean) => void
 }
 
-function collectFolderIds(nodes: TreeNodeType[]): string[] {
-  const ids: string[] = []
-  for (const node of nodes) {
-    if (node.type === 'folder' || node.children.length > 0) {
-      ids.push(node.id)
-      ids.push(...collectFolderIds(node.children))
-    }
-  }
-  return ids
-}
-
-export const LocalizationTree: React.FC<LocalizationTreeProps> = ({ rootNodes }) => {
-  const [collapsedSet, setCollapsedSet] = useState<Set<string>>(new Set())
-
-  const handleToggleCollapse = (id: string) => {
-    setCollapsedSet((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }
-
-  const handleExpandAll = () => {
-    setCollapsedSet(new Set())
-  }
-
-  const handleCollapseAll = () => {
-    const allFolderIds = collectFolderIds(rootNodes)
-    setCollapsedSet(new Set(allFolderIds))
-  }
-
+export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
+  rootNodes,
+  collapsedSet,
+  activeMissingKey,
+  treeBodyRef,
+  onToggleCollapse,
+  onExpandAll,
+  onCollapseAll,
+  onSelectRow,
+}) => {
   return (
     <div className="tree-container" aria-label="Localization Tree">
       <div className="tree-toolbar">
@@ -49,7 +31,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({ rootNodes })
           <button
             type="button"
             className="tree-tool-btn"
-            onClick={handleExpandAll}
+            onClick={onExpandAll}
             title="Expand all nodes"
           >
             Expand All
@@ -57,7 +39,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({ rootNodes })
           <button
             type="button"
             className="tree-tool-btn"
-            onClick={handleCollapseAll}
+            onClick={onCollapseAll}
             title="Collapse all nodes"
           >
             Collapse All
@@ -65,7 +47,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({ rootNodes })
         </div>
       </div>
 
-      <div className="tree-body">
+      <div className="tree-body" ref={treeBodyRef}>
         {rootNodes.length > 0 ? (
           rootNodes.map((node) => (
             <LocalizationTreeNode
@@ -73,7 +55,9 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({ rootNodes })
               node={node}
               depth={0}
               collapsedSet={collapsedSet}
-              onToggleCollapse={handleToggleCollapse}
+              activeMissingKey={activeMissingKey}
+              onToggleCollapse={onToggleCollapse}
+              onSelectRow={onSelectRow}
             />
           ))
         ) : (

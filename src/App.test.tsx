@@ -6,6 +6,8 @@ describe('App', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     delete (window as unknown as { electronAPI?: unknown }).electronAPI
+    Element.prototype.scrollIntoView = vi.fn()
+    HTMLElement.prototype.scrollTo = vi.fn()
   })
 
   afterEach(() => {
@@ -41,6 +43,7 @@ describe('App', () => {
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: vi.fn(),
+      writeJsonFiles: vi.fn(),
     }
 
     render(<App />)
@@ -60,7 +63,7 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
-  it('parses files, compares them, and renders the diff viewer with tabs and tree', async () => {
+  it('parses files, compares them, and enables navigation between missing keys', async () => {
     const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
     const mockGetJsonFiles = vi.fn().mockResolvedValue([
       { name: 'en.json', path: 'C:/Projects/locales/en.json' },
@@ -72,8 +75,11 @@ describe('App', () => {
           ADMIN: {
             PANEL: {
               TITLE: 'Admin panel',
-              BUTTON: { SAVE: 'Save' },
+              BUTTON: { SAVE: 'Save', CANCEL: 'Cancel' },
             },
+          },
+          AUTH: {
+            LOGOUT: 'Logout',
           },
         }
       }
@@ -95,6 +101,7 @@ describe('App', () => {
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
+      writeJsonFiles: vi.fn(),
     }
 
     render(<App />)
@@ -105,58 +112,105 @@ describe('App', () => {
       expect(screen.getByText('en.json')).toBeInTheDocument()
     })
 
-    const parseButton = screen.getByRole('button', { name: /parse json files/i })
-    fireEvent.click(parseButton)
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/parse results:/i)).toBeInTheDocument()
     })
 
-    const compareButton = screen.getByRole('button', { name: /compare selected files/i })
-    expect(compareButton).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
 
-    // Trigger comparison
-    fireEvent.click(compareButton)
-
-    // Verify Diff Viewer section is displayed
-    expect(screen.getByLabelText(/localization diff viewer/i)).toBeInTheDocument()
-    expect(screen.getByText(/files compared:/i)).toBeInTheDocument()
-    expect(screen.getByText(/unique keys:/i)).toBeInTheDocument()
-
-    // Default active tab is en.json
-    const enTab = screen.getByRole('tab', { name: /en\.json/i })
+    // Switch tab to ru.json (which has 3 missing keys: ADMIN.PANEL.BUTTON.CANCEL, ADMIN.PANEL.BUTTON.SAVE, AUTH.LOGOUT)
     const ruTab = screen.getByRole('tab', { name: /ru\.json/i })
-    expect(enTab).toHaveAttribute('aria-selected', 'true')
-    expect(ruTab).toHaveAttribute('aria-selected', 'false')
-
-    // In en.json, both keys are present
-    expect(screen.getByText('"Admin panel"')).toBeInTheDocument()
-    expect(screen.getByText('"Save"')).toBeInTheDocument()
-
-    // Switch tab to ru.json
     fireEvent.click(ruTab)
-    expect(ruTab).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('"Панель администратора"')).toBeInTheDocument()
 
-    // In ru.json, ADMIN.PANEL.BUTTON.SAVE is missing
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('3 missing translations in this file')
+
+    const prevBtn = screen.getByRole('button', { name: /previous missing key/i })
+    const nextBtn = screen.getByRole('button', { name: /next missing key/i })
+    const topBtn = screen.getByRole('button', { name: /scroll to top/i })
+
+    expect(prevBtn).toBeDisabled()
+    expect(nextBtn).toBeEnabled()
+
+    // Click Next -> moves to 1st missing key (ADMIN.PANEL.BUTTON.CANCEL)
+    fireEvent.click(nextBtn)
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Missing translation 1 of 3')
+    expect(prevBtn).toBeDisabled()
+    expect(nextBtn).toBeEnabled()
+
+    const cancelNode = screen.getByTestId('tree-node-ADMIN.PANEL.BUTTON.CANCEL')
+    expect(cancelNode).toHaveClass('row-active-missing')
+
+    // Click Next -> moves to 2nd missing key (ADMIN.PANEL.BUTTON.SAVE)
+    fireEvent.click(nextBtn)
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Missing translation 2 of 3')
+    expect(prevBtn).toBeEnabled()
+    expect(nextBtn).toBeEnabled()
+
     const saveNode = screen.getByTestId('tree-node-ADMIN.PANEL.BUTTON.SAVE')
-    expect(saveNode).toHaveTextContent('[ MISSING ]')
+    expect(saveNode).toHaveClass('row-active-missing')
 
-    // Check active tab summary stats
-    expect(screen.getByText('1 missing')).toBeInTheDocument()
+    // Click Next -> moves to 3rd missing key (AUTH.LOGOUT)
+    fireEvent.click(nextBtn)
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Missing translation 3 of 3')
+    expect(prevBtn).toBeEnabled()
+    expect(nextBtn).toBeDisabled()
+
+    const logoutNode = screen.getByTestId('tree-node-AUTH.LOGOUT')
+    expect(logoutNode).toHaveClass('row-active-missing')
+
+    // Click Previous -> moves back to 2nd missing key
+    fireEvent.click(prevBtn)
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Missing translation 2 of 3')
+    expect(saveNode).toHaveClass('row-active-missing')
+
+    // Click Top -> clears active focus
+    fireEvent.click(topBtn)
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('3 missing translations in this file')
+    expect(saveNode).not.toHaveClass('row-active-missing')
   })
 
-  it('supports expand and collapse all in the diff viewer tree', async () => {
+  it('supports previewing and confirming addition of missing keys as empty strings', async () => {
+    let ruContent: Record<string, unknown> = {
+      ADMIN: {
+        PANEL: {
+          TITLE: 'Панель администратора',
+        },
+      },
+    }
+
     const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
     const mockGetJsonFiles = vi.fn().mockResolvedValue([
       { name: 'en.json', path: 'C:/Projects/locales/en.json' },
       { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
     ])
-    const mockReadJsonFile = vi.fn().mockResolvedValue({
-      AUTH: {
-        LOGIN: 'Login',
-      },
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return {
+          ADMIN: {
+            PANEL: {
+              TITLE: 'Admin panel',
+              BUTTON: { SAVE: 'Save' },
+            },
+          },
+        }
+      }
+      if (filePath.endsWith('ru.json')) {
+        return ruContent
+      }
+      throw new Error('File not found')
     })
+    const mockWriteJsonFiles = vi
+      .fn()
+      .mockImplementation(async (files: { path: string; content: string }[]) => {
+        for (const file of files) {
+          if (file.path.endsWith('ru.json')) {
+            ruContent = JSON.parse(file.content)
+          }
+        }
+        return { success: true }
+      })
 
     window.electronAPI = {
       isElectron: true,
@@ -164,6 +218,7 @@ describe('App', () => {
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
+      writeJsonFiles: mockWriteJsonFiles,
     }
 
     render(<App />)
@@ -176,59 +231,54 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
 
-    expect(screen.getByText('"Login"')).toBeInTheDocument()
+    // Add Missing Keys button should be enabled
+    const addMissingBtn = screen.getByRole('button', { name: /add missing keys/i })
+    expect(addMissingBtn).toBeEnabled()
 
-    // Collapse All
-    const collapseBtn = screen.getByRole('button', { name: /collapse all/i })
-    fireEvent.click(collapseBtn)
-    expect(screen.queryByText('"Login"')).not.toBeInTheDocument()
+    // Open Preview Modal
+    fireEvent.click(addMissingBtn)
 
-    // Expand All
-    const expandBtn = screen.getByRole('button', { name: /expand all/i })
-    fireEvent.click(expandBtn)
-    expect(screen.getByText('"Login"')).toBeInTheDocument()
-  })
+    expect(screen.getByRole('dialog', { name: /add missing keys preview/i })).toBeInTheDocument()
+    expect(screen.getByText('ADMIN.PANEL.BUTTON.SAVE')).toBeInTheDocument()
 
-  it('keeps compare button disabled when only 1 file is successfully parsed', async () => {
-    const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
-    const mockGetJsonFiles = vi.fn().mockResolvedValue([
-      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
-      { name: 'invalid.json', path: 'C:/Projects/locales/invalid.json' },
-    ])
-    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
-      if (filePath.endsWith('en.json')) {
-        return { HELLO: 'Hello' }
-      }
-      throw new Error('SyntaxError: Unexpected token')
-    })
+    // Test Cancel
+    const cancelBtn = screen.getByRole('button', { name: /cancel/i })
+    fireEvent.click(cancelBtn)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mockWriteJsonFiles).not.toHaveBeenCalled()
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
-      selectDirectory: mockSelectDirectory,
-      getJsonFiles: mockGetJsonFiles,
-      readJsonFile: mockReadJsonFile,
-    }
-
-    render(<App />)
-
-    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    // Open Modal again and Confirm
+    fireEvent.click(screen.getByRole('button', { name: /add missing keys/i }))
+    const confirmBtn = screen.getByRole('button', { name: /confirm & write to disk/i })
+    fireEvent.click(confirmBtn)
 
     await waitFor(() => {
-      expect(screen.getByText('en.json')).toBeInTheDocument()
+      expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+        {
+          path: 'C:/Projects/locales/ru.json',
+          content: JSON.stringify(
+            {
+              ADMIN: {
+                PANEL: {
+                  TITLE: 'Панель администратора',
+                  BUTTON: {
+                    SAVE: '',
+                  },
+                },
+              },
+            },
+            null,
+            2
+          ) + '\n',
+        },
+      ])
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-
+    // After refresh, modal should be closed and Add Missing Keys button becomes "✓ All Complete" and disabled
     await waitFor(() => {
-      expect(screen.getByTestId('parse-result-en.json')).toHaveTextContent('✓ Parsed')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /✓ all complete/i })).toBeDisabled()
     })
-
-    const compareButton = screen.getByRole('button', { name: /compare selected files/i })
-    expect(compareButton).toBeDisabled()
-    expect(
-      screen.getByText(/at least 2 successfully parsed files required to compare/i)
-    ).toBeInTheDocument()
   })
 
   it('shows an error message if Electron API is unavailable', () => {

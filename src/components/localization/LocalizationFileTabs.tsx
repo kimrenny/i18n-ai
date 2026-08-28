@@ -6,6 +6,7 @@ interface LocalizationFileTabsProps {
   activeFilename: string
   activeTreeData: FileTreeData
   onSelectFile: (filename: string) => void
+  onNavigateFirstMissing: (filename: string) => void
 }
 
 export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
@@ -13,6 +14,7 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
   activeFilename,
   activeTreeData,
   onSelectFile,
+  onNavigateFirstMissing,
 }) => {
   return (
     <div className="file-tabs-container" aria-label="Localization files tabs">
@@ -41,9 +43,15 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
           {activeTreeData.presentKeysCount} keys
         </span>
         {activeTreeData.missingKeysCount > 0 ? (
-          <span className="active-tab-badge missing-badge">
+          <button
+            type="button"
+            className="active-tab-badge missing-badge clickable-missing-badge"
+            onClick={() => onNavigateFirstMissing(activeFilename)}
+            title="Click to navigate to first missing key"
+            aria-label={`${activeTreeData.missingKeysCount} missing keys, click to navigate`}
+          >
             {activeTreeData.missingKeysCount} missing
-          </span>
+          </button>
         ) : (
           <span className="active-tab-badge complete-badge">0 missing</span>
         )}

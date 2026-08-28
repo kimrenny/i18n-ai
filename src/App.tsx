@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import type { JsonFileInfo } from './types/electron'
 import type {
   FileParseResult,
@@ -112,10 +112,54 @@ export const App: React.FC = () => {
     setIsParsing(false)
   }
 
+  const handleRefreshFiles = useCallback(async () => {
+    if (!window.electronAPI?.readJsonFile) {
+      return
+    }
+
+    const filesToParse = jsonFiles.filter((f) => checkedPaths.has(f.path))
+    const results: FileParseResult[] = []
+
+    for (const file of filesToParse) {
+      try {
+        const rawJson = await window.electronAPI.readJsonFile(file.path)
+        const parsed = parseLocalizationData(file.name, file.path, rawJson)
+        results.push({
+          filename: file.name,
+          path: file.path,
+          success: true,
+          data: parsed,
+        })
+      } catch (err) {
+        results.push({
+          filename: file.name,
+          path: file.path,
+          success: false,
+          error: err instanceof Error ? err.message : 'Invalid JSON',
+        })
+      }
+    }
+
+    setParseResults(results)
+
+    const validFiles = results
+      .filter(
+        (r): r is FileParseResult & { data: NonNullable<FileParseResult['data']> } =>
+          r.success && !!r.data
+      )
+      .map((r) => r.data)
+
+    if (validFiles.length >= 2) {
+      const newComparison = compareLocalizationFiles(validFiles)
+      setComparisonResult(newComparison)
+    }
+  }, [jsonFiles, checkedPaths])
+
   const successfulParsedFiles = parseResults
     ? parseResults
-        .filter((r): r is FileParseResult & { data: NonNullable<FileParseResult['data']> } =>
-          r.success && !!r.data
+        .filter(
+          (r): r is FileParseResult & { data: NonNullable<FileParseResult['data']> } =>
+            r.success && !!r.data
         )
         .map((r) => r.data)
     : []
@@ -263,6 +307,7 @@ export const App: React.FC = () => {
         <LocalizationDiffViewer
           comparisonResult={comparisonResult}
           parsedFiles={successfulParsedFiles}
+          onRefreshFiles={handleRefreshFiles}
         />
       )}
 

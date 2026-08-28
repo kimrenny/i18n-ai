@@ -113,6 +113,49 @@ app.whenReady().then(() => {
     return JSON.parse(content)
   })
 
+  ipcMain.handle(
+    'fs:writeJsonFiles',
+    async (_, files: { path: string; content: string }[]) => {
+      console.log('[main] fs:writeJsonFiles invoked for', files?.length, 'files')
+      if (!Array.isArray(files) || files.length === 0) {
+        throw new Error('No files provided for writing')
+      }
+
+      // Perform atomic writes: write to temporary files first, then rename
+      const tempFiles: { tempPath: string; finalPath: string }[] = []
+      try {
+        for (const file of files) {
+          if (!file.path || typeof file.path !== 'string') {
+            throw new Error('Invalid file path')
+          }
+          if (typeof file.content !== 'string') {
+            throw new Error(`Invalid file content for ${file.path}`)
+          }
+          const tempPath = `${file.path}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 8)}`
+          await fs.writeFile(tempPath, file.content, 'utf-8')
+          tempFiles.push({ tempPath, finalPath: file.path })
+        }
+
+        // Rename all temp files to target paths
+        for (const { tempPath, finalPath } of tempFiles) {
+          await fs.rename(tempPath, finalPath)
+        }
+
+        return { success: true }
+      } catch (err) {
+        // Clean up any remaining temp files
+        for (const { tempPath } of tempFiles) {
+          try {
+            await fs.unlink(tempPath)
+          } catch {
+            // ignore cleanup error
+          }
+        }
+        throw err
+      }
+    }
+  )
+
   createWindow()
 
   app.on('activate', () => {

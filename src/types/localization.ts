@@ -60,3 +60,24 @@ export interface FileTreeData {
   missingKeysCount: number
   rootNodes: LocalizationTreeNode[]
 }
+
+export interface KeyAdditionPlan {
+  key: string
+  value: string
+}
+
+export interface FileModificationPlan {
+  filename: string
+  path: string
+  keysToAdd: KeyAdditionPlan[]
+  conflicts: string[]
+  newRawJson: JsonValue
+  formattedJson: string
+}
+
+export interface MissingKeysAdditionPlan {
+  filesToModify: FileModificationPlan[]
+  totalKeysToAdd: number
+  hasConflicts: boolean
+  conflictMessages: string[]
+}
