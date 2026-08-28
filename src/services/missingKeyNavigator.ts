@@ -17,6 +17,22 @@ export function getMissingKeysForFile(
 }
 
 /**
+ * Returns the list of empty keys (value === "") for a given file in deterministic alphabetical order.
+ */
+export function getEmptyKeysForFile(
+  filename: string,
+  comparisonResult: LocalizationComparisonResult
+): string[] {
+  if (!comparisonResult || !comparisonResult.keys) {
+    return []
+  }
+
+  return comparisonResult.keys
+    .filter((entry) => entry.emptyInFiles.includes(filename))
+    .map((entry) => entry.key)
+}
+
+/**
  * Returns all ancestor key paths for a full dot-notated localization key.
  * Example: 'ADMIN.PANEL.BUTTON.SAVE' -> ['ADMIN', 'ADMIN.PANEL', 'ADMIN.PANEL.BUTTON']
  */

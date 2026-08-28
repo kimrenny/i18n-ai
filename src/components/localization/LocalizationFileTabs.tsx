@@ -1,12 +1,13 @@
 import React from 'react'
 import type { FileTreeData } from '../../types/localization'
+import type { ProblemNavMode } from './MissingKeyNavigator'
 
 interface LocalizationFileTabsProps {
   files: { filename: string; path: string }[]
   activeFilename: string
   activeTreeData: FileTreeData
   onSelectFile: (filename: string) => void
-  onNavigateFirstMissing: (filename: string) => void
+  onNavigateProblem: (filename: string, mode: ProblemNavMode) => void
 }
 
 export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
@@ -14,7 +15,7 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
   activeFilename,
   activeTreeData,
   onSelectFile,
-  onNavigateFirstMissing,
+  onNavigateProblem,
 }) => {
   return (
     <div className="file-tabs-container" aria-label="Localization files tabs">
@@ -42,11 +43,12 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
         <span className="active-tab-badge present-badge">
           {activeTreeData.presentKeysCount} keys
         </span>
+
         {activeTreeData.missingKeysCount > 0 ? (
           <button
             type="button"
             className="active-tab-badge missing-badge clickable-missing-badge"
-            onClick={() => onNavigateFirstMissing(activeFilename)}
+            onClick={() => onNavigateProblem(activeFilename, 'missing')}
             title="Click to navigate to first missing key"
             aria-label={`${activeTreeData.missingKeysCount} missing keys, click to navigate`}
           >
@@ -54,6 +56,20 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
           </button>
         ) : (
           <span className="active-tab-badge complete-badge">0 missing</span>
+        )}
+
+        {activeTreeData.emptyKeysCount > 0 ? (
+          <button
+            type="button"
+            className="active-tab-badge empty-tab-badge clickable-empty-badge"
+            onClick={() => onNavigateProblem(activeFilename, 'empty')}
+            title="Click to navigate to first empty translation"
+            aria-label={`${activeTreeData.emptyKeysCount} empty keys, click to navigate`}
+          >
+            {activeTreeData.emptyKeysCount} empty
+          </button>
+        ) : (
+          <span className="active-tab-badge complete-badge">0 empty</span>
         )}
       </div>
     </div>

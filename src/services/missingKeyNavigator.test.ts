@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { getMissingKeysForFile, getParentPaths } from './missingKeyNavigator'
+import {
+  getMissingKeysForFile,
+  getEmptyKeysForFile,
+  getParentPaths,
+} from './missingKeyNavigator'
 import { compareLocalizationFiles } from './localizationComparator'
 import type { ParsedLocalizationFile } from '../types/localization'
 
@@ -55,6 +59,35 @@ describe('missingKeyNavigator service', () => {
       expect(getMissingKeysForFile('en.json', comp)).toEqual(['D'])
       expect(getMissingKeysForFile('ru.json', comp)).toEqual(['C', 'D'])
       expect(getMissingKeysForFile('uk.json', comp)).toEqual(['B'])
+    })
+  })
+
+  describe('getEmptyKeysForFile', () => {
+    it('returns only keys whose value is strictly "" in deterministic alphabetical order', () => {
+      const en = createFile('en.json', {
+        'AUTH.LOGIN': 'Login',
+        'MENU.PLAY': 'Play',
+        'MENU.EXIT': 'Exit',
+        'AUTH.SIGNUP': 'Sign Up',
+      })
+      const ru = createFile('ru.json', {
+        'AUTH.LOGIN': '', // empty
+        'MENU.PLAY': 'Играть',
+        'MENU.EXIT': '', // empty
+        'AUTH.SIGNUP': ' ', // whitespace, not empty
+      })
+
+      const comp = compareLocalizationFiles([en, ru])
+      const emptyInRu = getEmptyKeysForFile('ru.json', comp)
+
+      expect(emptyInRu).toEqual(['AUTH.LOGIN', 'MENU.EXIT'])
+    })
+
+    it('returns empty array when file has 0 empty keys', () => {
+      const en = createFile('en.json', { A: '1', B: '2' })
+      const comp = compareLocalizationFiles([en])
+
+      expect(getEmptyKeysForFile('en.json', comp)).toEqual([])
     })
   })
 

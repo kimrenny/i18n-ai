@@ -126,8 +126,8 @@ describe('App', () => {
 
     expect(screen.getByTestId('navigator-position')).toHaveTextContent('3 missing translations in this file')
 
-    const prevBtn = screen.getByRole('button', { name: /previous missing key/i })
-    const nextBtn = screen.getByRole('button', { name: /next missing key/i })
+    const prevBtn = screen.getByRole('button', { name: /previous key/i })
+    const nextBtn = screen.getByRole('button', { name: /next key/i })
     const topBtn = screen.getByRole('button', { name: /scroll to top/i })
 
     expect(prevBtn).toBeDisabled()
@@ -274,10 +274,127 @@ describe('App', () => {
       ])
     })
 
-    // After refresh, modal should be closed and Add Missing Keys button becomes "✓ All Complete" and disabled
+    // After refresh, modal should be closed and Add Missing Keys button becomes "✓ All Keys Present"
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /✓ all complete/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /✓ all keys present/i })).toBeDisabled()
+    })
+  })
+
+  it('displays [ EMPTY ] badge for empty translations and enables inline manual editing', async () => {
+    let ruContent: Record<string, unknown> = {
+      MENU: {
+        PLAY: '', // empty
+        EXIT: 'Выход',
+      },
+    }
+
+    const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+    const mockGetJsonFiles = vi.fn().mockResolvedValue([
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+    ])
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return {
+          MENU: {
+            PLAY: 'Play',
+            EXIT: 'Exit',
+          },
+        }
+      }
+      if (filePath.endsWith('ru.json')) {
+        return ruContent
+      }
+      throw new Error('File not found')
+    })
+    const mockWriteJsonFiles = vi
+      .fn()
+      .mockImplementation(async (files: { path: string; content: string }[]) => {
+        for (const file of files) {
+          if (file.path.endsWith('ru.json')) {
+            ruContent = JSON.parse(file.content)
+          }
+        }
+        return { success: true }
+      })
+
+    window.electronAPI = {
+      isElectron: true,
+      platform: 'win32',
+      selectDirectory: mockSelectDirectory,
+      getJsonFiles: mockGetJsonFiles,
+      readJsonFile: mockReadJsonFile,
+      writeJsonFiles: mockWriteJsonFiles,
+    }
+
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
+
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+
+    // Switch to ru.json
+    const ruTab = screen.getByRole('tab', { name: /ru\.json/i })
+    fireEvent.click(ruTab)
+
+    // Check [ EMPTY ] badge is present for MENU.PLAY
+    const playNode = screen.getByTestId('tree-node-MENU.PLAY')
+    expect(playNode).toHaveTextContent('[ EMPTY ]')
+
+    // Click the empty badge in the file tabs to navigate to it
+    const emptyTabBadge = screen.getByRole('button', {
+      name: /1 empty keys, click to navigate/i,
+    })
+    fireEvent.click(emptyTabBadge)
+
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Empty translation 1 of 1')
+
+    // Click the row to start editing
+    fireEvent.click(playNode)
+
+    const input = screen.getByRole('textbox', { name: /edit menu\.play/i })
+    expect(input).toBeInTheDocument()
+    expect(input).toHaveValue('')
+
+    // Test Cancel
+    fireEvent.change(input, { target: { value: 'Something' } })
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(mockWriteJsonFiles).not.toHaveBeenCalled()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+
+    // Click row again, enter translation and Save
+    fireEvent.click(screen.getByTestId('tree-node-MENU.PLAY'))
+    const editInput = screen.getByRole('textbox', { name: /edit menu\.play/i })
+    fireEvent.change(editInput, { target: { value: 'Играть' } })
+    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+
+    await waitFor(() => {
+      expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+        {
+          path: 'C:/Projects/locales/ru.json',
+          content: JSON.stringify(
+            {
+              MENU: {
+                PLAY: 'Играть',
+                EXIT: 'Выход',
+              },
+            },
+            null,
+            2
+          ) + '\n',
+        },
+      ])
+    })
+
+    // After refresh, [ EMPTY ] badge should disappear and value should be displayed
+    await waitFor(() => {
+      expect(screen.getByTestId('tree-node-MENU.PLAY')).toHaveTextContent('"Играть"')
+      expect(screen.getByTestId('tree-node-MENU.PLAY')).not.toHaveTextContent('[ EMPTY ]')
     })
   })
 

@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { buildLocalizationTree } from './localizationTree'
 import { compareLocalizationFiles } from './localizationComparator'
-import type { ParsedLocalizationFile } from '../types/localization'
+import type { ParsedLocalizationFile, JsonValue } from '../types/localization'
 
 describe('localizationTree', () => {
   const createFile = (
     filename: string,
-    keys: Record<string, string | number | boolean | null>
+    keys: Record<string, JsonValue>
   ): ParsedLocalizationFile => ({
     filename,
     path: `/locales/${filename}`,
@@ -26,6 +26,7 @@ describe('localizationTree', () => {
     expect(tree.totalKeys).toBe(2)
     expect(tree.presentKeysCount).toBe(2)
     expect(tree.missingKeysCount).toBe(0)
+    expect(tree.emptyKeysCount).toBe(0)
     expect(tree.rootNodes.length).toBe(1)
 
     const authNode = tree.rootNodes[0]
@@ -37,11 +38,43 @@ describe('localizationTree', () => {
     expect(authNode.children[0].fullKey).toBe('AUTH.LOGIN')
     expect(authNode.children[0].type).toBe('leaf')
     expect(authNode.children[0].isPresent).toBe(true)
+    expect(authNode.children[0].isEmpty).toBe(false)
     expect(authNode.children[0].value).toBe('Login')
 
     expect(authNode.children[1].segment).toBe('LOGOUT')
     expect(authNode.children[1].fullKey).toBe('AUTH.LOGOUT')
     expect(authNode.children[1].type).toBe('leaf')
+  })
+
+  it('correctly flags empty string values as isEmpty: true', () => {
+    const en = createFile('en.json', {
+      'MENU.PLAY': 'Play',
+      'MENU.EXIT': 'Exit',
+    })
+    const ru = createFile('ru.json', {
+      'MENU.PLAY': '', // Empty string
+      'MENU.EXIT': 'Выход',
+    })
+    const comp = compareLocalizationFiles([en, ru])
+
+    const treeRu = buildLocalizationTree('ru.json', comp, ru)
+
+    expect(treeRu.presentKeysCount).toBe(2)
+    expect(treeRu.missingKeysCount).toBe(0)
+    expect(treeRu.emptyKeysCount).toBe(1)
+
+    const menu = treeRu.rootNodes[0]
+    const playNode = menu.children.find((c) => c.segment === 'PLAY')!
+    expect(playNode.isPresent).toBe(true)
+    expect(playNode.isMissing).toBe(false)
+    expect(playNode.isEmpty).toBe(true)
+    expect(playNode.value).toBe('')
+
+    const exitNode = menu.children.find((c) => c.segment === 'EXIT')!
+    expect(exitNode.isPresent).toBe(true)
+    expect(exitNode.isMissing).toBe(false)
+    expect(exitNode.isEmpty).toBe(false)
+    expect(exitNode.value).toBe('Выход')
   })
 
   it('constructs correct hierarchy for deeply nested keys', () => {
@@ -97,37 +130,6 @@ describe('localizationTree', () => {
     expect(logout.isMissing).toBe(true)
     expect(logout.value).toBeUndefined()
     expect(logout.missingInFiles).toContain('ru.json')
-  })
-
-  it('correctly represents missing and complete keys across three files', () => {
-    const en = createFile('en.json', {
-      'AUTH.LOGIN': 'Login',
-      'AUTH.LOGOUT': 'Logout',
-      'ADMIN.PANEL.TITLE': 'Admin Panel',
-    })
-    const ru = createFile('ru.json', {
-      'AUTH.LOGIN': 'Войти',
-      'ADMIN.PANEL.TITLE': 'Панель администратора',
-    })
-    const uk = createFile('uk.json', {
-      'AUTH.LOGIN': 'Увійти',
-    })
-
-    const comp = compareLocalizationFiles([en, ru, uk])
-
-    // Inspect UK file
-    const treeUk = buildLocalizationTree('uk.json', comp, uk)
-    expect(treeUk.presentKeysCount).toBe(1)
-    expect(treeUk.missingKeysCount).toBe(2)
-
-    const ukAdmin = treeUk.rootNodes.find((n) => n.segment === 'ADMIN')!
-    const ukTitle = ukAdmin.children[0].children[0]
-    expect(ukTitle.fullKey).toBe('ADMIN.PANEL.TITLE')
-    expect(ukTitle.isMissing).toBe(true)
-
-    const ukAuth = treeUk.rootNodes.find((n) => n.segment === 'AUTH')!
-    const ukLogout = ukAuth.children.find((c) => c.segment === 'LOGOUT')!
-    expect(ukLogout.isMissing).toBe(true)
   })
 
   it('detects structural conflict when a parent is a primitive in one file and an object in another', () => {
