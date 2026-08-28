@@ -110,3 +110,58 @@ export function planMissingKeysAddition(
     conflictMessages: allConflictMessages,
   }
 }
+
+/**
+ * Updates a single key in a localization file's raw JSON representation.
+ *
+ * Rules:
+ * - Pure function: deeply clones input and does not mutate it.
+ * - Preserves all unrelated keys, values, and formatting.
+ * - Safely handles nested paths (e.g. 'MENU.PLAY').
+ * - Throws error if attempting to overwrite an incompatible non-object parent.
+ */
+export function updateSingleKeyInFile(
+  raw: JsonValue,
+  fullKey: string,
+  newValue: JsonValue
+): { updatedRaw: JsonValue; formattedJson: string } {
+  if (!fullKey || typeof fullKey !== 'string') {
+    throw new Error('Invalid key')
+  }
+
+  const clonedRaw: Record<string, JsonValue> =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? JSON.parse(JSON.stringify(raw))
+      : {}
+
+  const segments = fullKey.split('.')
+  let current: Record<string, JsonValue> = clonedRaw
+  let accumulated = ''
+
+  for (let i = 0; i < segments.length - 1; i++) {
+    const seg = segments[i]
+    accumulated = accumulated ? `${accumulated}.${seg}` : seg
+
+    if (!Object.prototype.hasOwnProperty.call(current, seg)) {
+      const newObj: Record<string, JsonValue> = {}
+      current[seg] = newObj
+      current = newObj
+    } else {
+      const val = current[seg]
+      if (typeof val !== 'object' || val === null || Array.isArray(val)) {
+        throw new Error(
+          `Structural conflict: cannot update "${fullKey}" because "${accumulated}" is a primitive value.`
+        )
+      }
+      current = val as Record<string, JsonValue>
+    }
+  }
+
+  const leaf = segments[segments.length - 1]
+  current[leaf] = newValue
+
+  return {
+    updatedRaw: clonedRaw,
+    formattedJson: JSON.stringify(clonedRaw, null, 2) + '\n',
+  }
+}

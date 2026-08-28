@@ -30,9 +30,15 @@ export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
           </span>
         </div>
         <div className="summary-stat">
-          <span className="stat-label">Keys with missing:</span>
+          <span className="stat-label">Missing keys:</span>
           <span className="stat-value stat-missing">
             {comparisonResult.incompleteKeysCount}
+          </span>
+        </div>
+        <div className="summary-stat">
+          <span className="stat-label">Empty keys:</span>
+          <span className="stat-value stat-empty">
+            {comparisonResult.emptyKeysCount}
           </span>
         </div>
       </div>
@@ -46,10 +52,10 @@ export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
           title={
             hasMissing
               ? 'Add all missing keys as empty values'
-              : 'All localization keys are complete'
+              : 'All localization keys are present'
           }
         >
-          {hasMissing ? 'Add Missing Keys' : '✓ All Complete'}
+          {hasMissing ? 'Add Missing Keys' : '✓ All Keys Present'}
         </button>
       </div>
     </div>

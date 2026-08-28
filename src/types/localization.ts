@@ -25,6 +25,7 @@ export interface KeyComparisonEntry {
   isComplete: boolean
   presentInFiles: string[]
   missingInFiles: string[]
+  emptyInFiles: string[]
   values: Record<string, JsonValue>
 }
 
@@ -34,6 +35,7 @@ export interface LocalizationComparisonResult {
   totalUniqueKeys: number
   completeKeysCount: number
   incompleteKeysCount: number
+  emptyKeysCount: number
   keys: KeyComparisonEntry[]
 }
 
@@ -47,6 +49,7 @@ export interface LocalizationTreeNode {
   children: LocalizationTreeNode[]
   isPresent: boolean
   isMissing: boolean
+  isEmpty: boolean
   isConflict: boolean
   value?: JsonValue
   missingInFiles: string[]
@@ -58,6 +61,7 @@ export interface FileTreeData {
   totalKeys: number
   presentKeysCount: number
   missingKeysCount: number
+  emptyKeysCount: number
   rootNodes: LocalizationTreeNode[]
 }
 

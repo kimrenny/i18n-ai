@@ -11,8 +11,9 @@ import type {
  * Rules:
  * - Operates on the UNION of all keys across all files (no master/canonical file).
  * - Key sorting is deterministic (alphabetical).
- * - Identifies which files have the key and which files are missing the key.
- * - Key is complete if present in all compared files; incomplete if missing in >= 1 file.
+ * - Identifies which files have the key, which files are missing the key, and which files have empty string ("").
+ * - Key is complete if present and non-empty in all compared files.
+ * - Key is empty if present but value is strictly === "".
  * - Does not mutate input objects.
  */
 export function compareLocalizationFiles(
@@ -25,6 +26,7 @@ export function compareLocalizationFiles(
       totalUniqueKeys: 0,
       completeKeysCount: 0,
       incompleteKeysCount: 0,
+      emptyKeysCount: 0,
       keys: [],
     }
   }
@@ -48,26 +50,36 @@ export function compareLocalizationFiles(
   const keyEntries: KeyComparisonEntry[] = []
   let completeKeysCount = 0
   let incompleteKeysCount = 0
+  let emptyKeysCount = 0
 
   for (const key of sortedKeys) {
     const presentInFiles: string[] = []
     const missingInFiles: string[] = []
+    const emptyInFiles: string[] = []
     const values: Record<string, JsonValue> = {}
 
     for (const file of files) {
       if (Object.prototype.hasOwnProperty.call(file.keys, key)) {
         presentInFiles.push(file.filename)
-        values[file.filename] = file.keys[key]
+        const val = file.keys[key]
+        values[file.filename] = val
+        if (val === '') {
+          emptyInFiles.push(file.filename)
+        }
       } else {
         missingInFiles.push(file.filename)
       }
     }
 
-    const isComplete = missingInFiles.length === 0
+    const isComplete = missingInFiles.length === 0 && emptyInFiles.length === 0
     if (isComplete) {
       completeKeysCount++
-    } else {
+    }
+    if (missingInFiles.length > 0) {
       incompleteKeysCount++
+    }
+    if (emptyInFiles.length > 0) {
+      emptyKeysCount++
     }
 
     keyEntries.push({
@@ -75,6 +87,7 @@ export function compareLocalizationFiles(
       isComplete,
       presentInFiles,
       missingInFiles,
+      emptyInFiles,
       values,
     })
   }
@@ -85,6 +98,7 @@ export function compareLocalizationFiles(
     totalUniqueKeys: sortedKeys.length,
     completeKeysCount,
     incompleteKeysCount,
+    emptyKeysCount,
     keys: keyEntries,
   }
 }

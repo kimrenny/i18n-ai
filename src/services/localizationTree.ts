@@ -12,6 +12,7 @@ interface InternalNode {
   isLeaf: boolean
   isPresent: boolean
   isMissing: boolean
+  isEmpty: boolean
   isConflict: boolean
   value?: JsonValue
   missingInFiles: string[]
@@ -26,6 +27,7 @@ function createInternalNode(segment: string, fullKey: string): InternalNode {
     isLeaf: false,
     isPresent: false,
     isMissing: false,
+    isEmpty: false,
     isConflict: false,
     missingInFiles: [],
     presentInFiles: [],
@@ -35,7 +37,7 @@ function createInternalNode(segment: string, fullKey: string): InternalNode {
 
 /**
  * Builds a deterministic tree representation of localization keys for a specific target file,
- * using the comparison result as the authoritative source of truth for key presence/absence.
+ * using the comparison result as the authoritative source of truth for key presence/absence/emptiness.
  */
 export function buildLocalizationTree(
   filename: string,
@@ -47,11 +49,18 @@ export function buildLocalizationTree(
 
   let presentKeysCount = 0
   let missingKeysCount = 0
+  let emptyKeysCount = 0
 
   for (const entry of comparisonResult.keys) {
     const isPresentInFile = Object.prototype.hasOwnProperty.call(fileKeys, entry.key)
+    const fileVal = isPresentInFile ? fileKeys[entry.key] : undefined
+    const isEmptyInFile = isPresentInFile && fileVal === ''
+
     if (isPresentInFile) {
       presentKeysCount++
+      if (isEmptyInFile) {
+        emptyKeysCount++
+      }
     } else {
       missingKeysCount++
     }
@@ -72,8 +81,6 @@ export function buildLocalizationTree(
       }
 
       // Check for structural conflict:
-      // If an intermediate parent is defined as a leaf value in this file,
-      // but child properties are defined in the union.
       if (!isLast && Object.prototype.hasOwnProperty.call(fileKeys, accumulatedPath)) {
         node.isConflict = true
         node.value = fileKeys[accumulatedPath]
@@ -83,7 +90,8 @@ export function buildLocalizationTree(
         node.isLeaf = true
         node.isPresent = isPresentInFile
         node.isMissing = !isPresentInFile
-        node.value = isPresentInFile ? fileKeys[entry.key] : undefined
+        node.isEmpty = isEmptyInFile
+        node.value = fileVal
         node.missingInFiles = [...entry.missingInFiles]
         node.presentInFiles = [...entry.presentInFiles]
       }
@@ -113,6 +121,7 @@ export function buildLocalizationTree(
         children,
         isPresent: node.isPresent,
         isMissing: node.isMissing,
+        isEmpty: node.isEmpty,
         isConflict: node.isConflict,
         value: node.value,
         missingInFiles: node.missingInFiles,
@@ -128,6 +137,7 @@ export function buildLocalizationTree(
     totalKeys: comparisonResult.totalUniqueKeys,
     presentKeysCount,
     missingKeysCount,
+    emptyKeysCount,
     rootNodes,
   }
 }

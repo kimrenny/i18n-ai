@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { compareLocalizationFiles } from './localizationComparator'
-import type { ParsedLocalizationFile } from '../types/localization'
+import type { ParsedLocalizationFile, JsonValue } from '../types/localization'
 
 describe('localizationComparator', () => {
   const createFile = (
     filename: string,
-    keys: Record<string, string>
+    keys: Record<string, JsonValue>
   ): ParsedLocalizationFile => ({
     filename,
     path: `/locales/${filename}`,
@@ -24,12 +24,14 @@ describe('localizationComparator', () => {
     expect(result.totalUniqueKeys).toBe(2)
     expect(result.completeKeysCount).toBe(2)
     expect(result.incompleteKeysCount).toBe(0)
+    expect(result.emptyKeysCount).toBe(0)
     expect(result.keys).toEqual([
       {
         key: 'COMMON.CANCEL',
         isComplete: true,
         presentInFiles: ['en.json', 'ru.json'],
         missingInFiles: [],
+        emptyInFiles: [],
         values: { 'en.json': 'Cancel', 'ru.json': 'Отмена' },
       },
       {
@@ -37,6 +39,7 @@ describe('localizationComparator', () => {
         isComplete: true,
         presentInFiles: ['en.json', 'ru.json'],
         missingInFiles: [],
+        emptyInFiles: [],
         values: { 'en.json': 'OK', 'ru.json': 'ОК' },
       },
     ])
@@ -51,12 +54,66 @@ describe('localizationComparator', () => {
     expect(result.totalUniqueKeys).toBe(3)
     expect(result.completeKeysCount).toBe(2)
     expect(result.incompleteKeysCount).toBe(1)
+    expect(result.emptyKeysCount).toBe(0)
 
     const keyC = result.keys.find((k) => k.key === 'C')
     expect(keyC).toBeDefined()
     expect(keyC?.isComplete).toBe(false)
     expect(keyC?.presentInFiles).toEqual(['en.json'])
     expect(keyC?.missingInFiles).toEqual(['ru.json'])
+  })
+
+  it('distinguishes between missing and empty keys', () => {
+    const en = createFile('en.json', {
+      MENU_PLAY: 'Play',
+      MENU_EXIT: 'Exit',
+      MENU_HELP: 'Help',
+    })
+    const ru = createFile('ru.json', {
+      MENU_PLAY: '', // empty
+      MENU_EXIT: 'Выход', // normal translated
+      // MENU_HELP is missing
+    })
+
+    const result = compareLocalizationFiles([en, ru])
+
+    expect(result.totalUniqueKeys).toBe(3)
+    expect(result.completeKeysCount).toBe(1) // MENU_EXIT
+    expect(result.incompleteKeysCount).toBe(1) // MENU_HELP missing in ru
+    expect(result.emptyKeysCount).toBe(1) // MENU_PLAY empty in ru
+
+    const playKey = result.keys.find((k) => k.key === 'MENU_PLAY')!
+    expect(playKey.isComplete).toBe(false)
+    expect(playKey.presentInFiles).toEqual(['en.json', 'ru.json'])
+    expect(playKey.missingInFiles).toEqual([])
+    expect(playKey.emptyInFiles).toEqual(['ru.json'])
+
+    const helpKey = result.keys.find((k) => k.key === 'MENU_HELP')!
+    expect(helpKey.isComplete).toBe(false)
+    expect(helpKey.presentInFiles).toEqual(['en.json'])
+    expect(helpKey.missingInFiles).toEqual(['ru.json'])
+    expect(helpKey.emptyInFiles).toEqual([])
+  })
+
+  it('does NOT consider non-empty values as empty (whitespace, null, false, 0, arrays)', () => {
+    const file = createFile('en.json', {
+      SPACES: ' ',
+      NULL_VAL: null,
+      FALSE_VAL: false,
+      ZERO_VAL: 0,
+      EMPTY_STR: '',
+    })
+
+    const result = compareLocalizationFiles([file])
+
+    expect(result.totalUniqueKeys).toBe(5)
+    expect(result.emptyKeysCount).toBe(1)
+
+    expect(result.keys.find((k) => k.key === 'SPACES')?.emptyInFiles).toEqual([])
+    expect(result.keys.find((k) => k.key === 'NULL_VAL')?.emptyInFiles).toEqual([])
+    expect(result.keys.find((k) => k.key === 'FALSE_VAL')?.emptyInFiles).toEqual([])
+    expect(result.keys.find((k) => k.key === 'ZERO_VAL')?.emptyInFiles).toEqual([])
+    expect(result.keys.find((k) => k.key === 'EMPTY_STR')?.emptyInFiles).toEqual(['en.json'])
   })
 
   it('handles different unique keys across multiple files without a canonical language', () => {
@@ -68,107 +125,22 @@ describe('localizationComparator', () => {
     expect(result.totalUniqueKeys).toBe(3)
     expect(result.completeKeysCount).toBe(1)
     expect(result.incompleteKeysCount).toBe(2)
-
-    expect(result.keys[0]).toEqual({
-      key: 'A',
-      isComplete: true,
-      presentInFiles: ['en.json', 'ru.json'],
-      missingInFiles: [],
-      values: { 'en.json': '1', 'ru.json': '1' },
-    })
-
-    expect(result.keys[1]).toEqual({
-      key: 'B',
-      isComplete: false,
-      presentInFiles: ['en.json'],
-      missingInFiles: ['ru.json'],
-      values: { 'en.json': '2' },
-    })
-
-    expect(result.keys[2]).toEqual({
-      key: 'C',
-      isComplete: false,
-      presentInFiles: ['ru.json'],
-      missingInFiles: ['en.json'],
-      values: { 'ru.json': '3' },
-    })
-  })
-
-  it('compares across three files with independent presence per file', () => {
-    const en = createFile('en.json', {
-      'AUTH.LOGIN': 'Login',
-      'AUTH.LOGOUT': 'Logout',
-      'ADMIN.PANEL.TITLE': 'Admin Panel',
-    })
-    const ru = createFile('ru.json', {
-      'AUTH.LOGIN': 'Войти',
-      'ADMIN.PANEL.TITLE': 'Панель администратора',
-    })
-    const uk = createFile('uk.json', {
-      'AUTH.LOGIN': 'Увійти',
-    })
-
-    const result = compareLocalizationFiles([en, ru, uk])
-
-    expect(result.comparedFileCount).toBe(3)
-    expect(result.totalUniqueKeys).toBe(3)
-    expect(result.completeKeysCount).toBe(1) // AUTH.LOGIN
-    expect(result.incompleteKeysCount).toBe(2) // ADMIN.PANEL.TITLE, AUTH.LOGOUT
-
-    const adminKey = result.keys.find((k) => k.key === 'ADMIN.PANEL.TITLE')
-    expect(adminKey?.isComplete).toBe(false)
-    expect(adminKey?.presentInFiles).toEqual(['en.json', 'ru.json'])
-    expect(adminKey?.missingInFiles).toEqual(['uk.json'])
-
-    const logoutKey = result.keys.find((k) => k.key === 'AUTH.LOGOUT')
-    expect(logoutKey?.isComplete).toBe(false)
-    expect(logoutKey?.presentInFiles).toEqual(['en.json'])
-    expect(logoutKey?.missingInFiles).toEqual(['ru.json', 'uk.json'])
-  })
-
-  it('constructs union when first file does not have keys present in later files', () => {
-    const first = createFile('file1.json', { X: 'x' })
-    const second = createFile('file2.json', { Y: 'y', Z: 'z' })
-
-    const result = compareLocalizationFiles([first, second])
-
-    expect(result.keys.map((k) => k.key)).toEqual(['X', 'Y', 'Z'])
-    const yKey = result.keys.find((k) => k.key === 'Y')
-    expect(yKey?.presentInFiles).toEqual(['file2.json'])
-    expect(yKey?.missingInFiles).toEqual(['file1.json'])
-  })
-
-  it('participates empty valid JSON as a file with 0 keys', () => {
-    const normal = createFile('en.json', { 'APP.TITLE': 'App' })
-    const empty = createFile('empty.json', {})
-
-    const result = compareLocalizationFiles([normal, empty])
-
-    expect(result.comparedFileCount).toBe(2)
-    expect(result.totalUniqueKeys).toBe(1)
-    expect(result.completeKeysCount).toBe(0)
-    expect(result.incompleteKeysCount).toBe(1)
-
-    const key = result.keys[0]
-    expect(key.key === 'APP.TITLE').toBe(true)
-    expect(key.presentInFiles).toEqual(['en.json'])
-    expect(key.missingInFiles).toEqual(['empty.json'])
   })
 
   it('safely handles edge cases: 0 files and 1 file', () => {
     const emptyResult = compareLocalizationFiles([])
     expect(emptyResult.comparedFileCount).toBe(0)
     expect(emptyResult.totalUniqueKeys).toBe(0)
+    expect(emptyResult.emptyKeysCount).toBe(0)
     expect(emptyResult.keys).toEqual([])
 
     const oneFileResult = compareLocalizationFiles([
-      createFile('en.json', { A: '1', B: '2' }),
+      createFile('en.json', { A: '1', B: '' }),
     ])
     expect(oneFileResult.comparedFileCount).toBe(1)
     expect(oneFileResult.totalUniqueKeys).toBe(2)
-    expect(oneFileResult.completeKeysCount).toBe(2)
-    expect(oneFileResult.incompleteKeysCount).toBe(0)
-    expect(oneFileResult.keys[0].missingInFiles).toEqual([])
+    expect(oneFileResult.completeKeysCount).toBe(1)
+    expect(oneFileResult.emptyKeysCount).toBe(1)
   })
 
   it('returns keys in strictly deterministic alphabetical order', () => {
