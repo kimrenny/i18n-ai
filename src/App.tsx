@@ -79,6 +79,39 @@ export const App: React.FC = () => {
     }
   }
 
+  const handleUpdateTranslationSettings = async (update: Partial<AppSettings>) => {
+    setIsSettingsSaving(true)
+    setSettingsSaveError(null)
+
+    if (!window.electronAPI?.updateTranslationSettings) {
+      setSettings((prev) => ({
+        ...prev,
+        ...update,
+        aiTranslation: {
+          ...prev.aiTranslation,
+          ...(update.aiTranslation || {}),
+        },
+        freeTranslation: {
+          ...(prev.freeTranslation || DEFAULT_APP_SETTINGS.freeTranslation!),
+          ...(update.freeTranslation || {}),
+        },
+      }))
+      setIsSettingsSaving(false)
+      return
+    }
+
+    try {
+      const updated = await window.electronAPI.updateTranslationSettings(update)
+      setSettings(updated)
+    } catch (err) {
+      setSettingsSaveError(
+        err instanceof Error ? err.message : 'Failed to save translation settings.'
+      )
+    } finally {
+      setIsSettingsSaving(false)
+    }
+  }
+
   const handleSelectFolder = async () => {
     if (!window.electronAPI?.selectDirectory) {
       setErrorMessage('Unable to open folder selection dialog: Electron API is unavailable.')
@@ -396,6 +429,7 @@ export const App: React.FC = () => {
           isSaving={isSettingsSaving}
           saveError={settingsSaveError}
           onUpdateAiSettings={handleUpdateAiSettings}
+          onUpdateTranslationSettings={handleUpdateTranslationSettings}
           onClose={() => setIsSettingsOpen(false)}
         />
       )}

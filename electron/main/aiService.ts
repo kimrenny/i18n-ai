@@ -23,10 +23,17 @@ export interface BatchAiTranslationRequestPayload {
   entries: BatchTranslationEntryPayload[]
 }
 
+import { migrateAppSettings } from '../../src/types/settings'
+
 export interface BatchAiTranslationResponsePayload {
   translations: { key: string; translation: string }[]
   provider: string
   model: string
+}
+
+export function resolveAiSettingsPayload(settings: unknown): AiTranslationSettingsPayload {
+  const canonical = migrateAppSettings(settings)
+  return canonical.aiTranslation as AiTranslationSettingsPayload
 }
 
 export interface AiTranslationSettingsPayload {
@@ -259,10 +266,11 @@ function parseAndValidateBatchOutput(
 
 export async function performAiTranslation(
   request: AiTranslationRequestPayload,
-  settings: AiTranslationSettingsPayload
+  settings: unknown
 ): Promise<AiTranslationResponsePayload> {
-  const provider = settings.provider || 'mock'
-  const config = settings.providers[provider] || { model: 'default' }
+  const resolved = resolveAiSettingsPayload(settings)
+  const provider = resolved.provider || 'mock'
+  const config = resolved.providers?.[provider] || { model: 'mock-v1' }
   const targetLanguage =
     request.targetLanguage || request.targetFile.replace(/\.json$/i, '')
   const sourceLanguage =
@@ -632,10 +640,11 @@ export async function performAiTranslation(
  */
 export async function performBatchAiTranslation(
   request: BatchAiTranslationRequestPayload,
-  settings: AiTranslationSettingsPayload
+  settings: unknown
 ): Promise<BatchAiTranslationResponsePayload> {
-  const provider = settings.provider || 'mock'
-  const config = settings.providers[provider] || { model: 'default' }
+  const resolved = resolveAiSettingsPayload(settings)
+  const provider = resolved.provider || 'mock'
+  const config = resolved.providers?.[provider] || { model: 'mock-v1' }
   const targetLanguage = request.targetLanguage
 
   if (!request.entries || request.entries.length === 0) {

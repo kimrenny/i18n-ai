@@ -7,8 +7,16 @@ import {
   performBatchAiTranslation,
   type AiTranslationRequestPayload,
   type BatchAiTranslationRequestPayload,
-  type AiTranslationSettingsPayload,
 } from './aiService'
+import {
+  performFreeTranslation,
+  performBatchFreeTranslation,
+} from './freeTranslationService'
+import {
+  migrateAppSettings,
+  DEFAULT_APP_SETTINGS,
+  type AppSettings,
+} from '../../src/types/settings'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -35,51 +43,6 @@ let win: BrowserWindow | null = null
 
 const preload = path.join(__dirname, '../preload/index.cjs')
 
-interface AppSettings {
-  aiTranslation: {
-    provider: string
-    requireEditConfirmation: boolean
-    providers: Record<
-      string,
-      {
-        model: string
-        apiKey?: string
-        baseUrl?: string
-      }
-    >
-  }
-}
-
-const DEFAULT_APP_SETTINGS: AppSettings = {
-  aiTranslation: {
-    provider: 'mock',
-    requireEditConfirmation: true,
-    providers: {
-      mock: { model: 'mock-v1' },
-      openai: { model: 'gpt-4o-mini', apiKey: '' },
-      gemini: { model: 'gemini-3.6-flash', apiKey: '' },
-      anthropic: { model: 'claude-3-5-sonnet-20241022', apiKey: '' },
-      mistral: { model: 'mistral-large-latest', apiKey: '' },
-      xai: { model: 'grok-2-latest', apiKey: '' },
-      deepseek: { model: 'deepseek-chat', apiKey: '' },
-      ollama: { model: 'llama3.1', baseUrl: 'http://localhost:11434' },
-    },
-  },
-}
-
-const DEPRECATED_GEMINI_MODELS = new Set([
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-exp',
-  'gemini-2.0-pro-exp-02-05',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-pro',
-  'gemini-1.5-pro-latest',
-  'gemini-1.0-pro',
-  'gemini-pro',
-])
-
 function getSettingsFilePath(): string {
   return path.join(app.getPath('userData'), 'settings.json')
 }
@@ -89,75 +52,41 @@ async function loadPersistedSettings(): Promise<AppSettings> {
     const settingsPath = getSettingsFilePath()
     const content = await fs.readFile(settingsPath, 'utf-8')
     const parsed = JSON.parse(content)
-
-    // Gracefully merge with defaults for backward compatibility
-    const aiTrans = parsed?.aiTranslation || {}
-    const providers = {
-      ...DEFAULT_APP_SETTINGS.aiTranslation.providers,
-      ...(aiTrans.providers || {}),
-    }
-
-    // Automatically migrate obsolete Gemini models
-    if (
-      providers.gemini?.model &&
-      DEPRECATED_GEMINI_MODELS.has(providers.gemini.model.toLowerCase().trim())
-    ) {
-      console.log(
-        `[main] Migrating deprecated Gemini model "${providers.gemini.model}" -> "gemini-3.6-flash"`
-      )
-      providers.gemini.model = 'gemini-3.6-flash'
-    }
-
-    return {
-      aiTranslation: {
-        provider: typeof aiTrans.provider === 'string' ? aiTrans.provider : 'mock',
-        requireEditConfirmation:
-          typeof aiTrans.requireEditConfirmation === 'boolean'
-            ? aiTrans.requireEditConfirmation
-            : true,
-        providers,
-      },
-    }
+    return migrateAppSettings(parsed)
   } catch {
-    // If file does not exist or cannot be parsed, safely fallback to defaults
-    return { ...DEFAULT_APP_SETTINGS }
+    return DEFAULT_APP_SETTINGS
   }
 }
 
 async function persistSettings(settings: AppSettings): Promise<void> {
-  const settingsPath = getSettingsFilePath()
-  const dir = path.dirname(settingsPath)
-  await fs.mkdir(dir, { recursive: true })
-
-  const tempPath = `${settingsPath}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 8)}`
-  await fs.writeFile(tempPath, JSON.stringify(settings, null, 2), 'utf-8')
-  await fs.rename(tempPath, settingsPath)
+  try {
+    const settingsPath = getSettingsFilePath()
+    await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+  } catch (err) {
+    console.error('[main] Failed to persist settings:', err)
+  }
 }
 
 function createWindow() {
   console.log('[main] Creating window with preload path:', preload)
 
   win = new BrowserWindow({
-    width: 1080,
-    height: 720,
-    minWidth: 800,
-    minHeight: 600,
+    icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
     webPreferences: {
       preload,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
-    title: 'Localization AI',
-    show: false,
+    width: 1200,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
   })
 
-  win.webContents.on('console-message', (_, level, message, line, sourceId) => {
-    console.log(`[renderer console ${level}] ${message} (${sourceId}:${line})`)
-  })
-
-  win.once('ready-to-show', () => {
-    win?.show()
+  // Test active push message to Renderer process.
+  win.webContents.on('did-finish-load', () => {
+    win?.webContents.send('main-process-message', new Date().toLocaleString())
   })
 
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -168,101 +97,81 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // IPC: Dialog selectDirectory
   ipcMain.handle('dialog:selectDirectory', async () => {
-    console.log('[main] dialog:selectDirectory invoked')
-    const result = win
-      ? await dialog.showOpenDialog(win, {
-          properties: ['openDirectory'],
-        })
-      : await dialog.showOpenDialog({
-          properties: ['openDirectory'],
-        })
-
-    console.log('[main] dialog result:', result)
-
+    if (!win) return null
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory'],
+    })
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
-
     return result.filePaths[0]
   })
 
+  // IPC: Read directory JSON files
   ipcMain.handle('fs:getJsonFiles', async (_, directoryPath: string) => {
-    console.log('[main] fs:getJsonFiles invoked for:', directoryPath)
-    if (!directoryPath || typeof directoryPath !== 'string') {
-      throw new Error('Invalid directory path')
-    }
-
-    const entries = await fs.readdir(directoryPath, { withFileTypes: true })
-    const jsonFiles: { name: string; path: string }[] = []
-
-    for (const entry of entries) {
-      if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
-        jsonFiles.push({
+    try {
+      const entries = await fs.readdir(directoryPath, { withFileTypes: true })
+      const jsonFiles = entries
+        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.json'))
+        .map((entry) => ({
           name: entry.name,
           path: path.join(directoryPath, entry.name),
-        })
-      }
+        }))
+      return jsonFiles
+    } catch (err) {
+      console.error('[main] Error reading directory:', err)
+      throw new Error(`Failed to read directory: ${err instanceof Error ? err.message : String(err)}`)
     }
-
-    console.log('[main] found JSON files:', jsonFiles.length)
-    return jsonFiles
   })
 
+  // IPC: Read JSON file content
   ipcMain.handle('fs:readJsonFile', async (_, filePath: string) => {
-    console.log('[main] fs:readJsonFile invoked for:', filePath)
-    if (!filePath || typeof filePath !== 'string') {
-      throw new Error('Invalid file path')
+    try {
+      const content = await fs.readFile(filePath, 'utf-8')
+      return JSON.parse(content)
+    } catch (err) {
+      console.error(`[main] Error reading file ${filePath}:`, err)
+      throw new Error(`Failed to read file ${filePath}: ${err instanceof Error ? err.message : String(err)}`)
     }
-
-    const content = await fs.readFile(filePath, 'utf-8')
-    return JSON.parse(content)
   })
 
+  // IPC: Write JSON files atomically
   ipcMain.handle(
     'fs:writeJsonFiles',
     async (_, files: { path: string; content: string }[]) => {
-      console.log('[main] fs:writeJsonFiles invoked for', files?.length, 'files')
+      console.log(`[main] fs:writeJsonFiles invoked for ${files?.length} files`)
       if (!Array.isArray(files) || files.length === 0) {
-        throw new Error('No files provided for writing')
+        return { success: true }
       }
 
-      // Perform atomic writes: write to temporary files first, then rename
-      const tempFiles: { tempPath: string; finalPath: string }[] = []
-      try {
-        for (const file of files) {
-          if (!file.path || typeof file.path !== 'string') {
-            throw new Error('Invalid file path')
-          }
-          if (typeof file.content !== 'string') {
-            throw new Error(`Invalid file content for ${file.path}`)
-          }
-          const tempPath = `${file.path}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 8)}`
+      for (const file of files) {
+        const tempPath = `${file.path}.${Date.now()}.tmp`
+        try {
           await fs.writeFile(tempPath, file.content, 'utf-8')
-          tempFiles.push({ tempPath, finalPath: file.path })
-        }
-
-        // Rename all temp files to target paths
-        for (const { tempPath, finalPath } of tempFiles) {
-          await fs.rename(tempPath, finalPath)
-        }
-
-        return { success: true }
-      } catch (err) {
-        // Clean up any remaining temp files
-        for (const { tempPath } of tempFiles) {
+          await fs.rename(tempPath, file.path)
+          console.log(`[main] Successfully atomically wrote: ${file.path}`)
+        } catch (err) {
           try {
             await fs.unlink(tempPath)
           } catch {
-            // ignore cleanup error
+            // ignore temp cleanup error
           }
+          console.error(`[main] Failed to write file ${file.path}:`, err)
+          throw new Error(
+            `Atomic write failed for ${path.basename(file.path)}: ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          )
         }
-        throw err
       }
+
+      return { success: true }
     }
   )
 
-  // Settings IPC Handlers
+  // IPC: Settings handlers
   ipcMain.handle('settings:get', async () => {
     console.log('[main] settings:get invoked')
     return await loadPersistedSettings()
@@ -271,12 +180,9 @@ app.whenReady().then(() => {
   ipcMain.handle(
     'settings:updateAiTranslation',
     async (_, update: Partial<AppSettings['aiTranslation']>) => {
-      console.log('[main] settings:updateAiTranslation invoked with:', {
-        ...update,
-        providers: update.providers ? Object.keys(update.providers) : undefined,
-      })
+      console.log('[main] settings:updateAiTranslation invoked with provider:', update?.provider)
       const current = await loadPersistedSettings()
-      const updated: AppSettings = {
+      const merged = {
         ...current,
         aiTranslation: {
           ...current.aiTranslation,
@@ -287,25 +193,67 @@ app.whenReady().then(() => {
           },
         },
       }
+      const updated = migrateAppSettings(merged)
       await persistSettings(updated)
       return updated
     }
   )
 
-  // AI Translation IPC Handlers
+  ipcMain.handle(
+    'settings:updateTranslation',
+    async (_, update: Partial<AppSettings>) => {
+      console.log('[main] settings:updateTranslation invoked with engine:', update?.engine)
+      const current = await loadPersistedSettings()
+      const merged = {
+        ...current,
+        ...(update && typeof update === 'object' ? update : {}),
+        aiTranslation: {
+          ...current.aiTranslation,
+          ...(update?.aiTranslation || {}),
+          providers: {
+            ...current.aiTranslation.providers,
+            ...(update?.aiTranslation?.providers || {}),
+          },
+        },
+        freeTranslation: {
+          ...(current.freeTranslation || DEFAULT_APP_SETTINGS.freeTranslation!),
+          ...(update?.freeTranslation || {}),
+          providers: {
+            ...(current.freeTranslation?.providers || DEFAULT_APP_SETTINGS.freeTranslation!.providers),
+            ...(update?.freeTranslation?.providers || {}),
+          },
+        },
+      }
+      const updated = migrateAppSettings(merged)
+      await persistSettings(updated)
+      return updated
+    }
+  )
+
+  // AI & Free Translation IPC Handlers
   ipcMain.handle(
     'ai:translate',
     async (
       _,
       payload: {
         request: AiTranslationRequestPayload
-        settings: AiTranslationSettingsPayload
+        settings?: unknown
+        appSettings?: unknown
       }
     ) => {
+      const canonical = migrateAppSettings(payload?.settings || payload?.appSettings)
+
+      if (canonical.engine === 'free') {
+        console.log(
+          `[main] free:translate invoked for key "${payload?.request?.key}" with provider "${canonical.freeTranslation?.provider || 'libretranslate'}"`
+        )
+        return await performFreeTranslation(payload.request, canonical.freeTranslation)
+      }
+
       console.log(
-        `[main] ai:translate invoked for key "${payload?.request?.key}" with provider "${payload?.settings?.provider}"`
+        `[main] ai:translate invoked for key "${payload?.request?.key}" with provider "${canonical.aiTranslation.provider}"`
       )
-      return await performAiTranslation(payload.request, payload.settings)
+      return await performAiTranslation(payload.request, canonical.aiTranslation)
     }
   )
 
@@ -315,13 +263,23 @@ app.whenReady().then(() => {
       _,
       payload: {
         request: BatchAiTranslationRequestPayload
-        settings: AiTranslationSettingsPayload
+        settings?: unknown
+        appSettings?: unknown
       }
     ) => {
+      const canonical = migrateAppSettings(payload?.settings || payload?.appSettings)
+
+      if (canonical.engine === 'free') {
+        console.log(
+          `[main] free:translateBatch invoked with ${payload?.request?.entries?.length} entries for "${payload?.request?.targetFile}" with provider "${canonical.freeTranslation?.provider || 'libretranslate'}"`
+        )
+        return await performBatchFreeTranslation(payload.request, canonical.freeTranslation)
+      }
+
       console.log(
-        `[main] ai:translateBatch invoked with ${payload?.request?.entries?.length} entries for "${payload?.request?.targetFile}" with provider "${payload?.settings?.provider}"`
+        `[main] ai:translateBatch invoked with ${payload?.request?.entries?.length} entries for "${payload?.request?.targetFile}" with provider "${canonical.aiTranslation.provider}"`
       )
-      return await performBatchAiTranslation(payload.request, payload.settings)
+      return await performBatchAiTranslation(payload.request, canonical.aiTranslation)
     }
   )
 
@@ -337,6 +295,5 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
-    win = null
   }
 })

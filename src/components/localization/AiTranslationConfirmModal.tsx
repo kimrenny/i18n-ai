@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { getProviderDefinition } from '../../services/aiProviderRegistry'
-import type { AiProviderId } from '../../types/settings'
+import { getFreeProviderDefinition } from '../../services/freeProviderRegistry'
+import type { AiProviderId, FreeProviderId } from '../../types/settings'
 
 export interface AiTranslationProposal {
   key: string
@@ -10,7 +11,7 @@ export interface AiTranslationProposal {
   sourceLanguage?: string
   sourceValue: string
   translatedText: string
-  provider: AiProviderId
+  provider: AiProviderId | FreeProviderId | string
   model: string
 }
 
@@ -30,7 +31,13 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
   onCancel,
 }) => {
   const [editedText, setEditedText] = useState(proposal.translatedText)
-  const providerDef = getProviderDefinition(proposal.provider)
+
+  const isFree =
+    proposal.provider === 'libretranslate' || proposal.provider === 'mymemory'
+
+  const engineDisplay = isFree
+    ? `${getFreeProviderDefinition(proposal.provider as FreeProviderId).name} · Free Translator`
+    : `${getProviderDefinition(proposal.provider as AiProviderId).name} · ${proposal.model}`
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,7 +96,7 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
               <div className="ai-meta-item">
                 <span className="ai-meta-label">Engine:</span>
                 <span className="ai-meta-value ai-engine-badge">
-                  {providerDef.name} · {proposal.model}
+                  {engineDisplay}
                 </span>
               </div>
             </div>

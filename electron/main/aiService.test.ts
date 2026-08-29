@@ -424,4 +424,66 @@ describe('electron main aiService', () => {
       /Ensure the Ollama server is running/i
     )
   })
+
+  describe('Regression: Undefined provider handling', () => {
+    it('safely handles performAiTranslation when provider is undefined or settings is empty', async () => {
+      const resultEmpty = await performAiTranslation(baseRequest, {} as unknown)
+      expect(resultEmpty.provider).toBe('mock')
+      expect(resultEmpty.translatedText).toContain('[AI: DE]')
+
+      const resultUndefinedProvider = await performAiTranslation(baseRequest, {
+        provider: undefined,
+        providers: undefined,
+      } as unknown)
+      expect(resultUndefinedProvider.provider).toBe('mock')
+      expect(resultUndefinedProvider.translatedText).toContain('[AI: DE]')
+    })
+
+    it('safely handles performAiTranslation when full AppSettings object is passed directly', async () => {
+      const fullAppSettings = {
+        engine: 'ai',
+        aiTranslation: {
+          provider: 'mock',
+          requireEditConfirmation: true,
+          providers: {
+            mock: { model: 'mock-v1' },
+          },
+        },
+      }
+
+      const result = await performAiTranslation(baseRequest, fullAppSettings as unknown)
+      expect(result.provider).toBe('mock')
+      expect(result.translatedText).toContain('[AI: DE]')
+    })
+
+    it('safely handles performBatchAiTranslation when provider is undefined or settings is empty', async () => {
+      const resultEmpty = await performBatchAiTranslation(baseBatchRequest, {} as unknown)
+      expect(resultEmpty.provider).toBe('mock')
+      expect(resultEmpty.translations).toHaveLength(2)
+
+      const resultUndefinedProvider = await performBatchAiTranslation(baseBatchRequest, {
+        provider: undefined,
+        providers: undefined,
+      } as unknown)
+      expect(resultUndefinedProvider.provider).toBe('mock')
+      expect(resultUndefinedProvider.translations).toHaveLength(2)
+    })
+
+    it('safely handles performBatchAiTranslation when full AppSettings object is passed directly', async () => {
+      const fullAppSettings = {
+        engine: 'ai',
+        aiTranslation: {
+          provider: 'mock',
+          requireEditConfirmation: true,
+          providers: {
+            mock: { model: 'mock-v1' },
+          },
+        },
+      }
+
+      const result = await performBatchAiTranslation(baseBatchRequest, fullAppSettings as unknown)
+      expect(result.provider).toBe('mock')
+      expect(result.translations).toHaveLength(2)
+    })
+  })
 })

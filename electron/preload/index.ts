@@ -23,6 +23,8 @@ export const electronAPI = {
     ipcRenderer.invoke('settings:get'),
   updateAiTranslationSettings: (settings: unknown): Promise<unknown> =>
     ipcRenderer.invoke('settings:updateAiTranslation', settings),
+  updateTranslationSettings: (settings: unknown): Promise<unknown> =>
+    ipcRenderer.invoke('settings:updateTranslation', settings),
   translateWithAi: (request: unknown, settings: unknown): Promise<unknown> =>
     ipcRenderer.invoke('ai:translate', { request, settings }),
   translateBatchWithAi: (request: unknown, settings: unknown): Promise<unknown> =>

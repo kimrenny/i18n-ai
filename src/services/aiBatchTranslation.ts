@@ -184,7 +184,7 @@ export function createBatchTranslationPlan(
  */
 export async function executeBatchTranslation(
   plan: BatchTranslationPlan,
-  settings: AiTranslationSettings,
+  settings: AiTranslationSettings | import('../types/settings').AppSettings,
   onProgress?: (progress: BatchProgress) => void,
   abortSignal?: AbortSignal,
   options?: BatchTranslationOptions
@@ -430,7 +430,7 @@ export async function executeBatchTranslation(
  */
 export async function retryFailedBatchTranslations(
   plan: BatchTranslationPlan,
-  settings: AiTranslationSettings,
+  settings: AiTranslationSettings | import('../types/settings').AppSettings,
   onProgress?: (progress: BatchProgress) => void,
   abortSignal?: AbortSignal,
   options?: BatchTranslationOptions

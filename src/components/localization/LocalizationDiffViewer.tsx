@@ -316,18 +316,21 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
             targetLanguage,
             sourceValue: ref.sourceValue,
           },
-          settings?.aiTranslation || {
-            provider: 'mock',
-            requireEditConfirmation: true,
-            providers: {
-              mock: { model: 'mock-v1' },
-              openai: { model: 'gpt-4o-mini' },
-              gemini: { model: 'gemini-3.6-flash' },
-              anthropic: { model: 'claude-3-5-sonnet-20241022' },
-              mistral: { model: 'mistral-large-latest' },
-              xai: { model: 'grok-2-latest' },
-              deepseek: { model: 'deepseek-chat' },
-              ollama: { model: 'llama3.1' },
+          settings || {
+            engine: 'ai',
+            aiTranslation: {
+              provider: 'mock',
+              requireEditConfirmation: true,
+              providers: {
+                mock: { model: 'mock-v1' },
+                openai: { model: 'gpt-4o-mini' },
+                gemini: { model: 'gemini-3.6-flash' },
+                anthropic: { model: 'claude-3-5-sonnet-20241022' },
+                mistral: { model: 'mistral-large-latest' },
+                xai: { model: 'grok-2-latest' },
+                deepseek: { model: 'deepseek-chat' },
+                ollama: { model: 'llama3.1' },
+              },
             },
           }
         )
@@ -454,18 +457,21 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     try {
       const executedPlan = await executeBatchTranslation(
         initialPlan,
-        settings?.aiTranslation || {
-          provider: 'mock',
-          requireEditConfirmation: true,
-          providers: {
-            mock: { model: 'mock-v1' },
-            openai: { model: 'gpt-4o-mini' },
-            gemini: { model: 'gemini-3.6-flash' },
-            anthropic: { model: 'claude-3-5-sonnet-20241022' },
-            mistral: { model: 'mistral-large-latest' },
-            xai: { model: 'grok-2-latest' },
-            deepseek: { model: 'deepseek-chat' },
-            ollama: { model: 'llama3.1' },
+        settings || {
+          engine: 'ai',
+          aiTranslation: {
+            provider: 'mock',
+            requireEditConfirmation: true,
+            providers: {
+              mock: { model: 'mock-v1' },
+              openai: { model: 'gpt-4o-mini' },
+              gemini: { model: 'gemini-3.6-flash' },
+              anthropic: { model: 'claude-3-5-sonnet-20241022' },
+              mistral: { model: 'mistral-large-latest' },
+              xai: { model: 'grok-2-latest' },
+              deepseek: { model: 'deepseek-chat' },
+              ollama: { model: 'llama3.1' },
+            },
           },
         },
         (progress) => setBatchProgress(progress),
@@ -509,18 +515,21 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     try {
       const executedPlan = await retryFailedBatchTranslations(
         batchPlan,
-        settings?.aiTranslation || {
-          provider: 'mock',
-          requireEditConfirmation: true,
-          providers: {
-            mock: { model: 'mock-v1' },
-            openai: { model: 'gpt-4o-mini' },
-            gemini: { model: 'gemini-3.6-flash' },
-            anthropic: { model: 'claude-3-5-sonnet-20241022' },
-            mistral: { model: 'mistral-large-latest' },
-            xai: { model: 'grok-2-latest' },
-            deepseek: { model: 'deepseek-chat' },
-            ollama: { model: 'llama3.1' },
+        settings || {
+          engine: 'ai',
+          aiTranslation: {
+            provider: 'mock',
+            requireEditConfirmation: true,
+            providers: {
+              mock: { model: 'mock-v1' },
+              openai: { model: 'gpt-4o-mini' },
+              gemini: { model: 'gemini-3.6-flash' },
+              anthropic: { model: 'claude-3-5-sonnet-20241022' },
+              mistral: { model: 'mistral-large-latest' },
+              xai: { model: 'grok-2-latest' },
+              deepseek: { model: 'deepseek-chat' },
+              ollama: { model: 'llama3.1' },
+            },
           },
         },
         (progress) => setBatchProgress(progress),

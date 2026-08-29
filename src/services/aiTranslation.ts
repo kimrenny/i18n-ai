@@ -263,15 +263,38 @@ export function findSourceReference(
 }
 
 /**
- * Dispatches a single AI translation request using either the secure Electron IPC bridge
+ * Dispatches a single translation request using either the secure Electron IPC bridge
  * or an in-memory/mock provider if running in tests/browser.
  */
 export async function executeAiTranslation(
   request: AiTranslationRequest,
-  settings: AiTranslationSettings
+  settings: AiTranslationSettings | import('../types/settings').AppSettings
 ): Promise<AiTranslationResult> {
-  const providerId = settings.provider || 'mock'
-  const providerConfig = settings.providers[providerId] || {
+  const isFreeEngine = 'engine' in settings && settings.engine === 'free'
+
+  if (isFreeEngine) {
+    const freeSettings = (settings as import('../types/settings').AppSettings).freeTranslation || {
+      provider: 'libretranslate',
+      providers: {
+        libretranslate: { baseUrl: 'http://localhost:5000' },
+        mymemory: { baseUrl: 'https://api.mymemory.translated.net' },
+      },
+    }
+
+    if (window.electronAPI?.translateWithAi) {
+      const result = await window.electronAPI.translateWithAi(request, settings)
+      if (result && typeof result.translatedText === 'string') {
+        return result
+      }
+    }
+
+    // Fallback to in-memory provider
+    return await activeProvider.translate(request, { model: freeSettings.provider })
+  }
+
+  const aiSettings = 'aiTranslation' in settings ? settings.aiTranslation : settings
+  const providerId = aiSettings.provider || 'mock'
+  const providerConfig = aiSettings.providers[providerId] || {
     model: getProviderDefinition(providerId).defaultModel,
   }
 
@@ -296,15 +319,62 @@ export async function executeAiTranslation(
 }
 
 /**
- * Dispatches a multi-entry batch AI translation request using the secure Electron IPC bridge
+ * Dispatches a multi-entry batch translation request using the secure Electron IPC bridge
  * or an in-memory/mock provider.
  */
 export async function executeBatchAiTranslation(
   request: BatchAiTranslationRequest,
-  settings: AiTranslationSettings
+  settings: AiTranslationSettings | import('../types/settings').AppSettings
 ): Promise<BatchAiTranslationResult> {
-  const providerId = settings.provider || 'mock'
-  const providerConfig = settings.providers[providerId] || {
+  const isFreeEngine = 'engine' in settings && settings.engine === 'free'
+
+  if (isFreeEngine) {
+    const freeSettings = (settings as import('../types/settings').AppSettings).freeTranslation || {
+      provider: 'libretranslate',
+      providers: {
+        libretranslate: { baseUrl: 'http://localhost:5000' },
+        mymemory: { baseUrl: 'https://api.mymemory.translated.net' },
+      },
+    }
+
+    if (window.electronAPI?.translateBatchWithAi) {
+      const result = await window.electronAPI.translateBatchWithAi(request, settings)
+      if (result && Array.isArray(result.translations)) {
+        return result
+      }
+    }
+
+    // Fallback to in-memory provider batch
+    if (activeProvider.translateBatch) {
+      return await activeProvider.translateBatch(request, { model: freeSettings.provider })
+    }
+
+    const translations: { key: string; translation: string }[] = []
+    for (const entry of request.entries) {
+      const singleRes = await activeProvider.translate(
+        {
+          key: entry.key,
+          sourceFile: request.sourceFile,
+          targetFile: request.targetFile,
+          sourceLanguage: request.sourceLanguage,
+          targetLanguage: request.targetLanguage,
+          sourceValue: entry.text,
+        },
+        { model: freeSettings.provider }
+      )
+      translations.push({ key: entry.key, translation: singleRes.translatedText })
+    }
+
+    return {
+      translations,
+      provider: freeSettings.provider as unknown as AiProviderId,
+      model: freeSettings.provider,
+    }
+  }
+
+  const aiSettings = 'aiTranslation' in settings ? settings.aiTranslation : settings
+  const providerId = aiSettings.provider || 'mock'
+  const providerConfig = aiSettings.providers[providerId] || {
     model: getProviderDefinition(providerId).defaultModel,
   }
 
