@@ -41,8 +41,8 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
     return true
   })
 
-  const progressPercent = progress
-    ? Math.min(100, Math.round((progress.current / progress.total) * 100))
+  const progressPercent = progress && plan.totalCount > 0
+    ? Math.min(100, Math.round((progress.successCount / plan.totalCount) * 100))
     : 0
 
   return (
@@ -64,7 +64,7 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
             </h2>
             <p className="modal-subtitle">
               {isTranslating
-                ? 'Generating translations with rate-limit protection across all compared files...'
+                ? 'Generating optimized batch translations with rate-limit protection across all compared files...'
                 : 'Review, edit, and apply generated translations to your localization files.'}
             </p>
           </div>
@@ -91,7 +91,10 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
           <div className="batch-progress-body">
             <div className="batch-progress-header">
               <span className="batch-progress-count">
-                Translating {progress ? `${progress.current} / ${progress.total}` : `0 / ${plan.totalCount}`}
+                Translated {progress ? `${progress.successCount} / ${plan.totalCount}` : `0 / ${plan.totalCount}`}
+              </span>
+              <span className="batch-progress-batches">
+                Batches: {progress ? `${progress.currentBatch} / ${progress.totalBatches}` : '1 / 1'}
               </span>
               <span className="batch-progress-pct">{progressPercent}%</span>
             </div>
@@ -116,15 +119,25 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
                 )}
 
                 <div className="batch-detail-row">
+                  <span className="batch-detail-label">Status:</span>
+                  <span className="batch-detail-val">
+                    {progress.statusMessage ||
+                      `Translating batch ${progress.currentBatch} / ${progress.totalBatches} (${progress.keysInBatch} keys)...`}
+                  </span>
+                </div>
+
+                <div className="batch-detail-row">
                   <span className="batch-detail-label">Current File:</span>
                   <span className="batch-detail-val">{progress.targetFile || '...'}</span>
                 </div>
+
                 <div className="batch-detail-row">
                   <span className="batch-detail-label">Current Key:</span>
                   <span className="batch-detail-val key-highlight">
                     {progress.currentKey || '...'}
                   </span>
                 </div>
+
                 <div className="batch-detail-stats">
                   <span className="batch-success-count">
                     ✓ {progress.successCount} translated

@@ -60,6 +60,9 @@ describe('BatchTranslationModal', () => {
         progress={{
           current: 2,
           total: 3,
+          currentBatch: 1,
+          totalBatches: 2,
+          keysInBatch: 2,
           currentKey: 'AUTH.LOGOUT',
           targetFile: 'de.json',
           successCount: 1,
@@ -83,10 +86,12 @@ describe('BatchTranslationModal', () => {
     expect(
       screen.getByRole('heading', { name: /translating all untranslated keys/i })
     ).toBeInTheDocument()
-    expect(screen.getByText('Translating 2 / 3')).toBeInTheDocument()
+    expect(screen.getByText(/Translated 1 \/ 3/i)).toBeInTheDocument()
+    expect(screen.getByText(/Batches: 1 \/ 2/i)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
     expect(
-      screen.getByText(/Rate limit reached \(429\) — retrying in 3\.0s \(attempt 2\/4\)\.\.\./i)
-    ).toBeInTheDocument()
+      screen.getAllByText(/Rate limit reached \(429\) — retrying in 3\.0s \(attempt 2\/4\)\.\.\./i).length
+    ).toBeGreaterThanOrEqual(1)
 
     const cancelBtn = screen.getByRole('button', { name: /cancel translation/i })
     fireEvent.click(cancelBtn)

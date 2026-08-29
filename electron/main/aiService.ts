@@ -9,6 +9,26 @@ export interface AiTranslationRequestPayload {
   context?: string
 }
 
+export interface BatchTranslationEntryPayload {
+  key: string
+  text: string
+  context?: string
+}
+
+export interface BatchAiTranslationRequestPayload {
+  targetLanguage: string
+  sourceLanguage?: string
+  targetFile: string
+  sourceFile: string
+  entries: BatchTranslationEntryPayload[]
+}
+
+export interface BatchAiTranslationResponsePayload {
+  translations: { key: string; translation: string }[]
+  provider: string
+  model: string
+}
+
 export interface AiTranslationSettingsPayload {
   provider: string
   requireEditConfirmation: boolean
@@ -114,17 +134,127 @@ Source Text:
 ${sourceText}`
 }
 
+function buildBatchSystemPrompt(targetLanguage: string): string {
+  return `You are a professional software localization and translation engine.
+Your task is to accurately translate a batch of software localization entries into target language: "${targetLanguage}".
+
+STRICT BATCH TRANSLATION AND JSON OUTPUT RULES:
+1. You are given a JSON array of localization entries with "key" and "text" fields.
+2. You MUST return ONLY a valid, parseable JSON array of objects with the exact structure:
+   [
+     { "key": "...", "translation": "..." }
+   ]
+3. Do NOT output any commentary, explanations, greetings, or markdown other than the raw JSON array.
+4. Translate EVERY requested entry. DO NOT skip, rename, reorder, or omit any keys.
+5. PRESERVE ALL PLACEHOLDERS EXACTLY AS THEY ARE.
+   - Examples: {name}, {{count}}, %s, %d, %1$s, $t(key), @:key, :variable, #tag#.
+   - NEVER translate, rename, or remove placeholder names.
+6. PRESERVE ALL HTML / XML TAGS AND ATTRIBUTES EXACTLY.
+   - Examples: <b>, </b>, <span class="...">, <a href="...">...</a>, <br/>.
+7. PRESERVE ESCAPE SEQUENCES EXACTLY (e.g. \\n, \\t, \\r).
+8. Maintain original grammar, capitalization, and punctuation.
+9. If an entry's text is empty or whitespace only, return it unchanged.`
+}
+
+function buildBatchUserPrompt(
+  entries: BatchTranslationEntryPayload[],
+  targetLanguage: string,
+  sourceLanguage?: string
+): string {
+  const fromLang = sourceLanguage ? ` from ${sourceLanguage}` : ''
+  return `Translate the following ${entries.length} localization entries${fromLang} into target language "${targetLanguage}".
+Return ONLY the JSON array of objects with "key" and "translation" fields:
+
+${JSON.stringify(
+  entries.map((e) => ({ key: e.key, text: e.text })),
+  null,
+  2
+)}`
+}
+
 function cleanAiOutput(text: string): string {
   let cleaned = text.trim()
-  // Remove wrapping backticks / markdown code blocks if the model erroneously added them
   if (cleaned.startsWith('```') && cleaned.endsWith('```')) {
     cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim()
   }
-  // Remove wrapping double quotes if the model wrapped the entire output in quotes
   if (cleaned.length >= 2 && cleaned.startsWith('"') && cleaned.endsWith('"')) {
     cleaned = cleaned.substring(1, cleaned.length - 1)
   }
   return cleaned
+}
+
+function extractJsonArrayString(text: string): string {
+  let cleaned = text.trim()
+  const codeBlockMatch = cleaned.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  if (codeBlockMatch) {
+    cleaned = codeBlockMatch[1].trim()
+  } else {
+    const first = cleaned.indexOf('[')
+    const last = cleaned.lastIndexOf(']')
+    if (first !== -1 && last !== -1 && last > first) {
+      cleaned = cleaned.substring(first, last + 1).trim()
+    }
+  }
+  return cleaned
+}
+
+/**
+ * Validates and parses a raw batch response JSON string.
+ */
+function parseAndValidateBatchOutput(
+  rawText: string,
+  entries: BatchTranslationEntryPayload[]
+): { key: string; translation: string }[] {
+  const cleaned = extractJsonArrayString(rawText)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch (err) {
+    throw new AiTranslationError(
+      `Invalid JSON array returned by AI model: ${err instanceof Error ? err.message : String(err)}`,
+      { code: 'INVALID_JSON_RESPONSE', retryable: false }
+    )
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new AiTranslationError(
+      'AI model did not return a JSON array as requested.',
+      { code: 'INVALID_JSON_STRUCTURE', retryable: false }
+    )
+  }
+
+  const requestedMap = new Map<string, string>()
+  for (const e of entries) {
+    requestedMap.set(e.key, e.text)
+  }
+
+  const result: { key: string; translation: string }[] = []
+  const seenKeys = new Set<string>()
+
+  for (const item of parsed) {
+    if (!item || typeof item !== 'object') continue
+    const key = (item as Record<string, unknown>).key
+    const translation = (item as Record<string, unknown>).translation
+
+    if (typeof key === 'string' && typeof translation === 'string') {
+      if (requestedMap.has(key) && !seenKeys.has(key)) {
+        seenKeys.add(key)
+        result.push({ key, translation })
+      }
+    }
+  }
+
+  // If any requested keys are missing, fallback or fail
+  for (const e of entries) {
+    if (!seenKeys.has(e.key)) {
+      throw new AiTranslationError(
+        `Batch response is missing translation for key: "${e.key}".`,
+        { code: 'MISSING_BATCH_KEY', retryable: false }
+      )
+    }
+  }
+
+  return result
 }
 
 export async function performAiTranslation(
@@ -485,6 +615,332 @@ export async function performAiTranslation(
             retryable: false,
             code: 'CONNECTION_REFUSED',
           }
+        )
+      }
+      throw err
+    }
+  }
+
+  throw new AiTranslationError(`Unsupported AI provider: "${provider}"`, {
+    code: 'UNSUPPORTED_PROVIDER',
+    retryable: false,
+  })
+}
+
+/**
+ * Performs batch AI translation for a chunk of localization entries in a single request.
+ */
+export async function performBatchAiTranslation(
+  request: BatchAiTranslationRequestPayload,
+  settings: AiTranslationSettingsPayload
+): Promise<BatchAiTranslationResponsePayload> {
+  const provider = settings.provider || 'mock'
+  const config = settings.providers[provider] || { model: 'default' }
+  const targetLanguage = request.targetLanguage
+
+  if (!request.entries || request.entries.length === 0) {
+    return {
+      translations: [],
+      provider,
+      model: config.model || 'default',
+    }
+  }
+
+  // 1. Mock Provider
+  if (provider === 'mock') {
+    const translations = request.entries.map((e) => ({
+      key: e.key,
+      translation: e.text ? `[AI: ${targetLanguage.toUpperCase()}] ${e.text}` : '',
+    }))
+    return {
+      translations,
+      provider: 'mock',
+      model: config.model || 'mock-v1',
+    }
+  }
+
+  const systemPrompt = buildBatchSystemPrompt(targetLanguage)
+  const userPrompt = buildBatchUserPrompt(
+    request.entries,
+    targetLanguage,
+    request.sourceLanguage
+  )
+
+  // 2. OpenAI / Compatible
+  if (
+    provider === 'openai' ||
+    provider === 'mistral' ||
+    provider === 'xai' ||
+    provider === 'deepseek'
+  ) {
+    if (!config.apiKey?.trim()) {
+      throw new AiTranslationError(
+        `API key is required for ${provider.toUpperCase()}.`,
+        { code: 'MISSING_API_KEY', retryable: false }
+      )
+    }
+
+    let endpoint = 'https://api.openai.com/v1/chat/completions'
+    if (provider === 'mistral') endpoint = 'https://api.mistral.ai/v1/chat/completions'
+    if (provider === 'xai') endpoint = 'https://api.x.ai/v1/chat/completions'
+    if (provider === 'deepseek') endpoint = 'https://api.deepseek.com/chat/completions'
+
+    let response: Response
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey.trim()}`,
+        },
+        body: JSON.stringify({
+          model: config.model || (provider === 'openai' ? 'gpt-4o-mini' : 'default'),
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.2,
+        }),
+      })
+    } catch (err) {
+      throw new AiTranslationError(
+        `Network error connecting to ${provider.toUpperCase()}: ${err instanceof Error ? err.message : String(err)}`,
+        { retryable: true, code: 'NETWORK_ERROR' }
+      )
+    }
+
+    if (!response.ok) {
+      const errText = await response.text()
+      const retryAfterMs = parseRetryAfterHeader(
+        response.headers?.get ? response.headers.get('retry-after') : undefined
+      )
+      const status = response.status
+      const retryable = status === 429 || (status >= 500 && status <= 504) || status === 408
+
+      throw new AiTranslationError(
+        `${provider.toUpperCase()} API Error (${status}): ${errText || response.statusText}`,
+        { status, retryable, retryAfterMs, code: `HTTP_${status}` }
+      )
+    }
+
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string } }[]
+    }
+    const content = data.choices?.[0]?.message?.content ?? ''
+    const translations = parseAndValidateBatchOutput(content, request.entries)
+
+    return {
+      translations,
+      provider,
+      model: config.model,
+    }
+  }
+
+  // 3. Google Gemini
+  if (provider === 'gemini') {
+    if (!config.apiKey?.trim()) {
+      throw new AiTranslationError('API key is required for Google Gemini.', {
+        code: 'MISSING_API_KEY',
+        retryable: false,
+      })
+    }
+
+    const rawModel = (config.model || 'gemini-3.6-flash')
+      .trim()
+      .replace(/^models\//i, '')
+
+    const effectiveModel = DEPRECATED_GEMINI_MODELS.has(rawModel.toLowerCase())
+      ? 'gemini-3.6-flash'
+      : rawModel
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${encodeURIComponent(
+      config.apiKey.trim()
+    )}`
+
+    let response: Response
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+          },
+        }),
+      })
+    } catch (err) {
+      throw new AiTranslationError(
+        `Network error connecting to Google Gemini: ${err instanceof Error ? err.message : String(err)}`,
+        { retryable: true, code: 'NETWORK_ERROR' }
+      )
+    }
+
+    if (!response.ok) {
+      const errText = await response.text()
+      const retryAfterMs = parseRetryAfterHeader(
+        response.headers?.get ? response.headers.get('retry-after') : undefined
+      )
+      const status = response.status
+      const retryable = status === 429 || (status >= 500 && status <= 504) || status === 408
+
+      throw new AiTranslationError(
+        `Gemini API Error (${status}): ${errText || response.statusText}`,
+        { status, retryable, retryAfterMs, code: `HTTP_${status}` }
+      )
+    }
+
+    const data = (await response.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[]
+      outputs?: { text?: string }[]
+      text?: string
+    }
+
+    let content = ''
+    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      content = data.candidates[0].content.parts[0].text
+    } else if (data.outputs?.[0]?.text) {
+      content = data.outputs[0].text
+    } else if (typeof data.text === 'string') {
+      content = data.text
+    }
+
+    const translations = parseAndValidateBatchOutput(content, request.entries)
+    return {
+      translations,
+      provider: 'gemini',
+      model: effectiveModel,
+    }
+  }
+
+  // 4. Anthropic Claude
+  if (provider === 'anthropic') {
+    if (!config.apiKey?.trim()) {
+      throw new AiTranslationError('API key is required for Anthropic Claude.', {
+        code: 'MISSING_API_KEY',
+        retryable: false,
+      })
+    }
+
+    const model = config.model || 'claude-3-5-sonnet-20241022'
+    const endpoint = 'https://api.anthropic.com/v1/messages'
+
+    let response: Response
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': config.apiKey.trim(),
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+          temperature: 0.2,
+        }),
+      })
+    } catch (err) {
+      throw new AiTranslationError(
+        `Network error connecting to Anthropic: ${err instanceof Error ? err.message : String(err)}`,
+        { retryable: true, code: 'NETWORK_ERROR' }
+      )
+    }
+
+    if (!response.ok) {
+      const errText = await response.text()
+      const retryAfterMs = parseRetryAfterHeader(
+        response.headers?.get ? response.headers.get('retry-after') : undefined
+      )
+      const status = response.status
+      const retryable = status === 429 || (status >= 500 && status <= 504) || status === 408
+
+      throw new AiTranslationError(
+        `Anthropic API Error (${status}): ${errText || response.statusText}`,
+        { status, retryable, retryAfterMs, code: `HTTP_${status}` }
+      )
+    }
+
+    const data = (await response.json()) as {
+      content?: { text?: string }[]
+    }
+    const content = data.content?.[0]?.text ?? ''
+    const translations = parseAndValidateBatchOutput(content, request.entries)
+
+    return {
+      translations,
+      provider: 'anthropic',
+      model,
+    }
+  }
+
+  // 5. Ollama
+  if (provider === 'ollama') {
+    const baseUrl = (config.baseUrl?.trim() || 'http://localhost:11434').replace(
+      /\/+$/,
+      ''
+    )
+    const endpoint = `${baseUrl}/api/chat`
+    const model = config.model || 'llama3.1'
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          stream: false,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          options: {
+            temperature: 0.2,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        const status = response.status
+        const retryable = status === 429 || (status >= 500 && status <= 504)
+        throw new AiTranslationError(
+          `Ollama Error (${status}): ${errText || response.statusText}`,
+          { status, retryable, code: `HTTP_${status}` }
+        )
+      }
+
+      const data = (await response.json()) as {
+        message?: { content?: string }
+      }
+      const content = data.message?.content ?? ''
+      const translations = parseAndValidateBatchOutput(content, request.entries)
+
+      return {
+        translations,
+        provider: 'ollama',
+        model,
+      }
+    } catch (err) {
+      if (err instanceof AiTranslationError) throw err
+      if (
+        err instanceof TypeError &&
+        (err.message.includes('fetch failed') || err.message.includes('ECONNREFUSED'))
+      ) {
+        throw new AiTranslationError(
+          `Unable to connect to Ollama at ${baseUrl}. Ensure the Ollama server is running.`,
+          { status: 0, retryable: false, code: 'CONNECTION_REFUSED' }
         )
       }
       throw err

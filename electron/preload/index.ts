@@ -25,6 +25,8 @@ export const electronAPI = {
     ipcRenderer.invoke('settings:updateAiTranslation', settings),
   translateWithAi: (request: unknown, settings: unknown): Promise<unknown> =>
     ipcRenderer.invoke('ai:translate', { request, settings }),
+  translateBatchWithAi: (request: unknown, settings: unknown): Promise<unknown> =>
+    ipcRenderer.invoke('ai:translateBatch', { request, settings }),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

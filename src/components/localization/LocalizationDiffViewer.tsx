@@ -442,6 +442,9 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     setBatchProgress({
       current: 0,
       total: initialPlan.totalCount,
+      currentBatch: 0,
+      totalBatches: 1,
+      keysInBatch: 0,
       currentKey: '',
       targetFile: '',
       successCount: 0,

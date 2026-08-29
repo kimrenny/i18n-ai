@@ -19,6 +19,10 @@ export interface ElectronAPI {
     request: AiTranslationRequest,
     settings: AiTranslationSettings
   ) => Promise<AiTranslationResult>
+  translateBatchWithAi: (
+    request: import('../services/aiTranslation').BatchAiTranslationRequest,
+    settings: AiTranslationSettings
+  ) => Promise<import('../services/aiTranslation').BatchAiTranslationResult>
 }
 
 declare global {

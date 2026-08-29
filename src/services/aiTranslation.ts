@@ -19,6 +19,26 @@ export interface AiTranslationResult {
   detectedLanguage?: string
 }
 
+export interface BatchTranslationEntry {
+  key: string
+  text: string
+  context?: string
+}
+
+export interface BatchAiTranslationRequest {
+  targetLanguage: string
+  sourceLanguage?: string
+  targetFile: string
+  sourceFile: string
+  entries: BatchTranslationEntry[]
+}
+
+export interface BatchAiTranslationResult {
+  translations: { key: string; translation: string }[]
+  provider: AiProviderId
+  model: string
+}
+
 export class AiTranslationError extends Error {
   readonly status?: number
   readonly code?: string
@@ -98,6 +118,10 @@ export interface AiTranslationProvider {
     request: AiTranslationRequest,
     config?: AiProviderConfig
   ): Promise<AiTranslationResult>
+  translateBatch?(
+    request: BatchAiTranslationRequest,
+    config?: AiProviderConfig
+  ): Promise<BatchAiTranslationResult>
 }
 
 /**
@@ -112,13 +136,23 @@ export class MockAiTranslationProvider implements AiTranslationProvider {
     config?: AiProviderConfig
   ) => Promise<AiTranslationResult>
 
+  private customTranslateBatchFn?: (
+    request: BatchAiTranslationRequest,
+    config?: AiProviderConfig
+  ) => Promise<BatchAiTranslationResult>
+
   constructor(
     customTranslateFn?: (
       request: AiTranslationRequest,
       config?: AiProviderConfig
-    ) => Promise<AiTranslationResult>
+    ) => Promise<AiTranslationResult>,
+    customTranslateBatchFn?: (
+      request: BatchAiTranslationRequest,
+      config?: AiProviderConfig
+    ) => Promise<BatchAiTranslationResult>
   ) {
     this.customTranslateFn = customTranslateFn
+    this.customTranslateBatchFn = customTranslateBatchFn
   }
 
   async translate(
@@ -147,6 +181,27 @@ export class MockAiTranslationProvider implements AiTranslationProvider {
       model: config?.model || 'mock-v1',
       detectedLanguage:
         request.sourceLanguage || request.sourceFile.replace(/\.json$/i, ''),
+    }
+  }
+
+  async translateBatch(
+    request: BatchAiTranslationRequest,
+    config?: AiProviderConfig
+  ): Promise<BatchAiTranslationResult> {
+    if (this.customTranslateBatchFn) {
+      return this.customTranslateBatchFn(request, config)
+    }
+
+    const langTarget = request.targetLanguage.toUpperCase()
+    const translations = request.entries.map((e) => ({
+      key: e.key,
+      translation: e.text ? `[AI: ${langTarget}] ${e.text}` : '',
+    }))
+
+    return {
+      translations,
+      provider: 'mock',
+      model: config?.model || 'mock-v1',
     }
   }
 }
@@ -208,7 +263,7 @@ export function findSourceReference(
 }
 
 /**
- * Dispatches an AI translation request using either the secure Electron IPC bridge
+ * Dispatches a single AI translation request using either the secure Electron IPC bridge
  * or an in-memory/mock provider if running in tests/browser.
  */
 export async function executeAiTranslation(
@@ -238,4 +293,62 @@ export async function executeAiTranslation(
 
   // Fallback to active provider in memory (for tests and offline previews)
   return await activeProvider.translate(request, providerConfig)
+}
+
+/**
+ * Dispatches a multi-entry batch AI translation request using the secure Electron IPC bridge
+ * or an in-memory/mock provider.
+ */
+export async function executeBatchAiTranslation(
+  request: BatchAiTranslationRequest,
+  settings: AiTranslationSettings
+): Promise<BatchAiTranslationResult> {
+  const providerId = settings.provider || 'mock'
+  const providerConfig = settings.providers[providerId] || {
+    model: getProviderDefinition(providerId).defaultModel,
+  }
+
+  const def = getProviderDefinition(providerId)
+  if (def.requiresApiKey && !providerConfig.apiKey?.trim()) {
+    throw new AiTranslationError(
+      `API key is missing for ${def.name}. Please enter your API key in Settings.`,
+      { code: 'MISSING_API_KEY', retryable: false }
+    )
+  }
+
+  // If running in Electron and electronAPI.translateBatchWithAi is available
+  if (window.electronAPI?.translateBatchWithAi) {
+    const result = await window.electronAPI.translateBatchWithAi(request, settings)
+    if (result && Array.isArray(result.translations)) {
+      return result
+    }
+  }
+
+  // In-memory provider batch execution
+  if (activeProvider.translateBatch) {
+    return await activeProvider.translateBatch(request, providerConfig)
+  }
+
+  // Fallback: translate each item
+  const translations: { key: string; translation: string }[] = []
+  for (const entry of request.entries) {
+    const singleRes = await activeProvider.translate(
+      {
+        key: entry.key,
+        sourceFile: request.sourceFile,
+        targetFile: request.targetFile,
+        sourceLanguage: request.sourceLanguage,
+        targetLanguage: request.targetLanguage,
+        sourceValue: entry.text,
+      },
+      providerConfig
+    )
+    translations.push({ key: entry.key, translation: singleRes.translatedText })
+  }
+
+  return {
+    translations,
+    provider: providerId,
+    model: providerConfig.model || 'default',
+  }
 }
