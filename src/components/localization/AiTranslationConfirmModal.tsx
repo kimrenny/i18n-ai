@@ -1,11 +1,17 @@
 import React, { useState } from 'react'
+import { getProviderDefinition } from '../../services/aiProviderRegistry'
+import type { AiProviderId } from '../../types/settings'
 
 export interface AiTranslationProposal {
   key: string
   targetFile: string
+  targetLanguage?: string
   sourceFile: string
+  sourceLanguage?: string
   sourceValue: string
   translatedText: string
+  provider: AiProviderId
+  model: string
 }
 
 interface AiTranslationConfirmModalProps {
@@ -24,6 +30,7 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
   onCancel,
 }) => {
   const [editedText, setEditedText] = useState(proposal.translatedText)
+  const providerDef = getProviderDefinition(proposal.provider)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -76,14 +83,23 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
                 <span className="ai-meta-value key-highlight">{proposal.key}</span>
               </div>
               <div className="ai-meta-item">
-                <span className="ai-meta-label">Target File:</span>
+                <span className="ai-meta-label">Target:</span>
                 <span className="ai-meta-value">{proposal.targetFile}</span>
+              </div>
+              <div className="ai-meta-item">
+                <span className="ai-meta-label">Engine:</span>
+                <span className="ai-meta-value ai-engine-badge">
+                  {providerDef.name} · {proposal.model}
+                </span>
               </div>
             </div>
 
             <div className="ai-preview-card source-card">
               <div className="ai-card-header">
-                <span className="ai-card-title">Source Reference ({proposal.sourceFile})</span>
+                <span className="ai-card-title">
+                  Source Reference ({proposal.sourceFile}
+                  {proposal.sourceLanguage ? ` · ${proposal.sourceLanguage}` : ''})
+                </span>
               </div>
               <div className="ai-card-content source-text-box">
                 {proposal.sourceValue ? (
@@ -96,7 +112,10 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
 
             <div className="ai-preview-card target-card">
               <div className="ai-card-header">
-                <span className="ai-card-title">AI Proposed Translation ({proposal.targetFile})</span>
+                <span className="ai-card-title">
+                  Proposed Translation ({proposal.targetFile}
+                  {proposal.targetLanguage ? ` · ${proposal.targetLanguage}` : ''})
+                </span>
                 <span className="ai-badge">AI Proposal</span>
               </div>
               <div className="ai-card-content">

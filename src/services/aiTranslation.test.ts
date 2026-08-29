@@ -4,8 +4,11 @@ import {
   getAiTranslationProvider,
   setAiTranslationProvider,
   findSourceReference,
+  resolveLanguageFromFilename,
+  executeAiTranslation,
   type AiTranslationRequest,
 } from './aiTranslation'
+import { DEFAULT_AI_TRANSLATION_SETTINGS } from '../types/settings'
 
 describe('aiTranslation service', () => {
   beforeEach(() => {
@@ -23,12 +26,14 @@ describe('aiTranslation service', () => {
 
     const response = await provider.translate(request)
     expect(response.translatedText).toBe('[AI: RU] Play')
-    expect(response.model).toBe('mock-ai-translator-v1')
+    expect(response.provider).toBe('mock')
+    expect(response.model).toBe('mock-v1')
   })
 
   it('allows plugging in a custom AI translation provider', async () => {
     const customProvider = new MockAiTranslationProvider(async (req) => ({
       translatedText: `Custom translated: ${req.sourceValue}`,
+      provider: 'mock',
       model: 'custom-model',
     }))
 
@@ -45,6 +50,34 @@ describe('aiTranslation service', () => {
     expect(response.model).toBe('custom-model')
   })
 
+  it('validates API key requirement for cloud providers in executeAiTranslation', async () => {
+    const request: AiTranslationRequest = {
+      key: 'MENU.PLAY',
+      sourceFile: 'en.json',
+      targetFile: 'ru.json',
+      sourceValue: 'Play',
+    }
+
+    const settingsWithNoKey = {
+      ...DEFAULT_AI_TRANSLATION_SETTINGS,
+      provider: 'openai' as const,
+      providers: {
+        ...DEFAULT_AI_TRANSLATION_SETTINGS.providers,
+        openai: { model: 'gpt-4o-mini', apiKey: '' },
+      },
+    }
+
+    await expect(
+      executeAiTranslation(request, settingsWithNoKey)
+    ).rejects.toThrow(/API key is missing for OpenAI/i)
+  })
+
+  it('resolves language code from filename', () => {
+    expect(resolveLanguageFromFilename('en.json')).toBe('en')
+    expect(resolveLanguageFromFilename('ru.JSON')).toBe('ru')
+    expect(resolveLanguageFromFilename('zh-CN.json')).toBe('zh-CN')
+  })
+
   describe('findSourceReference', () => {
     it('prefers en.json when non-empty value is available', () => {
       const compared = [
@@ -56,6 +89,7 @@ describe('aiTranslation service', () => {
       const ref = findSourceReference('MENU.PLAY', 'ru.json', compared)
       expect(ref).toEqual({
         sourceFile: 'en.json',
+        sourceLanguage: 'en',
         sourceValue: 'Play',
       })
     })
@@ -69,6 +103,7 @@ describe('aiTranslation service', () => {
       const ref = findSourceReference('MENU.PLAY', 'ru.json', compared)
       expect(ref).toEqual({
         sourceFile: 'de.json',
+        sourceLanguage: 'de',
         sourceValue: 'Spielen',
       })
     })

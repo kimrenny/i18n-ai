@@ -1,5 +1,12 @@
 import type { AiTranslationSettings, AppSettings } from '../types/settings'
 
+export type AiEditPolicyInput =
+  | Partial<AiTranslationSettings>
+  | { aiTranslation?: Partial<AiTranslationSettings> }
+  | AppSettings
+  | null
+  | undefined
+
 /**
  * Determines whether an AI-proposed translation edit requires explicit user review/confirmation.
  *
@@ -8,9 +15,7 @@ import type { AiTranslationSettings, AppSettings } from '../types/settings'
  * - Returns true when requireEditConfirmation === true.
  * - Returns false only when requireEditConfirmation is explicitly set to false.
  */
-export function shouldConfirmAiEdit(
-  settings?: AiTranslationSettings | AppSettings | null
-): boolean {
+export function shouldConfirmAiEdit(settings?: AiEditPolicyInput): boolean {
   if (!settings) {
     return true
   }

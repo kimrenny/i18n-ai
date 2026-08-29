@@ -5,6 +5,7 @@ import {
   setAiTranslationProvider,
   MockAiTranslationProvider,
 } from './services/aiTranslation'
+import { DEFAULT_APP_SETTINGS } from './types/settings'
 
 describe('App', () => {
   beforeEach(() => {
@@ -39,18 +40,15 @@ describe('App', () => {
     expect(screen.queryByLabelText(/localization diff viewer/i)).not.toBeInTheDocument()
   })
 
-  it('opens settings modal, shows AI confirmation checked by default, and allows toggling', async () => {
-    let currentSettings = {
-      aiTranslation: {
-        requireEditConfirmation: true,
-      },
-    }
+  it('opens settings modal, configures multi-provider AI settings, API key, model and toggles confirmation', async () => {
+    let currentSettings = { ...DEFAULT_APP_SETTINGS }
 
     const mockGetSettings = vi.fn().mockImplementation(async () => currentSettings)
     const mockUpdateSettings = vi
       .fn()
-      .mockImplementation(async (update: { requireEditConfirmation?: boolean }) => {
+      .mockImplementation(async (update: Record<string, unknown>) => {
         currentSettings = {
+          ...currentSettings,
           aiTranslation: {
             ...currentSettings.aiTranslation,
             ...update,
@@ -68,6 +66,7 @@ describe('App', () => {
       writeJsonFiles: vi.fn(),
       getSettings: mockGetSettings,
       updateAiTranslationSettings: mockUpdateSettings,
+      translateWithAi: vi.fn(),
     }
 
     render(<App />)
@@ -83,33 +82,61 @@ describe('App', () => {
     expect(
       screen.getByRole('dialog', { name: /settings/i })
     ).toBeInTheDocument()
-    expect(screen.getByText('AI Translation')).toBeInTheDocument()
+    expect(screen.getByText('AI Translation Provider')).toBeInTheDocument()
 
+    // 1. Verify Default Provider is Mock / Offline
+    const providerSelect = screen.getByRole('combobox', { name: /select ai provider/i })
+    expect(providerSelect).toHaveValue('mock')
+
+    // 2. Switch provider to OpenAI
+    fireEvent.change(providerSelect, { target: { value: 'openai' } })
+    await waitFor(() => {
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'openai' })
+      )
+    })
+
+    // Verify API Key input appears for OpenAI
+    const apiKeyInput = screen.getByLabelText(/openai api key/i)
+    expect(apiKeyInput).toBeInTheDocument()
+    expect(apiKeyInput).toHaveAttribute('type', 'password')
+
+    // Enter API Key
+    fireEvent.change(apiKeyInput, { target: { value: 'sk-test-key-12345' } })
+    await waitFor(() => {
+      expect(mockUpdateSettings).toHaveBeenCalled()
+    })
+
+    // Toggle API Key visibility
+    const showToggleBtn = screen.getByRole('button', { name: /show/i })
+    fireEvent.click(showToggleBtn)
+    expect(apiKeyInput).toHaveAttribute('type', 'text')
+
+    // 3. Switch provider to Ollama
+    fireEvent.change(providerSelect, { target: { value: 'ollama' } })
+    await waitFor(() => {
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'ollama' })
+      )
+    })
+
+    // Verify Ollama Base URL input appears
+    const baseUrlInput = screen.getByLabelText(/ollama base url/i)
+    expect(baseUrlInput).toBeInTheDocument()
+    expect(baseUrlInput).toHaveValue('http://localhost:11434')
+
+    // 4. Toggle Confirmation checkbox
     const checkbox = screen.getByRole('checkbox', {
       name: /ask for confirmation before applying ai translations/i,
     })
     expect(checkbox).toBeChecked()
-    expect(
-      screen.getByText(
-        /when enabled, ai-generated translations must be reviewed and confirmed before they are written to localization files\./i
-      )
-    ).toBeInTheDocument()
 
-    // Uncheck confirmation checkbox
     fireEvent.click(checkbox)
-
     await waitFor(() => {
-      expect(mockUpdateSettings).toHaveBeenCalledWith({
-        requireEditConfirmation: false,
-      })
-    })
-
-    expect(checkbox).not.toBeChecked()
-    expect(
-      screen.getByText(
-        /ai-generated translations can be applied automatically without confirmation\./i
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ requireEditConfirmation: false })
       )
-    ).toBeInTheDocument()
+    })
 
     // Close settings modal
     const doneBtn = screen.getByRole('button', { name: /done/i })
@@ -118,7 +145,7 @@ describe('App', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('triggers AI translation review modal when requireEditConfirmation is true, allows cancel and apply', async () => {
+  it('triggers AI translation review modal when requireEditConfirmation is true, displaying engine badge and source info', async () => {
     let ruContent: Record<string, unknown> = {
       MENU: {
         PLAY: '', // empty key
@@ -163,8 +190,9 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
       updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
     }
 
     render(<App />)
@@ -184,17 +212,18 @@ describe('App', () => {
     const aiTranslateBtn = screen.getByRole('button', { name: /translate menu\.play with ai/i })
     fireEvent.click(aiTranslateBtn)
 
-    // Review Modal should appear
+    // Review Modal should appear with Provider & Model info
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: /review ai translation/i })).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Source Reference (en.json)')).toBeInTheDocument()
+    expect(screen.getByText(/Source Reference \(en\.json · en\)/i)).toBeInTheDocument()
     expect(screen.getByText('Play')).toBeInTheDocument()
+    expect(screen.getByText(/Mock \/ Offline · mock-v1/i)).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: /ai proposed translation/i })).toHaveValue('[AI: RU] Play')
 
     // Test Cancel
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(mockWriteJsonFiles).not.toHaveBeenCalled()
 
@@ -277,8 +306,15 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: false } }),
+      getSettings: vi.fn().mockResolvedValue({
+        ...DEFAULT_APP_SETTINGS,
+        aiTranslation: {
+          ...DEFAULT_APP_SETTINGS.aiTranslation,
+          requireEditConfirmation: false,
+        },
+      }),
       updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
     }
 
     render(<App />)
@@ -322,13 +358,7 @@ describe('App', () => {
     expect(screen.getByText(/✓ applied ai translation for menu\.play/i)).toBeInTheDocument()
   })
 
-  it('displays error and does not modify files when AI provider fails', async () => {
-    setAiTranslationProvider(
-      new MockAiTranslationProvider(async () => {
-        throw new Error('AI Service Unavailable')
-      })
-    )
-
+  it('displays error and does not modify files when AI provider fails or lacks required API key', async () => {
     const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
     const mockGetJsonFiles = vi.fn().mockResolvedValue([
       { name: 'en.json', path: 'C:/Projects/locales/en.json' },
@@ -352,8 +382,17 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      getSettings: vi.fn().mockResolvedValue({
+        aiTranslation: {
+          provider: 'openai',
+          requireEditConfirmation: true,
+          providers: {
+            openai: { model: 'gpt-4o-mini', apiKey: '' },
+          },
+        },
+      }),
       updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
     }
 
     render(<App />)
@@ -370,7 +409,7 @@ describe('App', () => {
     fireEvent.click(aiTranslateBtn)
 
     await waitFor(() => {
-      expect(screen.getByText(/ai service unavailable/i)).toBeInTheDocument()
+      expect(screen.getByText(/api key is missing for openai/i)).toBeInTheDocument()
     })
 
     expect(mockWriteJsonFiles).not.toHaveBeenCalled()
@@ -390,8 +429,9 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: vi.fn(),
       writeJsonFiles: vi.fn(),
-      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
       updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
     }
 
     render(<App />)
@@ -450,8 +490,9 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: vi.fn(),
-      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
       updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
     }
 
     render(<App />)
@@ -569,8 +610,9 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
       updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
     }
 
     render(<App />)
@@ -678,8 +720,9 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
       updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
     }
 
     render(<App />)

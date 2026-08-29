@@ -1,4 +1,5 @@
 import type { AppSettings, AiTranslationSettings } from './settings'
+import type { AiTranslationRequest, AiTranslationResult } from '../services/aiTranslation'
 
 export interface JsonFileInfo {
   name: string
@@ -14,6 +15,10 @@ export interface ElectronAPI {
   writeJsonFiles: (files: { path: string; content: string }[]) => Promise<{ success: boolean }>
   getSettings: () => Promise<AppSettings>
   updateAiTranslationSettings: (settings: Partial<AiTranslationSettings>) => Promise<AppSettings>
+  translateWithAi: (
+    request: AiTranslationRequest,
+    settings: AiTranslationSettings
+  ) => Promise<AiTranslationResult>
 }
 
 declare global {
