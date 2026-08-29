@@ -18,8 +18,9 @@ import {
 } from '../../services/localizationWriter'
 import { shouldConfirmAiEdit } from '../../services/aiEditPolicy'
 import {
-  getAiTranslationProvider,
+  executeAiTranslation,
   findSourceReference,
+  resolveLanguageFromFilename,
 } from '../../services/aiTranslation'
 import { LocalizationSummary } from './LocalizationSummary'
 import { LocalizationFileTabs } from './LocalizationFileTabs'
@@ -271,13 +272,31 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       setTranslatingKey(fullKey)
 
       try {
-        const provider = getAiTranslationProvider()
-        const response = await provider.translate({
-          key: fullKey,
-          sourceFile: ref.sourceFile,
-          targetFile: activeFilename,
-          sourceValue: ref.sourceValue,
-        })
+        const targetLanguage = resolveLanguageFromFilename(activeFilename)
+        const response = await executeAiTranslation(
+          {
+            key: fullKey,
+            sourceFile: ref.sourceFile,
+            sourceLanguage: ref.sourceLanguage,
+            targetFile: activeFilename,
+            targetLanguage,
+            sourceValue: ref.sourceValue,
+          },
+          settings?.aiTranslation || {
+            provider: 'mock',
+            requireEditConfirmation: true,
+            providers: {
+              mock: { model: 'mock-v1' },
+              openai: { model: 'gpt-4o-mini' },
+              gemini: { model: 'gemini-3.6-flash' },
+              anthropic: { model: 'claude-3-5-sonnet-20241022' },
+              mistral: { model: 'mistral-large-latest' },
+              xai: { model: 'grok-2-latest' },
+              deepseek: { model: 'deepseek-chat' },
+              ollama: { model: 'llama3.1' },
+            },
+          }
+        )
 
         const needsConfirmation = shouldConfirmAiEdit(settings)
 
@@ -285,9 +304,13 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           setAiProposal({
             key: fullKey,
             targetFile: activeFilename,
+            targetLanguage,
             sourceFile: ref.sourceFile,
+            sourceLanguage: ref.sourceLanguage,
             sourceValue: ref.sourceValue,
             translatedText: response.translatedText,
+            provider: response.provider,
+            model: response.model,
           })
         } else {
           // Automatic write mode when permission confirmation is disabled

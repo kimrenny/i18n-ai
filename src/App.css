@@ -1340,10 +1340,107 @@
   margin: 0;
 }
 
+.setting-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+}
+
+.setting-field-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.setting-select {
+  background: #0f172a;
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.setting-select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.setting-input-wrapper {
+  display: flex;
+  position: relative;
+}
+
+.setting-input-wrapper.with-toggle {
+  align-items: center;
+}
+
+.setting-text-input {
+  width: 100%;
+  background: #0f172a;
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.setting-text-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.toggle-api-key-btn {
+  position: absolute;
+  right: 6px;
+  background: rgba(30, 41, 59, 0.8);
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggle-api-key-btn:hover {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+
+.setting-field-hint {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.setting-permission-divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+}
+
 .setting-control-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.ai-engine-badge {
+  color: #c084fc !important;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
 }
 
 .setting-checkbox-label {
