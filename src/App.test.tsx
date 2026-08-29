@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from './App'
+import {
+  setAiTranslationProvider,
+  MockAiTranslationProvider,
+} from './services/aiTranslation'
 
 describe('App', () => {
   beforeEach(() => {
@@ -8,18 +12,23 @@ describe('App', () => {
     delete (window as unknown as { electronAPI?: unknown }).electronAPI
     Element.prototype.scrollIntoView = vi.fn()
     HTMLElement.prototype.scrollTo = vi.fn()
+    setAiTranslationProvider(new MockAiTranslationProvider())
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     delete (window as unknown as { electronAPI?: unknown }).electronAPI
+    setAiTranslationProvider(new MockAiTranslationProvider())
   })
 
-  it('renders application title and initial empty folder state', () => {
+  it('renders application title, settings button, and initial empty folder state', () => {
     render(<App />)
 
     expect(
       screen.getByRole('heading', { level: 1, name: /localization ai/i })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /open settings/i })
     ).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: /select folder/i })
@@ -28,6 +37,343 @@ describe('App', () => {
     expect(screen.queryByText(/json files:/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/parse results:/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/localization diff viewer/i)).not.toBeInTheDocument()
+  })
+
+  it('opens settings modal, shows AI confirmation checked by default, and allows toggling', async () => {
+    let currentSettings = {
+      aiTranslation: {
+        requireEditConfirmation: true,
+      },
+    }
+
+    const mockGetSettings = vi.fn().mockImplementation(async () => currentSettings)
+    const mockUpdateSettings = vi
+      .fn()
+      .mockImplementation(async (update: { requireEditConfirmation?: boolean }) => {
+        currentSettings = {
+          aiTranslation: {
+            ...currentSettings.aiTranslation,
+            ...update,
+          },
+        }
+        return currentSettings
+      })
+
+    window.electronAPI = {
+      isElectron: true,
+      platform: 'win32',
+      selectDirectory: vi.fn(),
+      getJsonFiles: vi.fn(),
+      readJsonFile: vi.fn(),
+      writeJsonFiles: vi.fn(),
+      getSettings: mockGetSettings,
+      updateAiTranslationSettings: mockUpdateSettings,
+    }
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(mockGetSettings).toHaveBeenCalled()
+    })
+
+    // Open settings modal
+    const settingsBtn = screen.getByRole('button', { name: /open settings/i })
+    fireEvent.click(settingsBtn)
+
+    expect(
+      screen.getByRole('dialog', { name: /settings/i })
+    ).toBeInTheDocument()
+    expect(screen.getByText('AI Translation')).toBeInTheDocument()
+
+    const checkbox = screen.getByRole('checkbox', {
+      name: /ask for confirmation before applying ai translations/i,
+    })
+    expect(checkbox).toBeChecked()
+    expect(
+      screen.getByText(
+        /when enabled, ai-generated translations must be reviewed and confirmed before they are written to localization files\./i
+      )
+    ).toBeInTheDocument()
+
+    // Uncheck confirmation checkbox
+    fireEvent.click(checkbox)
+
+    await waitFor(() => {
+      expect(mockUpdateSettings).toHaveBeenCalledWith({
+        requireEditConfirmation: false,
+      })
+    })
+
+    expect(checkbox).not.toBeChecked()
+    expect(
+      screen.getByText(
+        /ai-generated translations can be applied automatically without confirmation\./i
+      )
+    ).toBeInTheDocument()
+
+    // Close settings modal
+    const doneBtn = screen.getByRole('button', { name: /done/i })
+    fireEvent.click(doneBtn)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('triggers AI translation review modal when requireEditConfirmation is true, allows cancel and apply', async () => {
+    let ruContent: Record<string, unknown> = {
+      MENU: {
+        PLAY: '', // empty key
+        EXIT: 'Выход',
+      },
+    }
+
+    const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+    const mockGetJsonFiles = vi.fn().mockResolvedValue([
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+    ])
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return {
+          MENU: {
+            PLAY: 'Play',
+            EXIT: 'Exit',
+          },
+        }
+      }
+      if (filePath.endsWith('ru.json')) {
+        return ruContent
+      }
+      throw new Error('File not found')
+    })
+    const mockWriteJsonFiles = vi
+      .fn()
+      .mockImplementation(async (files: { path: string; content: string }[]) => {
+        for (const file of files) {
+          if (file.path.endsWith('ru.json')) {
+            ruContent = JSON.parse(file.content)
+          }
+        }
+        return { success: true }
+      })
+
+    window.electronAPI = {
+      isElectron: true,
+      platform: 'win32',
+      selectDirectory: mockSelectDirectory,
+      getJsonFiles: mockGetJsonFiles,
+      readJsonFile: mockReadJsonFile,
+      writeJsonFiles: mockWriteJsonFiles,
+      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      updateAiTranslationSettings: vi.fn(),
+    }
+
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
+
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+
+    // Switch to ru.json
+    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+
+    // Click "✨ Translate with AI" on MENU.PLAY
+    const aiTranslateBtn = screen.getByRole('button', { name: /translate menu\.play with ai/i })
+    fireEvent.click(aiTranslateBtn)
+
+    // Review Modal should appear
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /review ai translation/i })).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Source Reference (en.json)')).toBeInTheDocument()
+    expect(screen.getByText('Play')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /ai proposed translation/i })).toHaveValue('[AI: RU] Play')
+
+    // Test Cancel
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mockWriteJsonFiles).not.toHaveBeenCalled()
+
+    // Click AI translate again and Confirm
+    fireEvent.click(screen.getByRole('button', { name: /translate menu\.play with ai/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /review ai translation/i })).toBeInTheDocument()
+    })
+
+    const applyBtn = screen.getByRole('button', { name: /apply translation/i })
+    fireEvent.click(applyBtn)
+
+    await waitFor(() => {
+      expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+        {
+          path: 'C:/Projects/locales/ru.json',
+          content: JSON.stringify(
+            {
+              MENU: {
+                PLAY: '[AI: RU] Play',
+                EXIT: 'Выход',
+              },
+            },
+            null,
+            2
+          ) + '\n',
+        },
+      ])
+    })
+
+    // Modal closes and tree updates
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByTestId('tree-node-MENU.PLAY')).toHaveTextContent('"[AI: RU] Play"')
+    })
+  })
+
+  it('automatically applies AI translation when requireEditConfirmation is false', async () => {
+    let ruContent: Record<string, unknown> = {
+      MENU: {
+        PLAY: '', // empty key
+        EXIT: 'Выход',
+      },
+    }
+
+    const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+    const mockGetJsonFiles = vi.fn().mockResolvedValue([
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+    ])
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return {
+          MENU: {
+            PLAY: 'Play',
+            EXIT: 'Exit',
+          },
+        }
+      }
+      if (filePath.endsWith('ru.json')) {
+        return ruContent
+      }
+      throw new Error('File not found')
+    })
+    const mockWriteJsonFiles = vi
+      .fn()
+      .mockImplementation(async (files: { path: string; content: string }[]) => {
+        for (const file of files) {
+          if (file.path.endsWith('ru.json')) {
+            ruContent = JSON.parse(file.content)
+          }
+        }
+        return { success: true }
+      })
+
+    window.electronAPI = {
+      isElectron: true,
+      platform: 'win32',
+      selectDirectory: mockSelectDirectory,
+      getJsonFiles: mockGetJsonFiles,
+      readJsonFile: mockReadJsonFile,
+      writeJsonFiles: mockWriteJsonFiles,
+      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: false } }),
+      updateAiTranslationSettings: vi.fn(),
+    }
+
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
+
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+
+    // Switch to ru.json
+    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+
+    // Click "✨ Translate with AI" on MENU.PLAY
+    const aiTranslateBtn = screen.getByRole('button', { name: /translate menu\.play with ai/i })
+    fireEvent.click(aiTranslateBtn)
+
+    // Should NOT show confirmation dialog, writes immediately
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+        {
+          path: 'C:/Projects/locales/ru.json',
+          content: JSON.stringify(
+            {
+              MENU: {
+                PLAY: '[AI: RU] Play',
+                EXIT: 'Выход',
+              },
+            },
+            null,
+            2
+          ) + '\n',
+        },
+      ])
+    })
+
+    // Shows success status message
+    expect(screen.getByText(/✓ applied ai translation for menu\.play/i)).toBeInTheDocument()
+  })
+
+  it('displays error and does not modify files when AI provider fails', async () => {
+    setAiTranslationProvider(
+      new MockAiTranslationProvider(async () => {
+        throw new Error('AI Service Unavailable')
+      })
+    )
+
+    const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+    const mockGetJsonFiles = vi.fn().mockResolvedValue([
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+    ])
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return { MENU: { PLAY: 'Play' } }
+      }
+      if (filePath.endsWith('ru.json')) {
+        return { MENU: { PLAY: '' } }
+      }
+      throw new Error('File not found')
+    })
+    const mockWriteJsonFiles = vi.fn()
+
+    window.electronAPI = {
+      isElectron: true,
+      platform: 'win32',
+      selectDirectory: mockSelectDirectory,
+      getJsonFiles: mockGetJsonFiles,
+      readJsonFile: mockReadJsonFile,
+      writeJsonFiles: mockWriteJsonFiles,
+      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      updateAiTranslationSettings: vi.fn(),
+    }
+
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+
+    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+
+    const aiTranslateBtn = screen.getByRole('button', { name: /translate menu\.play with ai/i })
+    fireEvent.click(aiTranslateBtn)
+
+    await waitFor(() => {
+      expect(screen.getByText(/ai service unavailable/i)).toBeInTheDocument()
+    })
+
+    expect(mockWriteJsonFiles).not.toHaveBeenCalled()
   })
 
   it('displays discovered JSON files with checkboxes and parse button', async () => {
@@ -44,6 +390,8 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: vi.fn(),
       writeJsonFiles: vi.fn(),
+      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      updateAiTranslationSettings: vi.fn(),
     }
 
     render(<App />)
@@ -102,6 +450,8 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: vi.fn(),
+      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      updateAiTranslationSettings: vi.fn(),
     }
 
     render(<App />)
@@ -219,6 +569,8 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
+      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      updateAiTranslationSettings: vi.fn(),
     }
 
     render(<App />)
@@ -326,6 +678,8 @@ describe('App', () => {
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
+      getSettings: vi.fn().mockResolvedValue({ aiTranslation: { requireEditConfirmation: true } }),
+      updateAiTranslationSettings: vi.fn(),
     }
 
     render(<App />)

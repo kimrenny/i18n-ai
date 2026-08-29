@@ -5,6 +5,7 @@ import type {
   LocalizationTreeNode as TreeNodeType,
   MissingKeysAdditionPlan,
 } from '../../types/localization'
+import type { AppSettings } from '../../types/settings'
 import { buildLocalizationTree } from '../../services/localizationTree'
 import {
   getMissingKeysForFile,
@@ -15,15 +16,25 @@ import {
   planMissingKeysAddition,
   updateSingleKeyInFile,
 } from '../../services/localizationWriter'
+import { shouldConfirmAiEdit } from '../../services/aiEditPolicy'
+import {
+  getAiTranslationProvider,
+  findSourceReference,
+} from '../../services/aiTranslation'
 import { LocalizationSummary } from './LocalizationSummary'
 import { LocalizationFileTabs } from './LocalizationFileTabs'
 import { MissingKeyNavigator, type ProblemNavMode } from './MissingKeyNavigator'
 import { LocalizationTree } from './LocalizationTree'
 import { AddMissingKeysModal } from './AddMissingKeysModal'
+import {
+  AiTranslationConfirmModal,
+  type AiTranslationProposal,
+} from './AiTranslationConfirmModal'
 
 interface LocalizationDiffViewerProps {
   comparisonResult: LocalizationComparisonResult
   parsedFiles: ParsedLocalizationFile[]
+  settings?: AppSettings
   onRefreshFiles: () => Promise<void>
 }
 
@@ -41,6 +52,7 @@ function collectFolderIds(nodes: TreeNodeType[]): string[] {
 export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   comparisonResult,
   parsedFiles,
+  settings,
   onRefreshFiles,
 }) => {
   const initialFilename = comparisonResult.comparedFiles[0]?.filename || ''
@@ -57,6 +69,13 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const [editValue, setEditValue] = useState<string>('')
   const [isSavingKey, setIsSavingKey] = useState(false)
   const [saveKeyError, setSaveKeyError] = useState<string | null>(null)
+
+  // AI Translation state
+  const [translatingKey, setTranslatingKey] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null)
+  const [aiProposal, setAiProposal] = useState<AiTranslationProposal | null>(null)
+  const [isApplyingAi, setIsApplyingAi] = useState(false)
 
   const treeBodyRef = useRef<HTMLDivElement | null>(null)
 
@@ -93,6 +112,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     setActiveMissingKey(null)
     setEditingKey(null)
     setSaveKeyError(null)
+    setAiError(null)
+    setAiSuccessMessage(null)
   }, [])
 
   const handleNavigate = useCallback(
@@ -203,6 +224,106 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     }
   }, [editingKey, activeFileData, editValue, onRefreshFiles])
 
+  // AI Translation Execution Logic
+  const executeApplyAiTranslation = useCallback(
+    async (fullKey: string, textToApply: string) => {
+      if (!activeFileData) return
+      if (!window.electronAPI?.writeJsonFiles) {
+        throw new Error('Unable to write files: Electron API is unavailable.')
+      }
+
+      const { formattedJson } = updateSingleKeyInFile(
+        activeFileData.raw,
+        fullKey,
+        textToApply
+      )
+
+      await window.electronAPI.writeJsonFiles([
+        {
+          path: activeFileData.path,
+          content: formattedJson,
+        },
+      ])
+
+      if (editingKey === fullKey) {
+        setEditingKey(null)
+      }
+
+      setAiSuccessMessage(`✓ Applied AI translation for ${fullKey}`)
+      await onRefreshFiles()
+    },
+    [activeFileData, editingKey, onRefreshFiles]
+  )
+
+  const handleAiTranslate = useCallback(
+    async (fullKey: string) => {
+      if (translatingKey) return // Prevent concurrent duplicate requests
+
+      setAiError(null)
+      setAiSuccessMessage(null)
+
+      const ref = findSourceReference(fullKey, activeFilename, parsedFiles)
+      if (!ref) {
+        setAiError(`No source translation found for "${fullKey}" in other compared files.`)
+        return
+      }
+
+      setTranslatingKey(fullKey)
+
+      try {
+        const provider = getAiTranslationProvider()
+        const response = await provider.translate({
+          key: fullKey,
+          sourceFile: ref.sourceFile,
+          targetFile: activeFilename,
+          sourceValue: ref.sourceValue,
+        })
+
+        const needsConfirmation = shouldConfirmAiEdit(settings)
+
+        if (needsConfirmation) {
+          setAiProposal({
+            key: fullKey,
+            targetFile: activeFilename,
+            sourceFile: ref.sourceFile,
+            sourceValue: ref.sourceValue,
+            translatedText: response.translatedText,
+          })
+        } else {
+          // Automatic write mode when permission confirmation is disabled
+          await executeApplyAiTranslation(fullKey, response.translatedText)
+        }
+      } catch (err) {
+        setAiError(
+          err instanceof Error ? err.message : 'AI translation request failed.'
+        )
+      } finally {
+        setTranslatingKey(null)
+      }
+    },
+    [translatingKey, activeFilename, parsedFiles, settings, executeApplyAiTranslation]
+  )
+
+  const handleConfirmAiProposal = useCallback(
+    async (finalText: string) => {
+      if (!aiProposal) return
+      setIsApplyingAi(true)
+      setAiError(null)
+
+      try {
+        await executeApplyAiTranslation(aiProposal.key, finalText)
+        setAiProposal(null)
+      } catch (err) {
+        setAiError(
+          err instanceof Error ? err.message : 'Failed to apply AI translation.'
+        )
+      } finally {
+        setIsApplyingAi(false)
+      }
+    },
+    [aiProposal, executeApplyAiTranslation]
+  )
+
   const handleToggleCollapse = useCallback((id: string) => {
     setCollapsedSet((prev) => {
       const next = new Set(prev)
@@ -285,6 +406,12 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         onOpenAddMissingModal={handleOpenAddMissingModal}
       />
 
+      {aiSuccessMessage && (
+        <div className="success-banner" role="status">
+          {aiSuccessMessage}
+        </div>
+      )}
+
       {writeError && (
         <div className="error-message" role="alert">
           {writeError}
@@ -294,6 +421,12 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       {saveKeyError && (
         <div className="error-message" role="alert">
           {saveKeyError}
+        </div>
+      )}
+
+      {aiError && (
+        <div className="error-message" role="alert">
+          {aiError}
         </div>
       )}
 
@@ -323,6 +456,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           editingKey={editingKey}
           editValue={editValue}
           isSavingKey={isSavingKey}
+          translatingKey={translatingKey}
           treeBodyRef={treeBodyRef}
           onToggleCollapse={handleToggleCollapse}
           onExpandAll={handleExpandAll}
@@ -332,6 +466,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           onEditValueChange={setEditValue}
           onSaveEdit={handleSaveEdit}
           onCancelEdit={handleCancelEdit}
+          onAiTranslate={handleAiTranslate}
         />
       </div>
 
@@ -341,6 +476,19 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           isWriting={isWriting}
           onConfirm={handleConfirmWrite}
           onClose={() => setAdditionPlan(null)}
+        />
+      )}
+
+      {aiProposal && (
+        <AiTranslationConfirmModal
+          proposal={aiProposal}
+          isApplying={isApplyingAi}
+          error={aiError}
+          onConfirm={handleConfirmAiProposal}
+          onCancel={() => {
+            setAiProposal(null)
+            setAiError(null)
+          }}
         />
       )}
     </section>

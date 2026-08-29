@@ -9,12 +9,14 @@ interface LocalizationTreeNodeProps {
   editingKey?: string | null
   editValue?: string
   isSavingKey?: boolean
+  translatingKey?: string | null
   onToggleCollapse: (id: string) => void
   onSelectRow: (fullKey: string, isMissing: boolean, isEmpty: boolean) => void
   onStartEdit?: (fullKey: string, currentValue: string) => void
   onEditValueChange?: (value: string) => void
   onSaveEdit?: () => void
   onCancelEdit?: () => void
+  onAiTranslate?: (fullKey: string) => void
 }
 
 function formatJsonValue(value: JsonValue | undefined): string {
@@ -44,12 +46,14 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
   editingKey,
   editValue = '',
   isSavingKey = false,
+  translatingKey,
   onToggleCollapse,
   onSelectRow,
   onStartEdit,
   onEditValueChange,
   onSaveEdit,
   onCancelEdit,
+  onAiTranslate,
 }) => {
   const isFolder = node.type === 'folder' || node.children.length > 0
   const isCollapsed = collapsedSet.has(node.id)
@@ -58,6 +62,8 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
   const isCurrentlyEditing = editingKey === node.fullKey
   const isStringValue =
     node.isPresent && (typeof node.value === 'string' || node.isEmpty)
+  const isThisKeyTranslating = translatingKey === node.fullKey
+  const isAnyKeyTranslating = translatingKey !== null && translatingKey !== undefined
 
   const handleRowClick = () => {
     if (!isFolder) {
@@ -83,6 +89,11 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
       e.preventDefault()
       onCancelEdit?.()
     }
+  }
+
+  const handleAiClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onAiTranslate?.(node.fullKey)
   }
 
   return (
@@ -117,12 +128,26 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
             <span className="separator">:</span>
 
             {node.isMissing ? (
-              <span
-                className={`missing-pill ${isProblemActive ? 'active-pill' : ''}`}
-                role="status"
-              >
-                [ MISSING ]
-              </span>
+              <div className="missing-container">
+                <span
+                  className={`missing-pill ${isProblemActive ? 'active-pill' : ''}`}
+                  role="status"
+                >
+                  [ MISSING ]
+                </span>
+                {onAiTranslate && (
+                  <button
+                    type="button"
+                    className="ai-translate-btn"
+                    onClick={handleAiClick}
+                    disabled={isAnyKeyTranslating}
+                    title="Translate with AI"
+                    aria-label={`Translate ${node.fullKey} with AI`}
+                  >
+                    {isThisKeyTranslating ? 'Translating...' : '✨ Translate with AI'}
+                  </button>
+                )}
+              </div>
             ) : node.isConflict ? (
               <div className="conflict-box">
                 <span className="conflict-val">{formatJsonValue(node.value)}</span>
@@ -160,17 +185,43 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
                 >
                   Cancel
                 </button>
+                {onAiTranslate && (
+                  <button
+                    type="button"
+                    className="editor-btn ai-btn"
+                    onClick={handleAiClick}
+                    disabled={isAnyKeyTranslating || isSavingKey}
+                    title="Translate with AI"
+                    aria-label={`Translate ${node.fullKey} with AI`}
+                  >
+                    {isThisKeyTranslating ? 'Translating...' : '✨ AI Translate'}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="value-container">
                 <span className="leaf-value">{formatJsonValue(node.value)}</span>
                 {node.isEmpty && (
-                  <span
-                    className={`empty-pill ${isProblemActive ? 'active-empty-pill' : ''}`}
-                    role="status"
-                  >
-                    [ EMPTY ]
-                  </span>
+                  <>
+                    <span
+                      className={`empty-pill ${isProblemActive ? 'active-empty-pill' : ''}`}
+                      role="status"
+                    >
+                      [ EMPTY ]
+                    </span>
+                    {onAiTranslate && (
+                      <button
+                        type="button"
+                        className="ai-translate-btn"
+                        onClick={handleAiClick}
+                        disabled={isAnyKeyTranslating}
+                        title="Translate with AI"
+                        aria-label={`Translate ${node.fullKey} with AI`}
+                      >
+                        {isThisKeyTranslating ? 'Translating...' : '✨ Translate with AI'}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -190,12 +241,14 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
               editingKey={editingKey}
               editValue={editValue}
               isSavingKey={isSavingKey}
+              translatingKey={translatingKey}
               onToggleCollapse={onToggleCollapse}
               onSelectRow={onSelectRow}
               onStartEdit={onStartEdit}
               onEditValueChange={onEditValueChange}
               onSaveEdit={onSaveEdit}
               onCancelEdit={onCancelEdit}
+              onAiTranslate={onAiTranslate}
             />
           ))}
         </div>

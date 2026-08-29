@@ -28,6 +28,52 @@ let win: BrowserWindow | null = null
 
 const preload = path.join(__dirname, '../preload/index.cjs')
 
+interface AppSettings {
+  aiTranslation: {
+    requireEditConfirmation: boolean
+  }
+}
+
+const DEFAULT_APP_SETTINGS: AppSettings = {
+  aiTranslation: {
+    requireEditConfirmation: true,
+  },
+}
+
+function getSettingsFilePath(): string {
+  return path.join(app.getPath('userData'), 'settings.json')
+}
+
+async function loadPersistedSettings(): Promise<AppSettings> {
+  try {
+    const settingsPath = getSettingsFilePath()
+    const content = await fs.readFile(settingsPath, 'utf-8')
+    const parsed = JSON.parse(content)
+
+    return {
+      aiTranslation: {
+        requireEditConfirmation:
+          typeof parsed?.aiTranslation?.requireEditConfirmation === 'boolean'
+            ? parsed.aiTranslation.requireEditConfirmation
+            : true,
+      },
+    }
+  } catch {
+    // If file does not exist or cannot be parsed, safely fallback to defaults
+    return { ...DEFAULT_APP_SETTINGS }
+  }
+}
+
+async function persistSettings(settings: AppSettings): Promise<void> {
+  const settingsPath = getSettingsFilePath()
+  const dir = path.dirname(settingsPath)
+  await fs.mkdir(dir, { recursive: true })
+
+  const tempPath = `${settingsPath}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 8)}`
+  await fs.writeFile(tempPath, JSON.stringify(settings, null, 2), 'utf-8')
+  await fs.rename(tempPath, settingsPath)
+}
+
 function createWindow() {
   console.log('[main] Creating window with preload path:', preload)
 
@@ -153,6 +199,29 @@ app.whenReady().then(() => {
         }
         throw err
       }
+    }
+  )
+
+  // Settings IPC Handlers
+  ipcMain.handle('settings:get', async () => {
+    console.log('[main] settings:get invoked')
+    return await loadPersistedSettings()
+  })
+
+  ipcMain.handle(
+    'settings:updateAiTranslation',
+    async (_, update: Partial<AppSettings['aiTranslation']>) => {
+      console.log('[main] settings:updateAiTranslation invoked with:', update)
+      const current = await loadPersistedSettings()
+      const updated: AppSettings = {
+        ...current,
+        aiTranslation: {
+          ...current.aiTranslation,
+          ...(update && typeof update === 'object' ? update : {}),
+        },
+      }
+      await persistSettings(updated)
+      return updated
     }
   )
 
