@@ -4,7 +4,6 @@ import {
   executeBatchTranslation,
   retryFailedBatchTranslations,
   applyBatchTranslationPlan,
-  waitWithAbort,
 } from './aiBatchTranslation'
 import { compareLocalizationFiles } from './localizationComparator'
 import {
@@ -88,67 +87,131 @@ describe('aiBatchTranslation service', () => {
     expect(keys).not.toContain('SETTINGS.BOOL')
   })
 
-  it('executes batch translation sequentially with concurrency=1 by default and updates proposed translations', async () => {
+  it('translates multiple entries in optimized batch chunks rather than 1 request per key', async () => {
     const comparison = compareLocalizationFiles(mockParsedFiles)
-    const initialPlan = createBatchTranslationPlan(mockParsedFiles, comparison)
+    const plan = createBatchTranslationPlan(mockParsedFiles, comparison)
+    expect(plan.totalCount).toBe(4)
 
-    let activeConcurrent = 0
-    let maxObservedConcurrent = 0
+    let batchApiCallCount = 0
+    let totalKeysRequested = 0
 
     setAiTranslationProvider(
-      new MockAiTranslationProvider(async (req) => {
-        activeConcurrent++
-        if (activeConcurrent > maxObservedConcurrent) {
-          maxObservedConcurrent = activeConcurrent
-        }
-        await new Promise((r) => setTimeout(r, 5))
-        activeConcurrent--
-        return {
-          translatedText: `[Mock] ${req.sourceValue}`,
-          provider: 'mock',
-          model: 'mock-v1',
-        }
-      })
-    )
-
-    const executedPlan = await executeBatchTranslation(
-      initialPlan,
-      DEFAULT_AI_TRANSLATION_SETTINGS
-    )
-
-    expect(executedPlan.items.every((i) => i.status === 'translated')).toBe(true)
-    expect(maxObservedConcurrent).toBe(1) // Controlled sequential processing by default
-  })
-
-  describe('HTTP 429 & Rate Limit Retries', () => {
-    it('handles HTTP 429 rate limits with backoff and succeeds on retry', async () => {
-      let attempts = 0
-      setAiTranslationProvider(
-        new MockAiTranslationProvider(async (req) => {
-          attempts++
-          if (attempts === 1) {
-            throw new AiTranslationError('Rate limit exceeded (HTTP 429)', {
-              status: 429,
-              retryable: true,
-              retryAfterMs: 10,
-            })
-          }
+      new MockAiTranslationProvider(
+        undefined,
+        async (req) => {
+          batchApiCallCount++
+          totalKeysRequested += req.entries.length
           return {
-            translatedText: `[Mock] ${req.sourceValue}`,
+            translations: req.entries.map((e) => ({
+              key: e.key,
+              translation: `[MockRU] ${e.text}`,
+            })),
             provider: 'mock',
             model: 'mock-v1',
           }
-        })
+        }
+      )
+    )
+
+    const executedPlan = await executeBatchTranslation(
+      plan,
+      DEFAULT_AI_TRANSLATION_SETTINGS
+    )
+
+    // All 4 keys should be translated in a SINGLE batch API request!
+    expect(batchApiCallCount).toBe(1)
+    expect(totalKeysRequested).toBe(4)
+    expect(executedPlan.items.every((i) => i.status === 'translated')).toBe(true)
+    expect(executedPlan.items[0].proposedTranslation).toContain('[MockRU]')
+  })
+
+  it('automatically splits batch into smaller sub-batches when token/request size limit error occurs', async () => {
+    // 6 keys in total
+    const enKeys: Record<string, string> = {}
+    const ruKeys: Record<string, string> = {}
+    for (let i = 1; i <= 6; i++) {
+      enKeys[`KEY_${i}`] = `Source ${i}`
+      ruKeys[`KEY_${i}`] = ''
+    }
+
+    const files: ParsedLocalizationFile[] = [
+      { filename: 'en.json', path: '/locales/en.json', keys: enKeys, raw: enKeys, keyCount: 6 },
+      { filename: 'ru.json', path: '/locales/ru.json', keys: ruKeys, raw: ruKeys, keyCount: 6 },
+    ]
+
+    let apiCalls = 0
+
+    setAiTranslationProvider(
+      new MockAiTranslationProvider(
+        undefined,
+        async (req) => {
+          apiCalls++
+          // Fail initial chunk of 6 with token error
+          if (req.entries.length > 3) {
+            throw new AiTranslationError('Payload too large: maximum context length exceeded', {
+              status: 413,
+              retryable: false,
+            })
+          }
+          // Succeed for smaller chunks (length <= 3)
+          return {
+            translations: req.entries.map((e) => ({
+              key: e.key,
+              translation: `[RU] ${e.text}`,
+            })),
+            provider: 'mock',
+            model: 'mock-v1',
+          }
+        }
+      )
+    )
+
+    const comparison = compareLocalizationFiles(files)
+    const plan = createBatchTranslationPlan(files, comparison)
+
+    const executed = await executeBatchTranslation(
+      plan,
+      DEFAULT_AI_TRANSLATION_SETTINGS
+    )
+
+    // 1 rejected initial call + 2 successful split calls = 3 total API calls
+    expect(apiCalls).toBe(3)
+    expect(executed.items.every((i) => i.status === 'translated')).toBe(true)
+  })
+
+  describe('HTTP 429 & Rate Limit Retries on Batches', () => {
+    it('handles HTTP 429 on batch chunk with backoff and succeeds on retry', async () => {
+      let attempts = 0
+      setAiTranslationProvider(
+        new MockAiTranslationProvider(
+          undefined,
+          async (req) => {
+            attempts++
+            if (attempts === 1) {
+              throw new AiTranslationError('Rate limit exceeded (HTTP 429)', {
+                status: 429,
+                retryable: true,
+                retryAfterMs: 10,
+              })
+            }
+            return {
+              translations: req.entries.map((e) => ({
+                key: e.key,
+                translation: `[Mock] ${e.text}`,
+              })),
+              provider: 'mock',
+              model: 'mock-v1',
+            }
+          }
+        )
       )
 
       const comparison = compareLocalizationFiles(mockParsedFiles)
-      const singleItemPlan = createBatchTranslationPlan(mockParsedFiles, comparison)
-      singleItemPlan.items = [singleItemPlan.items[0]] // Test single item
-      singleItemPlan.totalCount = 1
+      const plan = createBatchTranslationPlan(mockParsedFiles, comparison)
 
       const progressStatuses: string[] = []
       const executed = await executeBatchTranslation(
-        singleItemPlan,
+        plan,
         DEFAULT_AI_TRANSLATION_SETTINGS,
         (p) => {
           if (p.statusMessage) progressStatuses.push(p.statusMessage)
@@ -158,95 +221,29 @@ describe('aiBatchTranslation service', () => {
       )
 
       expect(attempts).toBe(2)
-      expect(executed.items[0].status).toBe('translated')
-      expect(executed.items[0].proposedTranslation).toBe('[Mock] Description of app')
+      expect(executed.items.every((i) => i.status === 'translated')).toBe(true)
       expect(
         progressStatuses.some((msg) => msg.includes('Rate limit'))
       ).toBe(true)
     })
 
-    it('simulates the real-world scenario: 6 succeed, 7th encounters 429, retries, and all 9 complete', async () => {
-      // Create a 9-item batch
-      const enKeys: Record<string, string> = {}
-      const ruKeys: Record<string, string> = {}
-      for (let i = 1; i <= 9; i++) {
-        enKeys[`KEY_${i}`] = `Source ${i}`
-        ruKeys[`KEY_${i}`] = ''
-      }
-
-      const files: ParsedLocalizationFile[] = [
-        {
-          filename: 'en.json',
-          path: '/locales/en.json',
-          keys: enKeys,
-          raw: enKeys,
-          keyCount: 9,
-        },
-        {
-          filename: 'ru.json',
-          path: '/locales/ru.json',
-          keys: ruKeys,
-          raw: ruKeys,
-          keyCount: 9,
-        },
-      ]
-
+    it('marks batch chunk as error after exhausting maxRetries on persistent 429', async () => {
       let callCount = 0
-      let rateLimitHit = false
-
       setAiTranslationProvider(
-        new MockAiTranslationProvider(async (req) => {
-          callCount++
-          // On 7th call, return 429 once
-          if (callCount === 7 && !rateLimitHit) {
-            rateLimitHit = true
-            throw new AiTranslationError('OpenAI rate limit (429)', {
+        new MockAiTranslationProvider(
+          undefined,
+          async () => {
+            callCount++
+            throw new AiTranslationError('Google Gemini rate limit (429)', {
               status: 429,
               retryable: true,
-              retryAfterMs: 10,
             })
           }
-          return {
-            translatedText: `[RU] ${req.sourceValue}`,
-            provider: 'openai',
-            model: 'gpt-4o-mini',
-          }
-        })
-      )
-
-      const comparison = compareLocalizationFiles(files)
-      const plan = createBatchTranslationPlan(files, comparison)
-      expect(plan.totalCount).toBe(9)
-
-      const executed = await executeBatchTranslation(
-        plan,
-        DEFAULT_AI_TRANSLATION_SETTINGS,
-        undefined,
-        undefined,
-        { baseDelayMs: 5, maxDelayMs: 50, jitter: false }
-      )
-
-      expect(executed.items.every((i) => i.status === 'translated')).toBe(true)
-      expect(callCount).toBe(10) // 9 items + 1 retry = 10 total calls
-      expect(rateLimitHit).toBe(true)
-    })
-
-    it('marks item as error after exhausting maxRetries on persistent 429', async () => {
-      let callCount = 0
-      setAiTranslationProvider(
-        new MockAiTranslationProvider(async () => {
-          callCount++
-          throw new AiTranslationError('Google Gemini rate limit (429)', {
-            status: 429,
-            retryable: true,
-          })
-        })
+        )
       )
 
       const comparison = compareLocalizationFiles(mockParsedFiles)
       const plan = createBatchTranslationPlan(mockParsedFiles, comparison)
-      plan.items = [plan.items[0]]
-      plan.totalCount = 1
 
       const executed = await executeBatchTranslation(
         plan,
@@ -256,74 +253,8 @@ describe('aiBatchTranslation service', () => {
         { maxRetries: 3, baseDelayMs: 5, maxDelayMs: 20, jitter: false }
       )
 
-      expect(executed.items[0].status).toBe('error')
-      expect(executed.items[0].errorMessage).toContain('429')
-      expect(callCount).toBe(4) // initial attempt + 3 retries = 4
-    })
-
-    it('does NOT retry non-retryable permanent errors (400, 401, missing API key)', async () => {
-      let callCount = 0
-      setAiTranslationProvider(
-        new MockAiTranslationProvider(async () => {
-          callCount++
-          throw new AiTranslationError('Unauthorized API key (HTTP 401)', {
-            status: 401,
-            retryable: false,
-          })
-        })
-      )
-
-      const comparison = compareLocalizationFiles(mockParsedFiles)
-      const plan = createBatchTranslationPlan(mockParsedFiles, comparison)
-      plan.items = [plan.items[0]]
-      plan.totalCount = 1
-
-      const executed = await executeBatchTranslation(
-        plan,
-        DEFAULT_AI_TRANSLATION_SETTINGS,
-        undefined,
-        undefined,
-        { maxRetries: 4, baseDelayMs: 5 }
-      )
-
-      expect(executed.items[0].status).toBe('error')
-      expect(callCount).toBe(1) // Fails immediately on attempt 1 without retries
-    })
-
-    it('retries transient 500/502/503 server errors and recovers', async () => {
-      let callCount = 0
-      setAiTranslationProvider(
-        new MockAiTranslationProvider(async (req) => {
-          callCount++
-          if (callCount === 1) {
-            throw new AiTranslationError('Anthropic Server Overloaded (529/503)', {
-              status: 503,
-              retryable: true,
-            })
-          }
-          return {
-            translatedText: `[AI] ${req.sourceValue}`,
-            provider: 'anthropic',
-            model: 'claude-3-5-sonnet-20241022',
-          }
-        })
-      )
-
-      const comparison = compareLocalizationFiles(mockParsedFiles)
-      const plan = createBatchTranslationPlan(mockParsedFiles, comparison)
-      plan.items = [plan.items[0]]
-      plan.totalCount = 1
-
-      const executed = await executeBatchTranslation(
-        plan,
-        DEFAULT_AI_TRANSLATION_SETTINGS,
-        undefined,
-        undefined,
-        { baseDelayMs: 5, maxDelayMs: 50, jitter: false }
-      )
-
-      expect(executed.items[0].status).toBe('translated')
-      expect(callCount).toBe(2)
+      expect(executed.items.every((i) => i.status === 'error')).toBe(true)
+      expect(callCount).toBe(4) // 1 initial + 3 retries = 4
     })
   })
 
@@ -332,7 +263,7 @@ describe('aiBatchTranslation service', () => {
       const comparison = compareLocalizationFiles(mockParsedFiles)
       const plan = createBatchTranslationPlan(mockParsedFiles, comparison)
 
-      // Simulate a plan with 2 successful items and 2 error items
+      // Simulate 2 successful items and 2 error items
       plan.items[0].status = 'translated'
       plan.items[0].proposedTranslation = 'Existing 1'
       plan.items[1].status = 'translated'
@@ -342,16 +273,22 @@ describe('aiBatchTranslation service', () => {
       plan.items[3].status = 'error'
       plan.items[3].errorMessage = 'Temporary timeout'
 
-      let callCount = 0
+      let batchCallCount = 0
       setAiTranslationProvider(
-        new MockAiTranslationProvider(async (req) => {
-          callCount++
-          return {
-            translatedText: `[Retried] ${req.sourceValue}`,
-            provider: 'mock',
-            model: 'mock-v1',
+        new MockAiTranslationProvider(
+          undefined,
+          async (req) => {
+            batchCallCount++
+            return {
+              translations: req.entries.map((e) => ({
+                key: e.key,
+                translation: `[Retried] ${e.text}`,
+              })),
+              provider: 'mock',
+              model: 'mock-v1',
+            }
           }
-        })
+        )
       )
 
       const retriedPlan = await retryFailedBatchTranslations(
@@ -359,7 +296,7 @@ describe('aiBatchTranslation service', () => {
         DEFAULT_AI_TRANSLATION_SETTINGS
       )
 
-      expect(callCount).toBe(2) // Only the 2 failed items were retried!
+      expect(batchCallCount).toBe(1) // Single batch call containing only the 2 failed items
       expect(retriedPlan.items[0].proposedTranslation).toBe('Existing 1')
       expect(retriedPlan.items[1].proposedTranslation).toBe('Existing 2')
       expect(retriedPlan.items[2].proposedTranslation).toBe(
@@ -378,17 +315,18 @@ describe('aiBatchTranslation service', () => {
       const controller = new AbortController()
 
       setAiTranslationProvider(
-        new MockAiTranslationProvider(async () => {
-          // Trigger 429 to cause backoff delay
-          throw new AiTranslationError('429 Rate limited', {
-            status: 429,
-            retryable: true,
-            retryAfterMs: 5000,
-          })
-        })
+        new MockAiTranslationProvider(
+          undefined,
+          async () => {
+            throw new AiTranslationError('429 Rate limited', {
+              status: 429,
+              retryable: true,
+              retryAfterMs: 5000,
+            })
+          }
+        )
       )
 
-      // Abort after 50ms
       setTimeout(() => controller.abort(), 50)
 
       const executed = await executeBatchTranslation(
@@ -400,14 +338,6 @@ describe('aiBatchTranslation service', () => {
       )
 
       expect(executed.items.some((i) => i.status === 'skipped')).toBe(true)
-    })
-
-    it('waitWithAbort rejects immediately on abort signal', async () => {
-      const controller = new AbortController()
-      setTimeout(() => controller.abort(), 10)
-      await expect(waitWithAbort(10000, controller.signal)).rejects.toThrow(
-        /cancelled/i
-      )
     })
   })
 

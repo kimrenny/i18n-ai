@@ -5,7 +5,24 @@ import {
   setAiTranslationProvider,
   MockAiTranslationProvider,
 } from './services/aiTranslation'
+import type { ElectronAPI } from './types/electron'
 import { DEFAULT_APP_SETTINGS } from './types/settings'
+
+function createMockElectronAPI(overrides: Partial<ElectronAPI> = {}): ElectronAPI {
+  return {
+    isElectron: true,
+    platform: 'win32',
+    selectDirectory: vi.fn(),
+    getJsonFiles: vi.fn(),
+    readJsonFile: vi.fn(),
+    writeJsonFiles: vi.fn(),
+    getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
+    updateAiTranslationSettings: vi.fn(),
+    translateWithAi: vi.fn(),
+    translateBatchWithAi: vi.fn(),
+    ...overrides,
+  }
+}
 
 describe('App', () => {
   beforeEach(() => {
@@ -57,17 +74,10 @@ describe('App', () => {
         return currentSettings
       })
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
-      selectDirectory: vi.fn(),
-      getJsonFiles: vi.fn(),
-      readJsonFile: vi.fn(),
-      writeJsonFiles: vi.fn(),
+    window.electronAPI = createMockElectronAPI({
       getSettings: mockGetSettings,
       updateAiTranslationSettings: mockUpdateSettings,
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -183,17 +193,12 @@ describe('App', () => {
         return { success: true }
       })
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -283,17 +288,11 @@ describe('App', () => {
       throw new Error('File not found')
     })
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
-      writeJsonFiles: vi.fn(),
-      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -356,17 +355,12 @@ describe('App', () => {
         return { success: true }
       })
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -457,9 +451,7 @@ describe('App', () => {
         return { success: true }
       })
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
@@ -471,9 +463,7 @@ describe('App', () => {
           requireEditConfirmation: false,
         },
       }),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -521,9 +511,7 @@ describe('App', () => {
     })
     const mockWriteJsonFiles = vi.fn()
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
@@ -537,9 +525,7 @@ describe('App', () => {
           },
         },
       }),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -568,17 +554,10 @@ describe('App', () => {
       { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
     ])
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
-      readJsonFile: vi.fn(),
-      writeJsonFiles: vi.fn(),
-      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -629,17 +608,11 @@ describe('App', () => {
       throw new Error('File not found')
     })
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
-      writeJsonFiles: vi.fn(),
-      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -749,17 +722,12 @@ describe('App', () => {
         return { success: true }
       })
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 
@@ -859,17 +827,12 @@ describe('App', () => {
         return { success: true }
       })
 
-    window.electronAPI = {
-      isElectron: true,
-      platform: 'win32',
+    window.electronAPI = createMockElectronAPI({
       selectDirectory: mockSelectDirectory,
       getJsonFiles: mockGetJsonFiles,
       readJsonFile: mockReadJsonFile,
       writeJsonFiles: mockWriteJsonFiles,
-      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
-      updateAiTranslationSettings: vi.fn(),
-      translateWithAi: vi.fn(),
-    }
+    })
 
     render(<App />)
 

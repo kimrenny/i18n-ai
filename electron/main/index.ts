@@ -4,7 +4,9 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import {
   performAiTranslation,
+  performBatchAiTranslation,
   type AiTranslationRequestPayload,
+  type BatchAiTranslationRequestPayload,
   type AiTranslationSettingsPayload,
 } from './aiService'
 
@@ -290,7 +292,7 @@ app.whenReady().then(() => {
     }
   )
 
-  // AI Translation IPC Handler
+  // AI Translation IPC Handlers
   ipcMain.handle(
     'ai:translate',
     async (
@@ -304,6 +306,22 @@ app.whenReady().then(() => {
         `[main] ai:translate invoked for key "${payload?.request?.key}" with provider "${payload?.settings?.provider}"`
       )
       return await performAiTranslation(payload.request, payload.settings)
+    }
+  )
+
+  ipcMain.handle(
+    'ai:translateBatch',
+    async (
+      _,
+      payload: {
+        request: BatchAiTranslationRequestPayload
+        settings: AiTranslationSettingsPayload
+      }
+    ) => {
+      console.log(
+        `[main] ai:translateBatch invoked with ${payload?.request?.entries?.length} entries for "${payload?.request?.targetFile}" with provider "${payload?.settings?.provider}"`
+      )
+      return await performBatchAiTranslation(payload.request, payload.settings)
     }
   )
 

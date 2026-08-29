@@ -7,10 +7,17 @@ import type { AiTranslationSettings } from '../types/settings'
 import {
   findSourceReference,
   resolveLanguageFromFilename,
-  executeAiTranslation,
+  executeBatchAiTranslation,
   isRetryableError,
   getRetryAfterMs,
 } from './aiTranslation'
+import {
+  createOptimizedBatchChunks,
+  splitBatchChunk,
+  isRequestSizeOrTokenError,
+  type BatchChunk,
+  type BatchPlanningOptions,
+} from './aiBatchPlanner'
 
 export interface BatchTranslationItem {
   id: string
@@ -37,7 +44,10 @@ export interface BatchTranslationPlan {
 export interface BatchProgress {
   current: number
   total: number
-  currentKey: string
+  currentBatch: number
+  totalBatches: number
+  keysInBatch: number
+  currentKey?: string
   targetFile: string
   successCount: number
   errorCount: number
@@ -48,7 +58,7 @@ export interface BatchProgress {
   retryDelayRemainingMs?: number
 }
 
-export interface BatchTranslationOptions {
+export interface BatchTranslationOptions extends BatchPlanningOptions {
   concurrency?: number
   maxRetries?: number
   baseDelayMs?: number
@@ -62,6 +72,8 @@ const DEFAULT_OPTIONS: Required<BatchTranslationOptions> = {
   baseDelayMs: 1000,
   maxDelayMs: 15000,
   jitter: true,
+  maxItemsPerChunk: 50,
+  maxCharsPerChunk: 4000,
 }
 
 /**
@@ -167,8 +179,8 @@ export function createBatchTranslationPlan(
 }
 
 /**
- * Executes batch translation for all pending items in the plan using a controlled
- * queue, concurrency throttling, and bounded exponential backoff on HTTP 429 / transient errors.
+ * Executes batch translation for all pending items in the plan using optimized
+ * multi-key chunks, strict validation, automatic splitting, and rate-limit backoff.
  */
 export async function executeBatchTranslation(
   plan: BatchTranslationPlan,
@@ -178,167 +190,237 @@ export async function executeBatchTranslation(
   options?: BatchTranslationOptions
 ): Promise<BatchTranslationPlan> {
   const opts = { ...DEFAULT_OPTIONS, ...options }
-  const updatedItems = [...plan.items]
+  const updatedItemsMap = new Map<string, BatchTranslationItem>()
+  for (const item of plan.items) {
+    updatedItemsMap.set(item.id, { ...item })
+  }
 
-  let successCount = updatedItems.filter((i) => i.status === 'translated').length
-  let errorCount = updatedItems.filter((i) => i.status === 'error').length
+  let successCount = plan.items.filter((i) => i.status === 'translated').length
+  let errorCount = plan.items.filter((i) => i.status === 'error').length
 
-  // Process items in a queue with controlled concurrency (default: 1 sequential)
-  let currentIndex = 0
+  // Create initial optimized batch chunks
+  const pendingItems = plan.items.filter((i) => i.status === 'pending')
+  const chunkQueue: BatchChunk[] = createOptimizedBatchChunks(pendingItems, opts)
 
-  async function processNext(): Promise<void> {
-    while (currentIndex < updatedItems.length) {
-      const idx = currentIndex++
-      const item = updatedItems[idx]
+  let completedBatchCount = 0
 
-      if (abortSignal?.aborted) {
-        if (item.status === 'pending') {
-          updatedItems[idx] = {
-            ...item,
-            status: 'skipped',
-            errorMessage: 'Batch translation cancelled by user.',
-          }
-        }
-        continue
-      }
-
-      if (item.status !== 'pending') {
-        continue
-      }
-
-      onProgress?.({
-        current: idx + 1,
-        total: updatedItems.length,
-        currentKey: item.key,
-        targetFile: item.targetFile,
-        successCount,
-        errorCount,
-        isRetrying: false,
-        statusMessage: `Translating ${item.key} (${item.targetFile})...`,
-      })
-
-      let translated = false
-      let lastErrorMessage = 'AI translation request failed.'
-
-      for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
-        if (abortSignal?.aborted) {
-          updatedItems[idx] = {
-            ...item,
-            status: 'skipped',
-            errorMessage: 'Batch translation cancelled by user.',
-          }
-          break
-        }
-
-        try {
-          const response = await executeAiTranslation(
-            {
-              key: item.key,
-              sourceFile: item.sourceFile,
-              sourceLanguage: item.sourceLanguage,
-              targetFile: item.targetFile,
-              targetLanguage: item.targetLanguage,
-              sourceValue: item.sourceValue,
-            },
-            settings
-          )
-
-          updatedItems[idx] = {
-            ...item,
-            proposedTranslation: response.translatedText,
-            status: 'translated',
-            errorMessage: undefined,
-          }
-          successCount++
-          translated = true
-          break
-        } catch (err) {
-          lastErrorMessage =
-            err instanceof Error ? err.message : 'AI translation request failed.'
-          const retryable = isRetryableError(err)
-
-          if (!retryable || attempt === opts.maxRetries || abortSignal?.aborted) {
-            break
-          }
-
-          // Determine retry delay
-          const serverRetryAfter = getRetryAfterMs(err)
-          let delayMs: number
-          if (serverRetryAfter && serverRetryAfter > 0) {
-            delayMs = Math.min(serverRetryAfter, opts.maxDelayMs)
-          } else {
-            // Exponential backoff: baseDelay * 2^attempt + jitter
-            const exp = Math.min(
-              opts.maxDelayMs,
-              opts.baseDelayMs * Math.pow(2, attempt)
-            )
-            const jitterMs = opts.jitter ? Math.floor(Math.random() * 200) : 0
-            delayMs = exp + jitterMs
-          }
-
-          const secondsText = (delayMs / 1000).toFixed(1)
-          const retryMsg = `Rate limit / temporary error reached — retrying in ${secondsText}s (attempt ${attempt + 1}/${opts.maxRetries})...`
-
-          onProgress?.({
-            current: idx + 1,
-            total: updatedItems.length,
-            currentKey: item.key,
-            targetFile: item.targetFile,
-            successCount,
-            errorCount,
-            isRetrying: true,
-            retryAttempt: attempt + 1,
-            maxRetries: opts.maxRetries,
-            retryDelayRemainingMs: delayMs,
-            statusMessage: retryMsg,
-          })
-
-          try {
-            await waitWithAbort(delayMs, abortSignal)
-          } catch {
-            // Aborted during delay
-            updatedItems[idx] = {
-              ...item,
+  while (chunkQueue.length > 0) {
+    if (abortSignal?.aborted) {
+      // Mark remaining pending items as skipped
+      for (const remainingChunk of chunkQueue) {
+        for (const it of remainingChunk.items) {
+          const existing = updatedItemsMap.get(it.id)
+          if (existing && existing.status === 'pending') {
+            updatedItemsMap.set(it.id, {
+              ...existing,
               status: 'skipped',
               errorMessage: 'Batch translation cancelled by user.',
-            }
-            break
+            })
           }
         }
       }
+      break
+    }
 
-      if (!translated && updatedItems[idx].status === 'pending') {
-        errorCount++
-        updatedItems[idx] = {
-          ...item,
-          status: 'error',
-          errorMessage: lastErrorMessage,
+    const chunk = chunkQueue.shift()!
+    completedBatchCount++
+    const totalBatches = completedBatchCount + chunkQueue.length
+
+    onProgress?.({
+      current: successCount,
+      total: plan.totalCount,
+      currentBatch: completedBatchCount,
+      totalBatches,
+      keysInBatch: chunk.items.length,
+      currentKey: chunk.items[0]?.key,
+      targetFile: chunk.targetFile,
+      successCount,
+      errorCount,
+      isRetrying: false,
+      statusMessage: `Translating batch ${completedBatchCount} / ${totalBatches} (${chunk.items.length} keys in ${chunk.targetFile})...`,
+    })
+
+    let chunkSucceeded = false
+    let lastErrorMessage = 'Batch translation failed.'
+
+    for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
+      if (abortSignal?.aborted) {
+        for (const it of chunk.items) {
+          const existing = updatedItemsMap.get(it.id)
+          if (existing && existing.status === 'pending') {
+            updatedItemsMap.set(it.id, {
+              ...existing,
+              status: 'skipped',
+              errorMessage: 'Batch translation cancelled by user.',
+            })
+          }
         }
+        break
       }
 
-      onProgress?.({
-        current: idx + 1,
-        total: updatedItems.length,
-        currentKey: item.key,
-        targetFile: item.targetFile,
-        successCount,
-        errorCount,
-        isRetrying: false,
-      })
+      try {
+        const response = await executeBatchAiTranslation(
+          {
+            targetLanguage: chunk.targetLanguage,
+            sourceLanguage: chunk.sourceLanguage,
+            targetFile: chunk.targetFile,
+            sourceFile: chunk.sourceFile,
+            entries: chunk.items.map((it) => ({
+              key: it.key,
+              text: it.sourceValue,
+            })),
+          },
+          settings
+        )
+
+        // Map response translations to items
+        const resultMap = new Map<string, string>()
+        for (const tr of response.translations) {
+          resultMap.set(tr.key, tr.translation)
+        }
+
+        for (const it of chunk.items) {
+          const translation = resultMap.get(it.key)
+          const existing = updatedItemsMap.get(it.id)
+          if (existing) {
+            if (typeof translation === 'string') {
+              updatedItemsMap.set(it.id, {
+                ...existing,
+                proposedTranslation: translation,
+                status: 'translated',
+                errorMessage: undefined,
+              })
+              successCount++
+            } else {
+              updatedItemsMap.set(it.id, {
+                ...existing,
+                status: 'error',
+                errorMessage: `Translation missing for key "${it.key}" in AI response.`,
+              })
+              errorCount++
+            }
+          }
+        }
+
+        chunkSucceeded = true
+        break
+      } catch (err) {
+        lastErrorMessage =
+          err instanceof Error ? err.message : 'Batch translation failed.'
+
+        // 1. Check if the error is a Request Size / Token Limit error and chunk can be split
+        if (isRequestSizeOrTokenError(err) && chunk.items.length > 1) {
+          const [sub1, sub2] = splitBatchChunk(chunk)
+          chunkQueue.unshift(sub2)
+          chunkQueue.unshift(sub1)
+          completedBatchCount-- // Decrement since we're splitting instead of completing
+
+          onProgress?.({
+            current: successCount,
+            total: plan.totalCount,
+            currentBatch: completedBatchCount + 1,
+            totalBatches: completedBatchCount + chunkQueue.length,
+            keysInBatch: sub1.items.length,
+            targetFile: chunk.targetFile,
+            successCount,
+            errorCount,
+            isRetrying: false,
+            statusMessage: `Batch payload too large — automatically split into smaller chunks (${sub1.items.length} & ${sub2.items.length} keys).`,
+          })
+
+          chunkSucceeded = true // Avoid marking items as failed
+          break
+        }
+
+        const retryable = isRetryableError(err)
+        if (!retryable || attempt === opts.maxRetries || abortSignal?.aborted) {
+          break
+        }
+
+        // Calculate backoff delay
+        const serverRetryAfter = getRetryAfterMs(err)
+        let delayMs: number
+        if (serverRetryAfter && serverRetryAfter > 0) {
+          delayMs = Math.min(serverRetryAfter, opts.maxDelayMs)
+        } else {
+          const exp = Math.min(
+            opts.maxDelayMs,
+            opts.baseDelayMs * Math.pow(2, attempt)
+          )
+          const jitterMs = opts.jitter ? Math.floor(Math.random() * 200) : 0
+          delayMs = exp + jitterMs
+        }
+
+        const secondsText = (delayMs / 1000).toFixed(1)
+        const retryMsg = `Rate limit / temporary error reached — retrying batch in ${secondsText}s (attempt ${attempt + 1}/${opts.maxRetries})...`
+
+        onProgress?.({
+          current: successCount,
+          total: plan.totalCount,
+          currentBatch: completedBatchCount,
+          totalBatches,
+          keysInBatch: chunk.items.length,
+          targetFile: chunk.targetFile,
+          successCount,
+          errorCount,
+          isRetrying: true,
+          retryAttempt: attempt + 1,
+          maxRetries: opts.maxRetries,
+          retryDelayRemainingMs: delayMs,
+          statusMessage: retryMsg,
+        })
+
+        try {
+          await waitWithAbort(delayMs, abortSignal)
+        } catch {
+          // Aborted during delay
+          for (const it of chunk.items) {
+            const existing = updatedItemsMap.get(it.id)
+            if (existing && existing.status === 'pending') {
+              updatedItemsMap.set(it.id, {
+                ...existing,
+                status: 'skipped',
+                errorMessage: 'Batch translation cancelled by user.',
+              })
+            }
+          }
+          break
+        }
+      }
     }
+
+    if (!chunkSucceeded) {
+      for (const it of chunk.items) {
+        const existing = updatedItemsMap.get(it.id)
+        if (existing && existing.status === 'pending') {
+          errorCount++
+          updatedItemsMap.set(it.id, {
+            ...existing,
+            status: 'error',
+            errorMessage: lastErrorMessage,
+          })
+        }
+      }
+    }
+
+    onProgress?.({
+      current: successCount,
+      total: plan.totalCount,
+      currentBatch: completedBatchCount,
+      totalBatches: completedBatchCount + chunkQueue.length,
+      keysInBatch: chunk.items.length,
+      targetFile: chunk.targetFile,
+      successCount,
+      errorCount,
+      isRetrying: false,
+    })
   }
 
-  // Run concurrency workers
-  const workerCount = Math.max(1, opts.concurrency)
-  const workers: Promise<void>[] = []
-  for (let w = 0; w < workerCount; w++) {
-    workers.push(processNext())
-  }
-  await Promise.all(workers)
+  const finalItems = plan.items.map((it) => updatedItemsMap.get(it.id) || it)
 
   return {
     ...plan,
-    items: updatedItems,
+    items: finalItems,
   }
 }
 

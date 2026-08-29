@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   performAiTranslation,
+  performBatchAiTranslation,
   AiTranslationError,
   parseRetryAfterHeader,
   type AiTranslationRequestPayload,
+  type BatchAiTranslationRequestPayload,
   type AiTranslationSettingsPayload,
 } from './aiService'
 
@@ -15,6 +17,17 @@ describe('electron main aiService', () => {
     sourceLanguage: 'en',
     targetLanguage: 'de',
     sourceValue: 'Log in with {provider}',
+  }
+
+  const baseBatchRequest: BatchAiTranslationRequestPayload = {
+    targetFile: 'de.json',
+    sourceFile: 'en.json',
+    targetLanguage: 'de',
+    sourceLanguage: 'en',
+    entries: [
+      { key: 'AUTH.LOGIN', text: 'Log in with {provider}' },
+      { key: 'AUTH.LOGOUT', text: 'Log Out' },
+    ],
   }
 
   beforeEach(() => {
@@ -40,6 +53,61 @@ describe('electron main aiService', () => {
       expect(diff).toBeDefined()
       expect(diff).toBeGreaterThan(5000)
       expect(diff).toBeLessThanOrEqual(9000)
+    })
+  })
+
+  describe('performBatchAiTranslation', () => {
+    it('translates multiple entries deterministically with mock provider', async () => {
+      const settings: AiTranslationSettingsPayload = {
+        provider: 'mock',
+        requireEditConfirmation: true,
+        providers: {
+          mock: { model: 'mock-v1' },
+        },
+      }
+
+      const result = await performBatchAiTranslation(baseBatchRequest, settings)
+      expect(result.translations).toHaveLength(2)
+      expect(result.translations[0]).toEqual({
+        key: 'AUTH.LOGIN',
+        translation: '[AI: DE] Log in with {provider}',
+      })
+      expect(result.translations[1]).toEqual({
+        key: 'AUTH.LOGOUT',
+        translation: '[AI: DE] Log Out',
+      })
+    })
+
+    it('translates batch with OpenAI and validates JSON array output', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify([
+                  { key: 'AUTH.LOGIN', translation: 'Mit {provider} anmelden' },
+                  { key: 'AUTH.LOGOUT', translation: 'Abmelden' },
+                ]),
+              },
+            },
+          ],
+        }),
+      })
+      globalThis.fetch = mockFetch
+
+      const settings: AiTranslationSettingsPayload = {
+        provider: 'openai',
+        requireEditConfirmation: true,
+        providers: {
+          openai: { model: 'gpt-4o-mini', apiKey: 'sk-test' },
+        },
+      }
+
+      const result = await performBatchAiTranslation(baseBatchRequest, settings)
+      expect(result.translations).toHaveLength(2)
+      expect(result.translations[0].translation).toBe('Mit {provider} anmelden')
+      expect(result.translations[1].translation).toBe('Abmelden')
     })
   })
 
