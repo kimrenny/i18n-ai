@@ -29,6 +29,46 @@ export interface AiTranslationResponsePayload {
   detectedLanguage?: string
 }
 
+export class AiTranslationError extends Error {
+  readonly status?: number
+  readonly code?: string
+  readonly retryable: boolean
+  readonly retryAfterMs?: number
+
+  constructor(
+    message: string,
+    options?: {
+      status?: number
+      code?: string
+      retryable?: boolean
+      retryAfterMs?: number
+    }
+  ) {
+    super(message)
+    this.name = 'AiTranslationError'
+    this.status = options?.status
+    this.code = options?.code
+    this.retryable = options?.retryable ?? false
+    this.retryAfterMs = options?.retryAfterMs
+    Object.setPrototypeOf(this, AiTranslationError.prototype)
+  }
+}
+
+export function parseRetryAfterHeader(header?: string | null): number | undefined {
+  if (!header) return undefined
+  const trimmed = header.trim()
+  const seconds = Number(trimmed)
+  if (!isNaN(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000)
+  }
+  const dateParsed = Date.parse(trimmed)
+  if (!isNaN(dateParsed)) {
+    const diff = dateParsed - Date.now()
+    return diff > 0 ? diff : 0
+  }
+  return undefined
+}
+
 export const DEPRECATED_GEMINI_MODELS = new Set([
   'gemini-2.0-flash',
   'gemini-2.0-flash-exp',
@@ -126,7 +166,10 @@ export async function performAiTranslation(
     provider === 'deepseek'
   ) {
     if (!config.apiKey?.trim()) {
-      throw new Error(`API key is required for ${provider.toUpperCase()}.`)
+      throw new AiTranslationError(
+        `API key is required for ${provider.toUpperCase()}.`,
+        { code: 'MISSING_API_KEY', retryable: false }
+      )
     }
 
     let endpoint = 'https://api.openai.com/v1/chat/completions'
@@ -134,27 +177,55 @@ export async function performAiTranslation(
     if (provider === 'xai') endpoint = 'https://api.x.ai/v1/chat/completions'
     if (provider === 'deepseek') endpoint = 'https://api.deepseek.com/chat/completions'
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey.trim()}`,
-      },
-      body: JSON.stringify({
-        model: config.model || (provider === 'openai' ? 'gpt-4o-mini' : 'default'),
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.2,
-      }),
-    })
+    let response: Response
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey.trim()}`,
+        },
+        body: JSON.stringify({
+          model: config.model || (provider === 'openai' ? 'gpt-4o-mini' : 'default'),
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.2,
+        }),
+      })
+    } catch (err) {
+      throw new AiTranslationError(
+        `Network error connecting to ${provider.toUpperCase()}: ${err instanceof Error ? err.message : String(err)}`,
+        { retryable: true, code: 'NETWORK_ERROR' }
+      )
+    }
 
     if (!response.ok) {
       const errText = await response.text()
-      throw new Error(
-        `${provider.toUpperCase()} API Error (${response.status}): ${errText || response.statusText}`
+      const retryAfterMs = parseRetryAfterHeader(
+        response.headers?.get ? response.headers.get('retry-after') : undefined
       )
+      const status = response.status
+      const retryable = status === 429 || (status >= 500 && status <= 504) || status === 408
+
+      let message = `${provider.toUpperCase()} API Error (${status}): ${errText || response.statusText}`
+      let code = `HTTP_${status}`
+
+      if (status === 429) {
+        message = `${provider.toUpperCase()} rate limit reached (HTTP 429). Too many requests.`
+        code = 'RATE_LIMIT'
+      } else if (status === 401 || status === 403) {
+        message = `Unauthorized ${provider.toUpperCase()} request (HTTP ${status}). Please check your API key in Settings.`
+        code = 'UNAUTHORIZED'
+      }
+
+      throw new AiTranslationError(message, {
+        status,
+        retryable,
+        retryAfterMs,
+        code,
+      })
     }
 
     const data = (await response.json()) as {
@@ -171,7 +242,10 @@ export async function performAiTranslation(
   // 3. Google Gemini
   if (provider === 'gemini') {
     if (!config.apiKey?.trim()) {
-      throw new Error('API key is required for Google Gemini.')
+      throw new AiTranslationError('API key is required for Google Gemini.', {
+        code: 'MISSING_API_KEY',
+        retryable: false,
+      })
     }
 
     const rawModel = (config.model || 'gemini-3.6-flash')
@@ -187,46 +261,63 @@ export async function performAiTranslation(
       config.apiKey.trim()
     )}`
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.2,
+    let response: Response
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      }),
-    })
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+          },
+        }),
+      })
+    } catch (err) {
+      throw new AiTranslationError(
+        `Network error connecting to Google Gemini: ${err instanceof Error ? err.message : String(err)}`,
+        { retryable: true, code: 'NETWORK_ERROR' }
+      )
+    }
 
     if (!response.ok) {
       const errText = await response.text()
-
-      if (response.status === 404) {
-        throw new Error(
-          `The selected Gemini model ("${rawModel}") is no longer available. Please select a supported model (such as gemini-3.6-flash) in Settings.`
-        )
-      }
-      if (response.status === 400 && errText.includes('API_KEY_INVALID')) {
-        throw new Error(
-          'Invalid Google Gemini API key. Please check your API key in Settings.'
-        )
-      }
-      if (response.status === 401 || response.status === 403) {
-        throw new Error(
-          'Unauthorized Google Gemini request. Please check your API key permissions in Settings.'
-        )
-      }
-
-      throw new Error(
-        `Gemini API Error (${response.status}): ${errText || response.statusText}`
+      const retryAfterMs = parseRetryAfterHeader(
+        response.headers?.get ? response.headers.get('retry-after') : undefined
       )
+      const status = response.status
+      const retryable = status === 429 || (status >= 500 && status <= 504) || status === 408
+
+      let message = `Gemini API Error (${status}): ${errText || response.statusText}`
+      let code = `HTTP_${status}`
+
+      if (status === 429) {
+        message = 'Google Gemini rate limit reached (HTTP 429). Too many requests.'
+        code = 'RATE_LIMIT'
+      } else if (status === 404) {
+        message = `The selected Gemini model ("${rawModel}") is no longer available. Please select a supported model (such as gemini-3.6-flash) in Settings.`
+        code = 'MODEL_NOT_FOUND'
+      } else if (status === 400 && errText.includes('API_KEY_INVALID')) {
+        message = 'Invalid Google Gemini API key. Please check your API key in Settings.'
+        code = 'INVALID_API_KEY'
+      } else if (status === 401 || status === 403) {
+        message = 'Unauthorized Google Gemini request. Please check your API key permissions in Settings.'
+        code = 'UNAUTHORIZED'
+      }
+
+      throw new AiTranslationError(message, {
+        status,
+        retryable,
+        retryAfterMs,
+        code,
+      })
     }
 
     const data = (await response.json()) as {
@@ -257,33 +348,64 @@ export async function performAiTranslation(
   // 4. Anthropic Claude
   if (provider === 'anthropic') {
     if (!config.apiKey?.trim()) {
-      throw new Error('API key is required for Anthropic Claude.')
+      throw new AiTranslationError('API key is required for Anthropic Claude.', {
+        code: 'MISSING_API_KEY',
+        retryable: false,
+      })
     }
 
     const model = config.model || 'claude-3-5-sonnet-20241022'
     const endpoint = 'https://api.anthropic.com/v1/messages'
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': config.apiKey.trim(),
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-        temperature: 0.2,
-      }),
-    })
+    let response: Response
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': config.apiKey.trim(),
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+          temperature: 0.2,
+        }),
+      })
+    } catch (err) {
+      throw new AiTranslationError(
+        `Network error connecting to Anthropic: ${err instanceof Error ? err.message : String(err)}`,
+        { retryable: true, code: 'NETWORK_ERROR' }
+      )
+    }
 
     if (!response.ok) {
       const errText = await response.text()
-      throw new Error(
-        `Anthropic API Error (${response.status}): ${errText || response.statusText}`
+      const retryAfterMs = parseRetryAfterHeader(
+        response.headers?.get ? response.headers.get('retry-after') : undefined
       )
+      const status = response.status
+      const retryable = status === 429 || (status >= 500 && status <= 504) || status === 408
+
+      let message = `Anthropic API Error (${status}): ${errText || response.statusText}`
+      let code = `HTTP_${status}`
+
+      if (status === 429) {
+        message = 'Anthropic Claude rate limit reached (HTTP 429). Too many requests.'
+        code = 'RATE_LIMIT'
+      } else if (status === 401 || status === 403) {
+        message = 'Unauthorized Anthropic Claude request (HTTP 401/403). Please check your API key in Settings.'
+        code = 'UNAUTHORIZED'
+      }
+
+      throw new AiTranslationError(message, {
+        status,
+        retryable,
+        retryAfterMs,
+        code,
+      })
     }
 
     const data = (await response.json()) as {
@@ -327,8 +449,15 @@ export async function performAiTranslation(
 
       if (!response.ok) {
         const errText = await response.text()
-        throw new Error(
-          `Ollama Error (${response.status}): ${errText || response.statusText}`
+        const status = response.status
+        const retryable = status === 429 || (status >= 500 && status <= 504)
+        throw new AiTranslationError(
+          `Ollama Error (${status}): ${errText || response.statusText}`,
+          {
+            status,
+            retryable,
+            code: `HTTP_${status}`,
+          }
         )
       }
 
@@ -342,17 +471,28 @@ export async function performAiTranslation(
         model,
       }
     } catch (err) {
+      if (err instanceof AiTranslationError) {
+        throw err
+      }
       if (
         err instanceof TypeError &&
         (err.message.includes('fetch failed') || err.message.includes('ECONNREFUSED'))
       ) {
-        throw new Error(
-          `Unable to connect to Ollama at ${baseUrl}. Ensure the Ollama server is running.`
+        throw new AiTranslationError(
+          `Unable to connect to Ollama at ${baseUrl}. Ensure the Ollama server is running.`,
+          {
+            status: 0,
+            retryable: false,
+            code: 'CONNECTION_REFUSED',
+          }
         )
       }
       throw err
     }
   }
 
-  throw new Error(`Unsupported AI provider: "${provider}"`)
+  throw new AiTranslationError(`Unsupported AI provider: "${provider}"`, {
+    code: 'UNSUPPORTED_PROVIDER',
+    retryable: false,
+  })
 }

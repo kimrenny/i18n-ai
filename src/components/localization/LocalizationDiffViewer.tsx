@@ -22,6 +22,14 @@ import {
   findSourceReference,
   resolveLanguageFromFilename,
 } from '../../services/aiTranslation'
+import {
+  createBatchTranslationPlan,
+  executeBatchTranslation,
+  retryFailedBatchTranslations,
+  applyBatchTranslationPlan,
+  type BatchTranslationPlan,
+  type BatchProgress,
+} from '../../services/aiBatchTranslation'
 import { LocalizationSummary } from './LocalizationSummary'
 import { LocalizationFileTabs } from './LocalizationFileTabs'
 import { MissingKeyNavigator, type ProblemNavMode } from './MissingKeyNavigator'
@@ -31,6 +39,7 @@ import {
   AiTranslationConfirmModal,
   type AiTranslationProposal,
 } from './AiTranslationConfirmModal'
+import { BatchTranslationModal } from './BatchTranslationModal'
 
 interface LocalizationDiffViewerProps {
   comparisonResult: LocalizationComparisonResult
@@ -71,12 +80,20 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const [isSavingKey, setIsSavingKey] = useState(false)
   const [saveKeyError, setSaveKeyError] = useState<string | null>(null)
 
-  // AI Translation state
+  // Single AI Translation state
   const [translatingKey, setTranslatingKey] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null)
   const [aiProposal, setAiProposal] = useState<AiTranslationProposal | null>(null)
   const [isApplyingAi, setIsApplyingAi] = useState(false)
+
+  // Batch Translation state
+  const [batchPlan, setBatchPlan] = useState<BatchTranslationPlan | null>(null)
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null)
+  const [isBatchTranslating, setIsBatchTranslating] = useState(false)
+  const [isWritingBatch, setIsWritingBatch] = useState(false)
+  const [batchError, setBatchError] = useState<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const treeBodyRef = useRef<HTMLDivElement | null>(null)
 
@@ -161,6 +178,23 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       }
     },
     [activeFilename, comparisonResult, handleNavigate]
+  )
+
+  // Navigate to first problem across all files from summary counters
+  const handleNavigateFirstProblemAcrossAllFiles = useCallback(
+    (mode: ProblemNavMode) => {
+      for (const file of comparisonResult.comparedFiles) {
+        const list =
+          mode === 'missing'
+            ? getMissingKeysForFile(file.filename, comparisonResult)
+            : getEmptyKeysForFile(file.filename, comparisonResult)
+        if (list.length > 0) {
+          handleNavigateProblem(file.filename, mode)
+          return
+        }
+      }
+    },
+    [comparisonResult, handleNavigateProblem]
   )
 
   const handleSelectRow = useCallback(
@@ -347,6 +381,183 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     [aiProposal, executeApplyAiTranslation]
   )
 
+  // Batch Translation Actions
+  const handleConfirmApplyBatch = useCallback(
+    async (planToApply?: BatchTranslationPlan) => {
+      const activePlan = planToApply || batchPlan
+      if (!activePlan || activePlan.items.length === 0) return
+
+      if (!window.electronAPI?.writeJsonFiles) {
+        setBatchError('Unable to write files: Electron API is unavailable.')
+        return
+      }
+
+      setIsWritingBatch(true)
+      setBatchError(null)
+
+      try {
+        const { filesToModify, appliedCount } = applyBatchTranslationPlan(
+          parsedFiles,
+          activePlan
+        )
+
+        if (filesToModify.length > 0) {
+          await window.electronAPI.writeJsonFiles(
+            filesToModify.map((f) => ({ path: f.path, content: f.content }))
+          )
+        }
+
+        setBatchPlan(null)
+        setBatchProgress(null)
+        setAiSuccessMessage(
+          `✓ Successfully applied ${appliedCount} AI translations across ${filesToModify.length} file(s).`
+        )
+        await onRefreshFiles()
+      } catch (err) {
+        setBatchError(
+          err instanceof Error ? err.message : 'Failed to apply batch translations.'
+        )
+      } finally {
+        setIsWritingBatch(false)
+      }
+    },
+    [batchPlan, parsedFiles, onRefreshFiles]
+  )
+
+  const handleStartBatchTranslate = useCallback(async () => {
+    if (isBatchTranslating) return
+
+    setAiError(null)
+    setBatchError(null)
+    setAiSuccessMessage(null)
+
+    const initialPlan = createBatchTranslationPlan(parsedFiles, comparisonResult)
+    if (initialPlan.totalCount === 0) return
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    setIsBatchTranslating(true)
+    setBatchPlan(initialPlan)
+    setBatchProgress({
+      current: 0,
+      total: initialPlan.totalCount,
+      currentKey: '',
+      targetFile: '',
+      successCount: 0,
+      errorCount: 0,
+    })
+
+    try {
+      const executedPlan = await executeBatchTranslation(
+        initialPlan,
+        settings?.aiTranslation || {
+          provider: 'mock',
+          requireEditConfirmation: true,
+          providers: {
+            mock: { model: 'mock-v1' },
+            openai: { model: 'gpt-4o-mini' },
+            gemini: { model: 'gemini-3.6-flash' },
+            anthropic: { model: 'claude-3-5-sonnet-20241022' },
+            mistral: { model: 'mistral-large-latest' },
+            xai: { model: 'grok-2-latest' },
+            deepseek: { model: 'deepseek-chat' },
+            ollama: { model: 'llama3.1' },
+          },
+        },
+        (progress) => setBatchProgress(progress),
+        controller.signal
+      )
+
+      setBatchPlan(executedPlan)
+
+      const needsConfirmation = shouldConfirmAiEdit(settings)
+      if (!needsConfirmation) {
+        // Automatically apply without confirmation modal when requireEditConfirmation is false
+        await handleConfirmApplyBatch(executedPlan)
+      }
+    } catch (err) {
+      setBatchError(
+        err instanceof Error ? err.message : 'Batch translation failed.'
+      )
+    } finally {
+      setIsBatchTranslating(false)
+      abortControllerRef.current = null
+    }
+  }, [
+    isBatchTranslating,
+    parsedFiles,
+    comparisonResult,
+    settings,
+    handleConfirmApplyBatch,
+  ])
+
+  const handleRetryFailedBatch = useCallback(async () => {
+    if (!batchPlan || isBatchTranslating) return
+
+    setAiError(null)
+    setBatchError(null)
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    setIsBatchTranslating(true)
+
+    try {
+      const executedPlan = await retryFailedBatchTranslations(
+        batchPlan,
+        settings?.aiTranslation || {
+          provider: 'mock',
+          requireEditConfirmation: true,
+          providers: {
+            mock: { model: 'mock-v1' },
+            openai: { model: 'gpt-4o-mini' },
+            gemini: { model: 'gemini-3.6-flash' },
+            anthropic: { model: 'claude-3-5-sonnet-20241022' },
+            mistral: { model: 'mistral-large-latest' },
+            xai: { model: 'grok-2-latest' },
+            deepseek: { model: 'deepseek-chat' },
+            ollama: { model: 'llama3.1' },
+          },
+        },
+        (progress) => setBatchProgress(progress),
+        controller.signal
+      )
+
+      setBatchPlan(executedPlan)
+    } catch (err) {
+      setBatchError(
+        err instanceof Error ? err.message : 'Retry batch translation failed.'
+      )
+    } finally {
+      setIsBatchTranslating(false)
+      abortControllerRef.current = null
+    }
+  }, [batchPlan, isBatchTranslating, settings])
+
+  const handleCancelBatchTranslate = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    setIsBatchTranslating(false)
+  }, [])
+
+  const handleUpdateProposedBatchTranslation = useCallback(
+    (id: string, newText: string) => {
+      setBatchPlan((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          items: prev.items.map((item) =>
+            item.id === id ? { ...item, proposedTranslation: newText } : item
+          ),
+        }
+      })
+    },
+    []
+  )
+
   const handleToggleCollapse = useCallback((id: string) => {
     setCollapsedSet((prev) => {
       const next = new Set(prev)
@@ -427,6 +638,14 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       <LocalizationSummary
         comparisonResult={comparisonResult}
         onOpenAddMissingModal={handleOpenAddMissingModal}
+        onNavigateMissing={() =>
+          handleNavigateFirstProblemAcrossAllFiles('missing')
+        }
+        onNavigateEmpty={() =>
+          handleNavigateFirstProblemAcrossAllFiles('empty')
+        }
+        onStartBatchTranslate={handleStartBatchTranslate}
+        isBatchTranslating={isBatchTranslating}
       />
 
       {aiSuccessMessage && (
@@ -511,6 +730,25 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           onCancel={() => {
             setAiProposal(null)
             setAiError(null)
+          }}
+        />
+      )}
+
+      {batchPlan && (
+        <BatchTranslationModal
+          plan={batchPlan}
+          progress={batchProgress}
+          isTranslating={isBatchTranslating}
+          isWriting={isWritingBatch}
+          error={batchError}
+          onUpdateProposedTranslation={handleUpdateProposedBatchTranslation}
+          onCancelTranslate={handleCancelBatchTranslate}
+          onRetryFailed={handleRetryFailedBatch}
+          onConfirmApplyAll={() => handleConfirmApplyBatch()}
+          onClose={() => {
+            setBatchPlan(null)
+            setBatchProgress(null)
+            setBatchError(null)
           }}
         />
       )}
