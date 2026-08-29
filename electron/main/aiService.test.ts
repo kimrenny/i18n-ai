@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   performAiTranslation,
+  AiTranslationError,
+  parseRetryAfterHeader,
   type AiTranslationRequestPayload,
   type AiTranslationSettingsPayload,
 } from './aiService'
@@ -21,6 +23,24 @@ describe('electron main aiService', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  describe('parseRetryAfterHeader', () => {
+    it('parses numeric seconds into milliseconds', () => {
+      expect(parseRetryAfterHeader('5')).toBe(5000)
+      expect(parseRetryAfterHeader('0')).toBe(0)
+      expect(parseRetryAfterHeader('12.5')).toBe(12500)
+      expect(parseRetryAfterHeader(null)).toBeUndefined()
+      expect(parseRetryAfterHeader(undefined)).toBeUndefined()
+    })
+
+    it('parses HTTP date strings into milliseconds diff', () => {
+      const futureDate = new Date(Date.now() + 8000).toUTCString()
+      const diff = parseRetryAfterHeader(futureDate)
+      expect(diff).toBeDefined()
+      expect(diff).toBeGreaterThan(5000)
+      expect(diff).toBeLessThanOrEqual(9000)
+    })
   })
 
   it('handles mock provider deterministically without network calls', async () => {
@@ -107,6 +127,38 @@ describe('electron main aiService', () => {
     )
   })
 
+  it('throws structured retryable AiTranslationError on OpenAI HTTP 429 rate limit with Retry-After', async () => {
+    const mockHeaders = new Headers({ 'retry-after': '3' })
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      headers: mockHeaders,
+      text: async () => 'Rate limit exceeded',
+    })
+    globalThis.fetch = mockFetch
+
+    const settings: AiTranslationSettingsPayload = {
+      provider: 'openai',
+      requireEditConfirmation: true,
+      providers: {
+        openai: { model: 'gpt-4o-mini', apiKey: 'sk-test-123' },
+      },
+    }
+
+    try {
+      await performAiTranslation(baseRequest, settings)
+      expect.unreachable('Should have thrown')
+    } catch (err) {
+      expect(err).toBeInstanceOf(AiTranslationError)
+      const aiErr = err as AiTranslationError
+      expect(aiErr.status).toBe(429)
+      expect(aiErr.retryable).toBe(true)
+      expect(aiErr.retryAfterMs).toBe(3000)
+      expect(aiErr.code).toBe('RATE_LIMIT')
+    }
+  })
+
   describe('Google Gemini provider', () => {
     it('performs Google Gemini request with gemini-3.6-flash', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
@@ -182,6 +234,7 @@ describe('electron main aiService', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        headers: new Headers(),
         text: async () => 'Model models/old-model is no longer available.',
       })
       globalThis.fetch = mockFetch
@@ -204,6 +257,7 @@ describe('electron main aiService', () => {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
+        headers: new Headers(),
         text: async () => 'API_KEY_INVALID: The provided API key is invalid.',
       })
       globalThis.fetch = mockFetch
@@ -219,6 +273,36 @@ describe('electron main aiService', () => {
       await expect(performAiTranslation(baseRequest, settings)).rejects.toThrow(
         /Invalid Google Gemini API key/i
       )
+    })
+
+    it('identifies Gemini 429 as retryable', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: new Headers({ 'retry-after': '2' }),
+        text: async () => 'Resource exhausted',
+      })
+      globalThis.fetch = mockFetch
+
+      const settings: AiTranslationSettingsPayload = {
+        provider: 'gemini',
+        requireEditConfirmation: true,
+        providers: {
+          gemini: { model: 'gemini-3.6-flash', apiKey: 'test-key' },
+        },
+      }
+
+      try {
+        await performAiTranslation(baseRequest, settings)
+        expect.unreachable()
+      } catch (err) {
+        expect(err).toBeInstanceOf(AiTranslationError)
+        const aiErr = err as AiTranslationError
+        expect(aiErr.status).toBe(429)
+        expect(aiErr.retryable).toBe(true)
+        expect(aiErr.retryAfterMs).toBe(2000)
+      }
     })
   })
 

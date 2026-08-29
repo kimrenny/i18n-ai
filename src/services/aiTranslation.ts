@@ -19,6 +19,78 @@ export interface AiTranslationResult {
   detectedLanguage?: string
 }
 
+export class AiTranslationError extends Error {
+  readonly status?: number
+  readonly code?: string
+  readonly retryable: boolean
+  readonly retryAfterMs?: number
+
+  constructor(
+    message: string,
+    options?: {
+      status?: number
+      code?: string
+      retryable?: boolean
+      retryAfterMs?: number
+    }
+  ) {
+    super(message)
+    this.name = 'AiTranslationError'
+    this.status = options?.status
+    this.code = options?.code
+    this.retryable = options?.retryable ?? false
+    this.retryAfterMs = options?.retryAfterMs
+    Object.setPrototypeOf(this, AiTranslationError.prototype)
+  }
+}
+
+export function isRetryableError(error: unknown): boolean {
+  if (error instanceof AiTranslationError) {
+    return error.retryable
+  }
+  if (typeof error === 'object' && error !== null) {
+    const e = error as Record<string, unknown>
+    if (typeof e.retryable === 'boolean') {
+      return e.retryable
+    }
+    if (
+      e.status === 429 ||
+      e.status === 408 ||
+      (typeof e.status === 'number' && e.status >= 500 && e.status <= 504)
+    ) {
+      return true
+    }
+    if (typeof e.message === 'string') {
+      const msg = e.message.toLowerCase()
+      if (
+        msg.includes('429') ||
+        msg.includes('rate limit') ||
+        msg.includes('too many requests') ||
+        msg.includes('500') ||
+        msg.includes('502') ||
+        msg.includes('503') ||
+        msg.includes('504') ||
+        msg.includes('network error') ||
+        msg.includes('fetch failed') ||
+        msg.includes('timeout')
+      ) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+export function getRetryAfterMs(error: unknown): number | undefined {
+  if (typeof error === 'object' && error !== null) {
+    const e = error as Record<string, unknown>
+    if (typeof e.retryAfterMs === 'number' && e.retryAfterMs > 0) {
+      return e.retryAfterMs
+    }
+  }
+  return undefined
+}
+
 export interface AiTranslationProvider {
   readonly id: AiProviderId
   readonly name: string
@@ -103,7 +175,7 @@ export function resolveLanguageFromFilename(filename: string): string {
 export function findSourceReference(
   key: string,
   targetFilename: string,
-  comparedFiles: { filename: string; keys: Record<string, import('../types/localization').JsonValue> }[]
+  comparedFiles: readonly { filename: string; keys: Record<string, import('../types/localization').JsonValue> }[]
 ): { sourceFile: string; sourceLanguage: string; sourceValue: string } | null {
   const otherFiles = comparedFiles.filter((f) => f.filename !== targetFilename)
   if (otherFiles.length === 0) {
@@ -150,8 +222,9 @@ export async function executeAiTranslation(
 
   const def = getProviderDefinition(providerId)
   if (def.requiresApiKey && !providerConfig.apiKey?.trim()) {
-    throw new Error(
-      `API key is missing for ${def.name}. Please enter your API key in Settings.`
+    throw new AiTranslationError(
+      `API key is missing for ${def.name}. Please enter your API key in Settings.`,
+      { code: 'MISSING_API_KEY', retryable: false }
     )
   }
 

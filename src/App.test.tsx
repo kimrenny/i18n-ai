@@ -261,12 +261,71 @@ describe('App', () => {
     })
   })
 
-  it('automatically applies AI translation when requireEditConfirmation is false', async () => {
+  it('navigates to the first problem key when clicking summary problem counters', async () => {
+    const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+    const mockGetJsonFiles = vi.fn().mockResolvedValue([
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+    ])
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return {
+          AUTH: { LOGIN: 'Log In', LOGOUT: 'Log Out' },
+          MENU: { PLAY: 'Play' },
+        }
+      }
+      if (filePath.endsWith('ru.json')) {
+        return {
+          AUTH: { LOGIN: '' }, // empty
+          // AUTH.LOGOUT and MENU.PLAY are missing
+        }
+      }
+      throw new Error('File not found')
+    })
+
+    window.electronAPI = {
+      isElectron: true,
+      platform: 'win32',
+      selectDirectory: mockSelectDirectory,
+      getJsonFiles: mockGetJsonFiles,
+      readJsonFile: mockReadJsonFile,
+      writeJsonFiles: vi.fn(),
+      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
+      updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
+    }
+
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+
+    // Missing keys counter: 2
+    const missingBtn = screen.getByRole('button', { name: /navigate 2 missing keys/i })
+    expect(missingBtn).toBeInTheDocument()
+
+    // Click Missing keys counter -> switches to ru.json and selects first missing key (AUTH.LOGOUT)
+    fireEvent.click(missingBtn)
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Missing translation 1 of 2')
+    expect(screen.getByTestId('tree-node-AUTH.LOGOUT')).toHaveClass('row-active-missing')
+
+    // Empty keys counter: 1
+    const emptyBtn = screen.getByRole('button', { name: /navigate 1 empty keys/i })
+    expect(emptyBtn).toBeInTheDocument()
+
+    // Click Empty keys counter -> switches to empty mode and selects AUTH.LOGIN
+    fireEvent.click(emptyBtn)
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Empty translation 1 of 1')
+    expect(screen.getByTestId('tree-node-AUTH.LOGIN')).toHaveClass('row-empty')
+  })
+
+  it('performs batch "Translate All" with progress, review modal, inline editing, and atomic file update', async () => {
     let ruContent: Record<string, unknown> = {
-      MENU: {
-        PLAY: '', // empty key
-        EXIT: 'Выход',
-      },
+      AUTH: { LOGIN: '' }, // empty
+      // MENU.PLAY is missing
     }
 
     const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
@@ -277,11 +336,110 @@ describe('App', () => {
     const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
       if (filePath.endsWith('en.json')) {
         return {
-          MENU: {
-            PLAY: 'Play',
-            EXIT: 'Exit',
-          },
+          AUTH: { LOGIN: 'Log In' },
+          MENU: { PLAY: 'Play' },
         }
+      }
+      if (filePath.endsWith('ru.json')) {
+        return ruContent
+      }
+      throw new Error('File not found')
+    })
+    const mockWriteJsonFiles = vi
+      .fn()
+      .mockImplementation(async (files: { path: string; content: string }[]) => {
+        for (const file of files) {
+          if (file.path.endsWith('ru.json')) {
+            ruContent = JSON.parse(file.content)
+          }
+        }
+        return { success: true }
+      })
+
+    window.electronAPI = {
+      isElectron: true,
+      platform: 'win32',
+      selectDirectory: mockSelectDirectory,
+      getJsonFiles: mockGetJsonFiles,
+      readJsonFile: mockReadJsonFile,
+      writeJsonFiles: mockWriteJsonFiles,
+      getSettings: vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS),
+      updateAiTranslationSettings: vi.fn(),
+      translateWithAi: vi.fn(),
+    }
+
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+
+    // Click "✨ Translate All (2)"
+    const translateAllBtn = screen.getByRole('button', { name: /translate all \(2\)/i })
+    expect(translateAllBtn).toBeEnabled()
+    fireEvent.click(translateAllBtn)
+
+    // Review Modal should appear
+    await waitFor(() => {
+      expect(
+        screen.getByRole('dialog', { name: /review batch translations/i })
+      ).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('batch-row-ru.json-AUTH.LOGIN')).toBeInTheDocument()
+    expect(screen.getByTestId('batch-row-ru.json-MENU.PLAY')).toBeInTheDocument()
+
+    // Edit proposed translation for AUTH.LOGIN
+    const loginInput = screen.getByRole('textbox', {
+      name: /translation for auth\.login/i,
+    })
+    expect(loginInput).toHaveValue('[AI: RU] Log In')
+    fireEvent.change(loginInput, { target: { value: 'Войти' } })
+
+    // Click "✓ Apply All (2)"
+    const applyAllBtn = screen.getByRole('button', { name: /apply all \(2\)/i })
+    fireEvent.click(applyAllBtn)
+
+    await waitFor(() => {
+      expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+        {
+          path: 'C:/Projects/locales/ru.json',
+          content: JSON.stringify(
+            {
+              AUTH: { LOGIN: 'Войти' },
+              MENU: { PLAY: '[AI: RU] Play' },
+            },
+            null,
+            2
+          ) + '\n',
+        },
+      ])
+    })
+
+    // After refresh, modal should be closed and success message shown
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(
+        screen.getByText(/successfully applied 2 ai translations/i)
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('automatically applies batch translations when requireEditConfirmation is false', async () => {
+    let ruContent: Record<string, unknown> = {
+      AUTH: { LOGIN: '' },
+    }
+
+    const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+    const mockGetJsonFiles = vi.fn().mockResolvedValue([
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+    ])
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return { AUTH: { LOGIN: 'Log In' } }
       }
       if (filePath.endsWith('ru.json')) {
         return ruContent
@@ -321,31 +479,20 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
     await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
-
     fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
     await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-
     fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
 
-    // Switch to ru.json
-    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+    const translateAllBtn = screen.getByRole('button', { name: /translate all \(1\)/i })
+    fireEvent.click(translateAllBtn)
 
-    // Click "✨ Translate with AI" on MENU.PLAY
-    const aiTranslateBtn = screen.getByRole('button', { name: /translate menu\.play with ai/i })
-    fireEvent.click(aiTranslateBtn)
-
-    // Should NOT show confirmation dialog, writes immediately
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(mockWriteJsonFiles).toHaveBeenCalledWith([
         {
           path: 'C:/Projects/locales/ru.json',
           content: JSON.stringify(
             {
-              MENU: {
-                PLAY: '[AI: RU] Play',
-                EXIT: 'Выход',
-              },
+              AUTH: { LOGIN: '[AI: RU] Log In' },
             },
             null,
             2
@@ -354,8 +501,7 @@ describe('App', () => {
       ])
     })
 
-    // Shows success status message
-    expect(screen.getByText(/✓ applied ai translation for menu\.play/i)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('displays error and does not modify files when AI provider fails or lacks required API key', async () => {
