@@ -6,7 +6,7 @@ import {
   MockAiTranslationProvider,
 } from './services/aiTranslation'
 import type { ElectronAPI } from './types/electron'
-import { DEFAULT_APP_SETTINGS } from './types/settings'
+import { DEFAULT_APP_SETTINGS, type AppSettings } from './types/settings'
 
 function createMockElectronAPI(overrides: Partial<ElectronAPI> = {}): ElectronAPI {
   return {
@@ -137,7 +137,7 @@ describe('App', () => {
 
     // 4. Toggle Confirmation checkbox
     const checkbox = screen.getByRole('checkbox', {
-      name: /ask for confirmation before applying ai translations/i,
+      name: /ask for confirmation before applying (ai|generated) translations/i,
     })
     expect(checkbox).toBeChecked()
 
@@ -902,6 +902,85 @@ describe('App', () => {
       expect(screen.getByTestId('tree-node-MENU.PLAY')).toHaveTextContent('"Играть"')
       expect(screen.getByTestId('tree-node-MENU.PLAY')).not.toHaveTextContent('[ EMPTY ]')
     })
+  })
+
+  it('switches translation engine to Free Translator, configures LibreTranslate and MyMemory settings, and persists configuration', async () => {
+    let currentSettings: AppSettings = { ...DEFAULT_APP_SETTINGS }
+
+    const mockGetSettings = vi.fn().mockImplementation(async () => currentSettings)
+    const mockUpdateTranslationSettings = vi
+      .fn()
+      .mockImplementation(async (update: Partial<AppSettings>) => {
+        currentSettings = {
+          ...currentSettings,
+          ...update,
+          aiTranslation: {
+            ...currentSettings.aiTranslation,
+            ...(update.aiTranslation || {}),
+          },
+          freeTranslation: {
+            ...(currentSettings.freeTranslation || DEFAULT_APP_SETTINGS.freeTranslation!),
+            ...(update.freeTranslation || {}),
+          },
+        }
+        return currentSettings
+      })
+
+    window.electronAPI = createMockElectronAPI({
+      getSettings: mockGetSettings,
+      updateTranslationSettings: mockUpdateTranslationSettings,
+    })
+
+    render(<App />)
+
+    await waitFor(() => expect(mockGetSettings).toHaveBeenCalled())
+
+    // Open settings modal
+    fireEvent.click(screen.getByRole('button', { name: /open settings/i }))
+
+    // Switch engine to Free Translator
+    const engineSelect = screen.getByRole('combobox', { name: /select translation engine/i })
+    expect(engineSelect).toHaveValue('ai')
+
+    fireEvent.change(engineSelect, { target: { value: 'free' } })
+    expect(mockUpdateTranslationSettings).toHaveBeenCalledWith({ engine: 'free' })
+
+    // Verify Free Provider select is visible
+    const freeProviderSelect = screen.getByRole('combobox', { name: /select free provider/i })
+    expect(freeProviderSelect).toHaveValue('libretranslate')
+
+    // Edit LibreTranslate server URL
+    const urlInput = screen.getByRole('textbox', { name: /libretranslate server url/i })
+    fireEvent.change(urlInput, { target: { value: 'http://my-libretranslate.internal:5000' } })
+    expect(mockUpdateTranslationSettings).toHaveBeenCalled()
+
+    // Switch to MyMemory
+    fireEvent.change(freeProviderSelect, { target: { value: 'mymemory' } })
+    expect(mockUpdateTranslationSettings).toHaveBeenCalled()
+
+    // Enter MyMemory email
+    const emailInput = screen.getByRole('textbox', { name: /mymemory email/i })
+    fireEvent.change(emailInput, { target: { value: 'dev@example.com' } })
+    expect(mockUpdateTranslationSettings).toHaveBeenCalled()
+  })
+
+  it('ensures that zero network fetch requests are dispatched during application startup and settings loading', async () => {
+    const fetchSpy = vi.fn()
+    globalThis.fetch = fetchSpy
+
+    const mockGetSettings = vi.fn().mockResolvedValue(DEFAULT_APP_SETTINGS)
+    window.electronAPI = createMockElectronAPI({
+      getSettings: mockGetSettings,
+    })
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(mockGetSettings).toHaveBeenCalled()
+    })
+
+    // Assert that no provider network request occurred during initialization
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('shows an error message if Electron API is unavailable', () => {

@@ -15,13 +15,14 @@ export interface ElectronAPI {
   writeJsonFiles: (files: { path: string; content: string }[]) => Promise<{ success: boolean }>
   getSettings: () => Promise<AppSettings>
   updateAiTranslationSettings: (settings: Partial<AiTranslationSettings>) => Promise<AppSettings>
+  updateTranslationSettings?: (settings: Partial<AppSettings>) => Promise<AppSettings>
   translateWithAi: (
     request: AiTranslationRequest,
-    settings: AiTranslationSettings
+    settings: AiTranslationSettings | AppSettings
   ) => Promise<AiTranslationResult>
   translateBatchWithAi: (
     request: import('../services/aiTranslation').BatchAiTranslationRequest,
-    settings: AiTranslationSettings
+    settings: AiTranslationSettings | AppSettings
   ) => Promise<import('../services/aiTranslation').BatchAiTranslationResult>
 }
 
