@@ -9,6 +9,7 @@ interface LocalizationTreeProps {
   editingKey?: string | null
   editValue?: string
   isSavingKey?: boolean
+  translatingKey?: string | null
   treeBodyRef: React.RefObject<HTMLDivElement | null>
   onToggleCollapse: (id: string) => void
   onExpandAll: () => void
@@ -18,6 +19,7 @@ interface LocalizationTreeProps {
   onEditValueChange?: (value: string) => void
   onSaveEdit?: () => void
   onCancelEdit?: () => void
+  onAiTranslate?: (fullKey: string) => void
 }
 
 export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
@@ -27,6 +29,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   editingKey,
   editValue,
   isSavingKey,
+  translatingKey,
   treeBodyRef,
   onToggleCollapse,
   onExpandAll,
@@ -36,6 +39,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   onEditValueChange,
   onSaveEdit,
   onCancelEdit,
+  onAiTranslate,
 }) => {
   return (
     <div className="tree-container" aria-label="Localization Tree">
@@ -73,12 +77,14 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
               editingKey={editingKey}
               editValue={editValue}
               isSavingKey={isSavingKey}
+              translatingKey={translatingKey}
               onToggleCollapse={onToggleCollapse}
               onSelectRow={onSelectRow}
               onStartEdit={onStartEdit}
               onEditValueChange={onEditValueChange}
               onSaveEdit={onSaveEdit}
               onCancelEdit={onCancelEdit}
+              onAiTranslate={onAiTranslate}
             />
           ))
         ) : (

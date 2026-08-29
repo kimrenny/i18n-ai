@@ -19,6 +19,10 @@ export const electronAPI = {
     ipcRenderer.invoke('fs:readJsonFile', filePath),
   writeJsonFiles: (files: { path: string; content: string }[]): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('fs:writeJsonFiles', files),
+  getSettings: (): Promise<unknown> =>
+    ipcRenderer.invoke('settings:get'),
+  updateAiTranslationSettings: (settings: unknown): Promise<unknown> =>
+    ipcRenderer.invoke('settings:updateAiTranslation', settings),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

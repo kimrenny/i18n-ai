@@ -1,12 +1,18 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import type { JsonFileInfo } from './types/electron'
 import type {
   FileParseResult,
   LocalizationComparisonResult,
 } from './types/localization'
+import {
+  type AppSettings,
+  type AiTranslationSettings,
+  DEFAULT_APP_SETTINGS,
+} from './types/settings'
 import { parseLocalizationData } from './services/localizationParser'
 import { compareLocalizationFiles } from './services/localizationComparator'
 import { LocalizationDiffViewer } from './components/localization/LocalizationDiffViewer'
+import { SettingsModal } from './components/settings/SettingsModal'
 import './App.css'
 
 export const App: React.FC = () => {
@@ -19,6 +25,59 @@ export const App: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [noSelectionWarning, setNoSelectionWarning] = useState<string | null>(null)
   const [isParsing, setIsParsing] = useState(false)
+
+  // Settings State
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isSettingsSaving, setIsSettingsSaving] = useState(false)
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
+
+  // Load persisted settings on application mount
+  useEffect(() => {
+    async function loadSettings() {
+      if (window.electronAPI?.getSettings) {
+        try {
+          const loaded = await window.electronAPI.getSettings()
+          if (loaded && typeof loaded === 'object') {
+            setSettings(loaded)
+          }
+        } catch {
+          // Fallback to safe defaults on any loading error
+          setSettings(DEFAULT_APP_SETTINGS)
+        }
+      }
+    }
+    loadSettings()
+  }, [])
+
+  const handleUpdateAiSettings = async (update: Partial<AiTranslationSettings>) => {
+    setIsSettingsSaving(true)
+    setSettingsSaveError(null)
+
+    if (!window.electronAPI?.updateAiTranslationSettings) {
+      // In web/fallback mode, update in-memory state
+      setSettings((prev) => ({
+        ...prev,
+        aiTranslation: {
+          ...prev.aiTranslation,
+          ...update,
+        },
+      }))
+      setIsSettingsSaving(false)
+      return
+    }
+
+    try {
+      const updated = await window.electronAPI.updateAiTranslationSettings(update)
+      setSettings(updated)
+    } catch (err) {
+      setSettingsSaveError(
+        err instanceof Error ? err.message : 'Failed to save settings to disk.'
+      )
+    } finally {
+      setIsSettingsSaving(false)
+    }
+  }
 
   const handleSelectFolder = async () => {
     if (!window.electronAPI?.selectDirectory) {
@@ -176,7 +235,22 @@ export const App: React.FC = () => {
 
   return (
     <main className="app-container">
-      <div className="badge">Desktop Preview</div>
+      <div className="app-header-bar">
+        <div className="badge">Desktop Preview</div>
+        <button
+          type="button"
+          className="settings-open-btn"
+          onClick={() => {
+            setSettingsSaveError(null)
+            setIsSettingsOpen(true)
+          }}
+          aria-label="Open Settings"
+          title="Open Settings"
+        >
+          ⚙ Settings
+        </button>
+      </div>
+
       <h1 className="title">Localization AI</h1>
       <p className="description">
         Application is currently under development.
@@ -307,6 +381,7 @@ export const App: React.FC = () => {
         <LocalizationDiffViewer
           comparisonResult={comparisonResult}
           parsedFiles={successfulParsedFiles}
+          settings={settings}
           onRefreshFiles={handleRefreshFiles}
         />
       )}
@@ -314,6 +389,16 @@ export const App: React.FC = () => {
       <div className="status-box">
         Basic Electron + React + TypeScript + Vite foundation initialized.
       </div>
+
+      {isSettingsOpen && (
+        <SettingsModal
+          settings={settings}
+          isSaving={isSettingsSaving}
+          saveError={settingsSaveError}
+          onUpdateAiSettings={handleUpdateAiSettings}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      )}
     </main>
   )
 }
