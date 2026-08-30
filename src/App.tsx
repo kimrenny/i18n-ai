@@ -1,120 +1,66 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import type { JsonFileInfo } from './types/electron'
 import type {
-  FileParseResult,
-  LocalizationComparisonResult,
-} from './types/localization'
-import {
-  type AppSettings,
-  type AiTranslationSettings,
-  DEFAULT_APP_SETTINGS,
+  AppSettings,
+  AiTranslationSettings,
 } from './types/settings'
+import { DEFAULT_APP_SETTINGS } from './types/settings'
+import { SettingsModal } from './components/settings/SettingsModal'
+import { LocalizationDiffViewer } from './components/localization/LocalizationDiffViewer'
 import { parseLocalizationData } from './services/localizationParser'
 import { compareLocalizationFiles } from './services/localizationComparator'
-import { LocalizationDiffViewer } from './components/localization/LocalizationDiffViewer'
-import { SettingsModal } from './components/settings/SettingsModal'
+import type {
+  ParsedLocalizationFile,
+  LocalizationComparisonResult,
+} from './types/localization'
+import { I18nProvider } from './i18n/I18nContext'
+import { useTranslation } from './i18n/useTranslation'
 import './App.css'
 
-export const App: React.FC = () => {
+interface DiscoveredFile {
+  name: string
+  path: string
+}
+
+interface FileParseResult {
+  filename: string
+  path: string
+  success: boolean
+  data?: ParsedLocalizationFile
+  error?: string
+}
+
+interface AppContentProps {
+  settings: AppSettings
+  isSettingsSaving: boolean
+  settingsSaveError: string | null
+  onUpdateAiSettings: (update: Partial<AiTranslationSettings>) => Promise<void>
+  onUpdateTranslationSettings: (update: Partial<AppSettings>) => Promise<void>
+}
+
+const AppContent: React.FC<AppContentProps> = ({
+  settings,
+  isSettingsSaving,
+  settingsSaveError,
+  onUpdateAiSettings,
+  onUpdateTranslationSettings,
+}) => {
+  const { t } = useTranslation()
   const [selectedDirectory, setSelectedDirectory] = useState<string | null>(null)
-  const [jsonFiles, setJsonFiles] = useState<JsonFileInfo[]>([])
+  const [jsonFiles, setJsonFiles] = useState<DiscoveredFile[]>([])
   const [checkedPaths, setCheckedPaths] = useState<Set<string>>(new Set())
-  const [parseResults, setParseResults] = useState<FileParseResult[] | null>(null)
-  const [comparisonResult, setComparisonResult] =
-    useState<LocalizationComparisonResult | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [noSelectionWarning, setNoSelectionWarning] = useState<string | null>(null)
-  const [isParsing, setIsParsing] = useState(false)
-
-  // Settings State
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isSettingsSaving, setIsSettingsSaving] = useState(false)
-  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
+  const [, setSettingsSaveError] = useState<string | null>(null)
 
-  // Load persisted settings on application mount
-  useEffect(() => {
-    async function loadSettings() {
-      if (window.electronAPI?.getSettings) {
-        try {
-          const loaded = await window.electronAPI.getSettings()
-          if (loaded && typeof loaded === 'object') {
-            setSettings(loaded)
-          }
-        } catch {
-          // Fallback to safe defaults on any loading error
-          setSettings(DEFAULT_APP_SETTINGS)
-        }
-      }
-    }
-    loadSettings()
-  }, [])
-
-  const handleUpdateAiSettings = async (update: Partial<AiTranslationSettings>) => {
-    setIsSettingsSaving(true)
-    setSettingsSaveError(null)
-
-    if (!window.electronAPI?.updateAiTranslationSettings) {
-      // In web/fallback mode, update in-memory state
-      setSettings((prev) => ({
-        ...prev,
-        aiTranslation: {
-          ...prev.aiTranslation,
-          ...update,
-        },
-      }))
-      setIsSettingsSaving(false)
-      return
-    }
-
-    try {
-      const updated = await window.electronAPI.updateAiTranslationSettings(update)
-      setSettings(updated)
-    } catch (err) {
-      setSettingsSaveError(
-        err instanceof Error ? err.message : 'Failed to save settings to disk.'
-      )
-    } finally {
-      setIsSettingsSaving(false)
-    }
-  }
-
-  const handleUpdateTranslationSettings = async (update: Partial<AppSettings>) => {
-    setIsSettingsSaving(true)
-    setSettingsSaveError(null)
-
-    if (!window.electronAPI?.updateTranslationSettings) {
-      setSettings((prev) => ({
-        ...prev,
-        ...update,
-        aiTranslation: {
-          ...prev.aiTranslation,
-          ...(update.aiTranslation || {}),
-        },
-        freeTranslation: {
-          ...(prev.freeTranslation || DEFAULT_APP_SETTINGS.freeTranslation!),
-          ...(update.freeTranslation || {}),
-        },
-      }))
-      setIsSettingsSaving(false)
-      return
-    }
-
-    try {
-      const updated = await window.electronAPI.updateTranslationSettings(update)
-      setSettings(updated)
-    } catch (err) {
-      setSettingsSaveError(
-        err instanceof Error ? err.message : 'Failed to save translation settings.'
-      )
-    } finally {
-      setIsSettingsSaving(false)
-    }
-  }
+  // Parsing & Comparison State
+  const [isParsing, setIsParsing] = useState(false)
+  const [parseResults, setParseResults] = useState<FileParseResult[] | null>(null)
+  const [noSelectionWarning, setNoSelectionWarning] = useState<string | null>(null)
+  const [comparisonResult, setComparisonResult] = useState<LocalizationComparisonResult | null>(null)
 
   const handleSelectFolder = async () => {
     if (!window.electronAPI?.selectDirectory) {
-      setErrorMessage('Unable to open folder selection dialog: Electron API is unavailable.')
+      setErrorMessage(t('app.electronUnavailable'))
       return
     }
 
@@ -131,20 +77,19 @@ export const App: React.FC = () => {
           try {
             const files = await window.electronAPI.getJsonFiles(directory)
             setJsonFiles(files)
-            // By default, check all discovered JSON files
             setCheckedPaths(new Set(files.map((f) => f.path)))
           } catch (err) {
             setJsonFiles([])
             setCheckedPaths(new Set())
             setErrorMessage(
-              err instanceof Error ? err.message : 'Failed to read directory.'
+              err instanceof Error ? err.message : t('app.failedToReadDirectory')
             )
           }
         }
       }
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : 'Unable to open folder selection dialog.'
+        err instanceof Error ? err.message : t('app.electronUnavailable')
       )
     }
   }
@@ -164,12 +109,12 @@ export const App: React.FC = () => {
 
   const handleParseFiles = async () => {
     if (checkedPaths.size === 0) {
-      setNoSelectionWarning('No files selected for parsing')
+      setNoSelectionWarning(t('app.noFilesSelectedWarning'))
       return
     }
 
     if (!window.electronAPI?.readJsonFile) {
-      setErrorMessage('Unable to read JSON files: Electron API is unavailable.')
+      setErrorMessage(t('app.unableToReadJsonFiles'))
       return
     }
 
@@ -195,7 +140,7 @@ export const App: React.FC = () => {
           filename: file.name,
           path: file.path,
           success: false,
-          error: err instanceof Error ? err.message : 'Invalid JSON',
+          error: err instanceof Error ? err.message : t('app.invalidJsonBadge'),
         })
       }
     }
@@ -227,7 +172,7 @@ export const App: React.FC = () => {
           filename: file.name,
           path: file.path,
           success: false,
-          error: err instanceof Error ? err.message : 'Invalid JSON',
+          error: err instanceof Error ? err.message : t('app.invalidJsonBadge'),
         })
       }
     }
@@ -245,7 +190,7 @@ export const App: React.FC = () => {
       const newComparison = compareLocalizationFiles(validFiles)
       setComparisonResult(newComparison)
     }
-  }, [jsonFiles, checkedPaths])
+  }, [jsonFiles, checkedPaths, t])
 
   const successfulParsedFiles = parseResults
     ? parseResults
@@ -269,7 +214,7 @@ export const App: React.FC = () => {
   return (
     <main className="app-container">
       <div className="app-header-bar">
-        <div className="badge">Desktop Preview</div>
+        <div className="badge">{t('app.badge')}</div>
         <button
           type="button"
           className="settings-open-btn"
@@ -277,16 +222,16 @@ export const App: React.FC = () => {
             setSettingsSaveError(null)
             setIsSettingsOpen(true)
           }}
-          aria-label="Open Settings"
-          title="Open Settings"
+          aria-label={t('app.openSettings')}
+          title={t('app.openSettings')}
         >
-          ⚙ Settings
+          ⚙ {t('settings.title')}
         </button>
       </div>
 
-      <h1 className="title">Localization AI</h1>
+      <h1 className="title">{t('app.title')}</h1>
       <p className="description">
-        Application is currently under development.
+        {t('app.subtitle')}
       </p>
 
       <div className="folder-selection-section">
@@ -295,7 +240,7 @@ export const App: React.FC = () => {
           className="select-button"
           onClick={handleSelectFolder}
         >
-          Select Folder
+          {t('app.selectFolder')}
         </button>
         <div
           className="selected-path-container"
@@ -303,11 +248,11 @@ export const App: React.FC = () => {
         >
           {selectedDirectory ? (
             <div className="selected-path-info">
-              <span className="path-label">Selected folder:</span>
+              <span className="path-label">{t('app.selectedFolder')}</span>
               <span className="selected-path-text">{selectedDirectory}</span>
             </div>
           ) : (
-            <span className="empty-path-text">No folder selected</span>
+            <span className="empty-path-text">{t('app.noFolderSelected')}</span>
           )}
         </div>
       </div>
@@ -319,8 +264,8 @@ export const App: React.FC = () => {
       )}
 
       {selectedDirectory && !errorMessage && (
-        <section className="files-section" aria-label="Discovered JSON files">
-          <h2 className="files-title">JSON files:</h2>
+        <section className="files-section" aria-label={t('app.discoveredFilesAria')}>
+          <h2 className="files-title">{t('app.jsonFilesTitle')}</h2>
 
           {jsonFiles.length > 0 ? (
             <>
@@ -335,7 +280,7 @@ export const App: React.FC = () => {
                           checked={isChecked}
                           onChange={() => handleToggleFile(file.path)}
                           className="file-checkbox"
-                          aria-label={`Select ${file.name}`}
+                          aria-label={t('app.selectFileAria', { name: file.name })}
                         />
                         <span className="file-name">{file.name}</span>
                       </label>
@@ -351,7 +296,7 @@ export const App: React.FC = () => {
                   onClick={handleParseFiles}
                   disabled={isParsing}
                 >
-                  {isParsing ? 'Parsing...' : 'Parse JSON Files'}
+                  {isParsing ? t('app.parsing') : t('app.parseJsonFiles')}
                 </button>
               </div>
 
@@ -362,14 +307,14 @@ export const App: React.FC = () => {
               )}
             </>
           ) : (
-            <div className="empty-files-message">No JSON files found</div>
+            <div className="empty-files-message">{t('app.noFilesFound')}</div>
           )}
         </section>
       )}
 
       {parseResults && parseResults.length > 0 && (
-        <section className="parse-results-section" aria-label="Parse Results">
-          <h2 className="results-title">Parse Results:</h2>
+        <section className="parse-results-section" aria-label={t('app.parseResultsAria')}>
+          <h2 className="results-title">{t('app.parseResultsTitle')}</h2>
           <div className="results-grid">
             {parseResults.map((res) => (
               <div
@@ -380,12 +325,12 @@ export const App: React.FC = () => {
                 <div className="result-filename">{res.filename}</div>
                 {res.success && res.data ? (
                   <div className="result-details">
-                    <span className="status-badge success-badge">✓ Parsed</span>
-                    <span className="key-count">{res.data.keyCount} keys</span>
+                    <span className="status-badge success-badge">{t('app.parsedBadge')}</span>
+                    <span className="key-count">{t('app.keyCount', { count: res.data.keyCount })}</span>
                   </div>
                 ) : (
                   <div className="result-details">
-                    <span className="status-badge error-badge">✕ Invalid JSON</span>
+                    <span className="status-badge error-badge">{t('app.invalidJsonBadge')}</span>
                   </div>
                 )}
               </div>
@@ -399,11 +344,11 @@ export const App: React.FC = () => {
               onClick={handleCompareFiles}
               disabled={!canCompare}
             >
-              Compare Selected Files
+              {t('app.compareFiles')}
             </button>
             {!canCompare && parseResults.length > 0 && (
               <span className="compare-hint">
-                At least 2 successfully parsed files required to compare
+                {t('app.compareHint')}
               </span>
             )}
           </div>
@@ -420,7 +365,7 @@ export const App: React.FC = () => {
       )}
 
       <div className="status-box">
-        Basic Electron + React + TypeScript + Vite foundation initialized.
+        {t('app.statusFoundation')}
       </div>
 
       {isSettingsOpen && (
@@ -428,12 +373,124 @@ export const App: React.FC = () => {
           settings={settings}
           isSaving={isSettingsSaving}
           saveError={settingsSaveError}
-          onUpdateAiSettings={handleUpdateAiSettings}
-          onUpdateTranslationSettings={handleUpdateTranslationSettings}
+          onUpdateAiSettings={onUpdateAiSettings}
+          onUpdateTranslationSettings={onUpdateTranslationSettings}
           onClose={() => setIsSettingsOpen(false)}
         />
       )}
     </main>
+  )
+}
+
+export const App: React.FC = () => {
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
+  const [isSettingsSaving, setIsSettingsSaving] = useState(false)
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
+
+  // Load persisted settings on application mount
+  useEffect(() => {
+    async function loadSettings() {
+      if (window.electronAPI?.getSettings) {
+        try {
+          const loaded = await window.electronAPI.getSettings()
+          if (loaded && typeof loaded === 'object') {
+            setSettings(loaded)
+          }
+        } catch {
+          setSettings(DEFAULT_APP_SETTINGS)
+        }
+      }
+    }
+    loadSettings()
+  }, [])
+
+  const handleUpdateAiSettings = async (update: Partial<AiTranslationSettings>) => {
+    setIsSettingsSaving(true)
+    setSettingsSaveError(null)
+
+    if (!window.electronAPI?.updateAiTranslationSettings) {
+      setSettings((prev) => ({
+        ...prev,
+        aiTranslation: {
+          ...prev.aiTranslation,
+          ...update,
+          providers: {
+            ...prev.aiTranslation.providers,
+            ...(update.providers || {}),
+          },
+        },
+      }))
+      setIsSettingsSaving(false)
+      return
+    }
+
+    try {
+      const updated = await window.electronAPI.updateAiTranslationSettings(update)
+      setSettings(updated)
+    } catch (err) {
+      setSettingsSaveError(
+        err instanceof Error ? err.message : 'Failed to save settings.'
+      )
+    } finally {
+      setIsSettingsSaving(false)
+    }
+  }
+
+  const handleUpdateTranslationSettings = async (update: Partial<AppSettings>) => {
+    setIsSettingsSaving(true)
+    setSettingsSaveError(null)
+
+    if (!window.electronAPI?.updateTranslationSettings) {
+      setSettings((prev) => ({
+        ...prev,
+        ...update,
+        aiTranslation: update.aiTranslation
+          ? {
+              ...prev.aiTranslation,
+              ...update.aiTranslation,
+              providers: {
+                ...(prev.aiTranslation?.providers || {}),
+                ...(update.aiTranslation.providers || {}),
+              },
+            }
+          : prev.aiTranslation,
+        freeTranslation: update.freeTranslation
+          ? {
+              ...prev.freeTranslation,
+              ...update.freeTranslation,
+              providers: {
+                ...(prev.freeTranslation?.providers || {}),
+                ...(update.freeTranslation.providers || {}),
+              },
+            }
+          : prev.freeTranslation,
+      }))
+      setIsSettingsSaving(false)
+      return
+    }
+
+    try {
+      const updated = await window.electronAPI.updateTranslationSettings(update)
+      setSettings(updated)
+    } catch (err) {
+      setSettingsSaveError(
+        err instanceof Error ? err.message : 'Failed to save translation settings.'
+      )
+    } finally {
+      setIsSettingsSaving(false)
+    }
+  }
+
+  return (
+    <I18nProvider language={settings.language || 'en'}>
+      <AppContent
+        settings={settings}
+        isSettingsSaving={isSettingsSaving}
+        settingsSaveError={settingsSaveError}
+        onUpdateAiSettings={handleUpdateAiSettings}
+        onUpdateTranslationSettings={handleUpdateTranslationSettings}
+      />
+    </I18nProvider>
   )
 }
 

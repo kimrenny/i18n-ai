@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback } from 'react'
+import { useTranslation } from '../../i18n/useTranslation'
 
 export type ProblemNavMode = 'missing' | 'empty'
 
@@ -21,6 +22,7 @@ export const MissingKeyNavigator: React.FC<MissingKeyNavigatorProps> = ({
   onNavigate,
   onTop,
 }) => {
+  const { t } = useTranslation()
   const currentList = navMode === 'missing' ? missingKeys : emptyKeys
   const currentIndex =
     activeMissingKey !== null ? currentList.indexOf(activeMissingKey) : -1
@@ -74,7 +76,7 @@ export const MissingKeyNavigator: React.FC<MissingKeyNavigatorProps> = ({
   }, [canGoNext, canGoPrevious, handleNext, handlePrevious])
 
   return (
-    <div className="missing-navigator-bar" aria-label="Missing and empty key navigator">
+    <div className="missing-navigator-bar" aria-label={t('nav.navigatorAria')}>
       <div className="navigator-modes">
         <button
           type="button"
@@ -86,10 +88,10 @@ export const MissingKeyNavigator: React.FC<MissingKeyNavigatorProps> = ({
             }
           }}
           disabled={missingKeys.length === 0}
-          aria-label={`Navigate missing keys (${missingKeys.length})`}
+          aria-label={`${t('nav.modeMissing')} (${missingKeys.length})`}
         >
           <span className="mode-dot dot-missing">●</span>
-          Missing: <strong>{missingKeys.length}</strong>
+          {t('nav.modeMissing')}: <strong>{missingKeys.length}</strong>
         </button>
 
         <button
@@ -102,45 +104,37 @@ export const MissingKeyNavigator: React.FC<MissingKeyNavigatorProps> = ({
             }
           }}
           disabled={emptyKeys.length === 0}
-          aria-label={`Navigate empty keys (${emptyKeys.length})`}
+          aria-label={`${t('nav.modeEmpty')} (${emptyKeys.length})`}
         >
           <span className="mode-dot dot-empty">●</span>
-          Empty: <strong>{emptyKeys.length}</strong>
+          {t('nav.modeEmpty')}: <strong>{emptyKeys.length}</strong>
         </button>
       </div>
 
-      <div className="navigator-status">
-        {hasCurrentProblems ? (
-          currentIndex >= 0 ? (
-            <span className="navigator-position" data-testid="navigator-position">
-              {navMode === 'missing' ? 'Missing' : 'Empty'} translation {currentIndex + 1} of{' '}
-              {currentList.length}
-            </span>
-          ) : (
-            <span className="navigator-position" data-testid="navigator-position">
-              {currentList.length} {navMode} translations in this file
-            </span>
-          )
-        ) : (
-          <span
-            className="navigator-position navigator-all-complete"
-            data-testid="navigator-position"
-          >
-            ✓ 0 {navMode} translations in this file
-          </span>
-        )}
-      </div>
-
       <div className="navigator-controls">
+        <span
+          className="nav-index-display"
+          data-testid="navigator-position"
+          role="status"
+        >
+          {activeMissingKey !== null && currentIndex !== -1
+            ? (navMode === 'missing'
+                ? t('nav.missingIndex', { current: currentIndex + 1, total: currentList.length })
+                : t('nav.emptyIndex', { current: currentIndex + 1, total: currentList.length }))
+            : (navMode === 'missing'
+                ? t('nav.missingCountTotal', { count: currentList.length })
+                : t('nav.emptyCountTotal', { count: currentList.length }))}
+        </span>
+
         <button
           type="button"
           className="nav-btn prev-btn"
           onClick={handlePrevious}
           disabled={!canGoPrevious}
-          aria-label="Previous key"
-          title="Previous problem key"
+          title={t('nav.prevProblem')}
+          aria-label={t('nav.prevProblem')}
         >
-          ← Previous
+          ◀ Prev
         </button>
 
         <button
@@ -148,20 +142,20 @@ export const MissingKeyNavigator: React.FC<MissingKeyNavigatorProps> = ({
           className="nav-btn next-btn"
           onClick={handleNext}
           disabled={!canGoNext}
-          aria-label="Next key"
-          title="Next problem key"
+          title={t('nav.nextProblem')}
+          aria-label={t('nav.nextProblem')}
         >
-          Next →
+          Next ▶
         </button>
 
         <button
           type="button"
           className="nav-btn top-btn"
           onClick={onTop}
-          aria-label="Scroll to top"
-          title="Scroll tree to top"
+          title={t('nav.scrollTop')}
+          aria-label={t('nav.scrollTop')}
         >
-          ↑ Top
+          ▲ Top
         </button>
       </div>
     </div>

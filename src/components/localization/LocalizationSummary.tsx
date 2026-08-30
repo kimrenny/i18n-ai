@@ -1,5 +1,6 @@
 import React from 'react'
 import type { LocalizationComparisonResult } from '../../types/localization'
+import { useTranslation } from '../../i18n/useTranslation'
 
 interface LocalizationSummaryProps {
   comparisonResult: LocalizationComparisonResult
@@ -18,37 +19,38 @@ export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
   onStartBatchTranslate,
   isBatchTranslating = false,
 }) => {
+  const { t } = useTranslation()
   const hasMissing = comparisonResult.incompleteKeysCount > 0
   const hasEmpty = comparisonResult.emptyKeysCount > 0
   const totalUntranslated =
     comparisonResult.incompleteKeysCount + comparisonResult.emptyKeysCount
 
   return (
-    <div className="diff-summary-bar" aria-label="Comparison summary">
+    <div className="diff-summary-bar" aria-label={t('summary.comparisonSummaryAria')}>
       <div className="summary-stats-grid">
         <div className="summary-stat">
-          <span className="stat-label">Files compared:</span>
+          <span className="stat-label">{t('summary.filesCompared')}:</span>
           <span className="stat-value">{comparisonResult.comparedFileCount}</span>
         </div>
         <div className="summary-stat">
-          <span className="stat-label">Unique keys:</span>
+          <span className="stat-label">{t('summary.uniqueKeys')}:</span>
           <span className="stat-value">{comparisonResult.totalUniqueKeys}</span>
         </div>
         <div className="summary-stat">
-          <span className="stat-label">Complete keys:</span>
+          <span className="stat-label">{t('summary.completeKeys')}:</span>
           <span className="stat-value stat-complete">
             {comparisonResult.completeKeysCount}
           </span>
         </div>
         <div className="summary-stat">
-          <span className="stat-label">Missing keys:</span>
+          <span className="stat-label">{t('summary.missingKeys')}:</span>
           {hasMissing && onNavigateMissing ? (
             <button
               type="button"
               className="summary-stat-btn stat-missing-btn"
               onClick={onNavigateMissing}
-              title={`Click to navigate ${comparisonResult.incompleteKeysCount} missing keys`}
-              aria-label={`Navigate ${comparisonResult.incompleteKeysCount} missing keys`}
+              title={t('summary.interactiveMissingHint')}
+              aria-label={t('summary.navigateMissingAria', { count: comparisonResult.incompleteKeysCount })}
             >
               <span className="stat-value stat-missing">
                 {comparisonResult.incompleteKeysCount}
@@ -63,14 +65,14 @@ export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
           )}
         </div>
         <div className="summary-stat">
-          <span className="stat-label">Empty keys:</span>
+          <span className="stat-label">{t('summary.emptyKeys')}:</span>
           {hasEmpty && onNavigateEmpty ? (
             <button
               type="button"
               className="summary-stat-btn stat-empty-btn"
               onClick={onNavigateEmpty}
-              title={`Click to navigate ${comparisonResult.emptyKeysCount} empty keys`}
-              aria-label={`Navigate ${comparisonResult.emptyKeysCount} empty keys`}
+              title={t('summary.interactiveEmptyHint')}
+              aria-label={t('summary.navigateEmptyAria', { count: comparisonResult.emptyKeysCount })}
             >
               <span className="stat-value stat-empty">
                 {comparisonResult.emptyKeysCount}
@@ -95,13 +97,13 @@ export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
             disabled={totalUntranslated === 0 || isBatchTranslating}
             title={
               totalUntranslated > 0
-                ? `Translate all ${totalUntranslated} missing and empty entries with AI`
-                : 'All keys are translated'
+                ? `${t('translation.translateAll')} (${totalUntranslated})`
+                : t('summary.allComplete')
             }
           >
             {isBatchTranslating
-              ? 'Translating Batch...'
-              : `✨ Translate All (${totalUntranslated})`}
+              ? t('translation.translating')
+              : `${t('translation.translateAll')} (${totalUntranslated})`}
           </button>
         )}
         <button
@@ -109,13 +111,8 @@ export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
           className="add-missing-btn"
           onClick={onOpenAddMissingModal}
           disabled={!hasMissing}
-          title={
-            hasMissing
-              ? 'Add all missing keys as empty values'
-              : 'All localization keys are present'
-          }
         >
-          {hasMissing ? 'Add Missing Keys' : '✓ All Keys Present'}
+          {hasMissing ? t('nav.addMissingKeys') : t('nav.allKeysPresent')}
         </button>
       </div>
     </div>

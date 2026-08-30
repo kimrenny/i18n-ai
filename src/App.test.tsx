@@ -416,7 +416,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(
-        screen.getByText(/successfully applied 2 ai translations/i)
+        screen.getByText(/successfully applied 2 translations/i)
       ).toBeInTheDocument()
     })
   })
@@ -981,6 +981,127 @@ describe('App', () => {
 
     // Assert that no provider network request occurred during initialization
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('dynamically updates the translation button label between AI and Free Translation modes without restarting', async () => {
+    let currentSettings: AppSettings = { ...DEFAULT_APP_SETTINGS, engine: 'ai' }
+
+    const mockGetSettings = vi.fn().mockImplementation(async () => currentSettings)
+    const mockUpdateTranslationSettings = vi
+      .fn()
+      .mockImplementation(async (update: Partial<AppSettings>) => {
+        currentSettings = { ...currentSettings, ...update }
+        return currentSettings
+      })
+
+    window.electronAPI = createMockElectronAPI({
+      getSettings: mockGetSettings,
+      updateTranslationSettings: mockUpdateTranslationSettings,
+      selectDirectory: vi.fn().mockResolvedValue('/mock/locales'),
+      getJsonFiles: vi.fn().mockResolvedValue([
+        { name: 'en.json', path: '/mock/locales/en.json' },
+        { name: 'ru.json', path: '/mock/locales/ru.json' },
+      ]),
+      readJsonFile: vi.fn().mockImplementation(async (path: string) => {
+        if (path.endsWith('en.json')) {
+          return { MENU: { PLAY: 'Play' } }
+        }
+        if (path.endsWith('ru.json')) {
+          return { MENU: { PLAY: '' } }
+        }
+        return {}
+      }),
+    })
+
+    render(<App />)
+
+    await waitFor(() => expect(mockGetSettings).toHaveBeenCalled())
+
+    // Load and compare
+    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /parse json files/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+
+    // Switch to ru.json
+    await waitFor(() => expect(screen.getByRole('tab', { name: /ru\.json/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+
+    // In AI mode, verify button label is "✨ Translate with AI"
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /translate menu\.play with ai/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /translate menu\.play with ai/i })).toHaveTextContent('✨ Translate with AI')
+    })
+
+    // Open settings and switch engine to Free Translation
+    fireEvent.click(screen.getByRole('button', { name: /open settings/i }))
+    const engineSelect = screen.getByRole('combobox', { name: /select translation engine/i })
+    fireEvent.change(engineSelect, { target: { value: 'free' } })
+
+    // Close settings
+    fireEvent.click(screen.getByRole('button', { name: /^done$/i }))
+
+    // Verify button dynamically updated to "✨ Translate with Free" immediately
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /translate menu\.play with free/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /translate menu\.play with free/i })).toHaveTextContent('✨ Translate with Free')
+    })
+  })
+
+  it('allows switching the application UI language and immediately translates interface elements without touching localization files', async () => {
+    let currentSettings: AppSettings = { ...DEFAULT_APP_SETTINGS, language: 'en' }
+
+    const mockGetSettings = vi.fn().mockImplementation(async () => currentSettings)
+    const mockUpdateTranslationSettings = vi
+      .fn()
+      .mockImplementation(async (update: Partial<AppSettings>) => {
+        currentSettings = { ...currentSettings, ...update }
+        return currentSettings
+      })
+
+    window.electronAPI = createMockElectronAPI({
+      getSettings: mockGetSettings,
+      updateTranslationSettings: mockUpdateTranslationSettings,
+    })
+
+    render(<App />)
+
+    await waitFor(() => expect(mockGetSettings).toHaveBeenCalled())
+
+    // Initial English check
+    expect(screen.getByRole('button', { name: /select folder/i })).toHaveTextContent('Select Folder')
+
+    // Open settings
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    // Switch language to Ukrainian (uk)
+    const langSelect = document.getElementById('app-language-select') as HTMLSelectElement
+    expect(langSelect).toBeTruthy()
+    fireEvent.change(langSelect, { target: { value: 'uk' } })
+
+    // Close settings
+    const doneBtnUk = document.querySelector('.settings-done-btn') as HTMLButtonElement
+    fireEvent.click(doneBtnUk)
+
+    // Verify UI is immediately in Ukrainian
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /обрати папку/i })).toHaveTextContent('Обрати папку')
+    })
+
+    // Open settings again and switch to Japanese (ja)
+    fireEvent.click(screen.getByRole('button', { name: /налаштування/i }))
+    const langSelectJa = document.getElementById('app-language-select') as HTMLSelectElement
+    fireEvent.change(langSelectJa, {
+      target: { value: 'ja' },
+    })
+    const doneBtnJa = document.querySelector('.settings-done-btn') as HTMLButtonElement
+    fireEvent.click(doneBtnJa)
+
+    // Verify UI is immediately in Japanese
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /フォルダーを選択/i })).toHaveTextContent('フォルダーを選択')
+    })
   })
 
   it('shows an error message if Electron API is unavailable', () => {

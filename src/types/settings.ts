@@ -1,5 +1,49 @@
 export type TranslationEngine = 'ai' | 'free'
 
+export type AppLanguage =
+  | 'en'
+  | 'uk'
+  | 'ru'
+  | 'de'
+  | 'fr'
+  | 'es'
+  | 'pt'
+  | 'it'
+  | 'pl'
+  | 'cs'
+  | 'tr'
+  | 'zh-CN'
+  | 'ja'
+  | 'ko'
+
+export const SUPPORTED_LANGUAGES: readonly {
+  code: AppLanguage
+  nativeName: string
+  englishName: string
+}[] = [
+  { code: 'en', nativeName: 'English', englishName: 'English' },
+  { code: 'uk', nativeName: 'Українська', englishName: 'Ukrainian' },
+  { code: 'ru', nativeName: 'Русский', englishName: 'Russian' },
+  { code: 'de', nativeName: 'Deutsch', englishName: 'German' },
+  { code: 'fr', nativeName: 'Français', englishName: 'French' },
+  { code: 'es', nativeName: 'Español', englishName: 'Spanish' },
+  { code: 'pt', nativeName: 'Português', englishName: 'Portuguese' },
+  { code: 'it', nativeName: 'Italiano', englishName: 'Italian' },
+  { code: 'pl', nativeName: 'Polski', englishName: 'Polish' },
+  { code: 'cs', nativeName: 'Čeština', englishName: 'Czech' },
+  { code: 'tr', nativeName: 'Türkçe', englishName: 'Turkish' },
+  { code: 'zh-CN', nativeName: '简体中文', englishName: 'Chinese (Simplified)' },
+  { code: 'ja', nativeName: '日本語', englishName: 'Japanese' },
+  { code: 'ko', nativeName: '한국어', englishName: 'Korean' },
+] as const
+
+export function isAppLanguage(val: unknown): val is AppLanguage {
+  return (
+    typeof val === 'string' &&
+    SUPPORTED_LANGUAGES.some((lang) => lang.code === val)
+  )
+}
+
 export type AiProviderId =
   | 'mock'
   | 'openai'
@@ -60,6 +104,7 @@ export interface FreeTranslationSettings {
 }
 
 export interface AppSettings {
+  language?: AppLanguage
   engine?: TranslationEngine
   aiTranslation: AiTranslationSettings
   freeTranslation?: FreeTranslationSettings
@@ -139,6 +184,7 @@ export const DEFAULT_FREE_TRANSLATION_SETTINGS: FreeTranslationSettings = {
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
+  language: 'en',
   engine: 'ai',
   aiTranslation: DEFAULT_AI_TRANSLATION_SETTINGS,
   freeTranslation: DEFAULT_FREE_TRANSLATION_SETTINGS,
@@ -155,10 +201,15 @@ export function migrateAppSettings(raw: unknown): AppSettings {
 
   const data = raw as Record<string, unknown>
 
-  // 1. Determine Engine
+  // 1. Determine Language (safe fallback to English)
+  const language: AppLanguage = isAppLanguage(data.language)
+    ? data.language
+    : DEFAULT_APP_SETTINGS.language || 'en'
+
+  // 2. Determine Engine
   const engine: TranslationEngine = data.engine === 'free' ? 'free' : 'ai'
 
-  // 2. Extract AI Translation Settings (support nested data.aiTranslation OR top-level legacy properties)
+  // 3. Extract AI Translation Settings (support nested data.aiTranslation OR top-level legacy properties)
   const nestedAi = (
     data.aiTranslation && typeof data.aiTranslation === 'object' ? data.aiTranslation : {}
   ) as Record<string, unknown>
@@ -212,7 +263,7 @@ export function migrateAppSettings(raw: unknown): AppSettings {
     }
   }
 
-  // 3. Extract Free Translation Settings (support nested data.freeTranslation OR top-level legacy free keys)
+  // 4. Extract Free Translation Settings (support nested data.freeTranslation OR top-level legacy free keys)
   const nestedFree = (
     data.freeTranslation && typeof data.freeTranslation === 'object' ? data.freeTranslation : {}
   ) as Record<string, unknown>
@@ -250,6 +301,7 @@ export function migrateAppSettings(raw: unknown): AppSettings {
   }
 
   return {
+    language,
     engine,
     aiTranslation: {
       provider: aiProvider,

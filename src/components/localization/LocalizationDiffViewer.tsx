@@ -40,6 +40,7 @@ import {
   type AiTranslationProposal,
 } from './AiTranslationConfirmModal'
 import { BatchTranslationModal } from './BatchTranslationModal'
+import { useTranslation } from '../../i18n/useTranslation'
 
 interface LocalizationDiffViewerProps {
   comparisonResult: LocalizationComparisonResult
@@ -65,6 +66,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   settings,
   onRefreshFiles,
 }) => {
+  const { t } = useTranslation()
   const initialFilename = comparisonResult.comparedFiles[0]?.filename || ''
   const [activeFilename, setActiveFilename] = useState<string>(initialFilename)
   const [activeMissingKey, setActiveMissingKey] = useState<string | null>(null)
@@ -252,19 +254,19 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       await onRefreshFiles()
     } catch (err) {
       setSaveKeyError(
-        err instanceof Error ? err.message : 'Failed to save translation to disk.'
+        err instanceof Error ? err.message : t('errors.failedToSaveKey')
       )
     } finally {
       setIsSavingKey(false)
     }
-  }, [editingKey, activeFileData, editValue, onRefreshFiles])
+  }, [editingKey, activeFileData, editValue, onRefreshFiles, t])
 
   // AI Translation Execution Logic
   const executeApplyAiTranslation = useCallback(
     async (fullKey: string, textToApply: string) => {
       if (!activeFileData) return
       if (!window.electronAPI?.writeJsonFiles) {
-        throw new Error('Unable to write files: Electron API is unavailable.')
+        throw new Error(t('errors.electronUnavailableWrite'))
       }
 
       const { formattedJson } = updateSingleKeyInFile(
@@ -284,10 +286,10 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         setEditingKey(null)
       }
 
-      setAiSuccessMessage(`✓ Applied AI translation for ${fullKey}`)
+      setAiSuccessMessage(t('diff.appliedKeySuccess', { key: fullKey }))
       await onRefreshFiles()
     },
-    [activeFileData, editingKey, onRefreshFiles]
+    [activeFileData, editingKey, onRefreshFiles, t]
   )
 
   const handleAiTranslate = useCallback(
@@ -299,7 +301,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
       const ref = findSourceReference(fullKey, activeFilename, parsedFiles)
       if (!ref) {
-        setAiError(`No source translation found for "${fullKey}" in other compared files.`)
+        setAiError(t('diff.noSourceRefFound', { key: fullKey }))
         return
       }
 
@@ -355,13 +357,13 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         }
       } catch (err) {
         setAiError(
-          err instanceof Error ? err.message : 'AI translation request failed.'
+          err instanceof Error ? err.message : t('errors.translationRequestFailed')
         )
       } finally {
         setTranslatingKey(null)
       }
     },
-    [translatingKey, activeFilename, parsedFiles, settings, executeApplyAiTranslation]
+    [translatingKey, activeFilename, parsedFiles, settings, executeApplyAiTranslation, t]
   )
 
   const handleConfirmAiProposal = useCallback(
@@ -375,13 +377,13 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         setAiProposal(null)
       } catch (err) {
         setAiError(
-          err instanceof Error ? err.message : 'Failed to apply AI translation.'
+          err instanceof Error ? err.message : t('errors.failedToApplyTranslation')
         )
       } finally {
         setIsApplyingAi(false)
       }
     },
-    [aiProposal, executeApplyAiTranslation]
+    [aiProposal, executeApplyAiTranslation, t]
   )
 
   // Batch Translation Actions
@@ -391,7 +393,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       if (!activePlan || activePlan.items.length === 0) return
 
       if (!window.electronAPI?.writeJsonFiles) {
-        setBatchError('Unable to write files: Electron API is unavailable.')
+        setBatchError(t('errors.electronUnavailableWrite'))
         return
       }
 
@@ -413,18 +415,18 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         setBatchPlan(null)
         setBatchProgress(null)
         setAiSuccessMessage(
-          `✓ Successfully applied ${appliedCount} AI translations across ${filesToModify.length} file(s).`
+          t('diff.appliedBatchSuccess', { count: appliedCount, files: filesToModify.length })
         )
         await onRefreshFiles()
       } catch (err) {
         setBatchError(
-          err instanceof Error ? err.message : 'Failed to apply batch translations.'
+          err instanceof Error ? err.message : t('errors.failedToApplyBatch')
         )
       } finally {
         setIsWritingBatch(false)
       }
     },
-    [batchPlan, parsedFiles, onRefreshFiles]
+    [batchPlan, parsedFiles, onRefreshFiles, t]
   )
 
   const handleStartBatchTranslate = useCallback(async () => {
@@ -604,7 +606,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     }
 
     if (!window.electronAPI?.writeJsonFiles) {
-      setWriteError('Unable to write files: Electron API is unavailable.')
+      setWriteError(t('errors.electronUnavailableWrite'))
       return
     }
 
@@ -622,7 +624,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       await onRefreshFiles()
     } catch (err) {
       setWriteError(
-        err instanceof Error ? err.message : 'Failed to write files to disk.'
+        err instanceof Error ? err.message : t('errors.failedToWriteFiles')
       )
     } finally {
       setIsWriting(false)
@@ -646,7 +648,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   }, [activeMissingKey, collapsedSet])
 
   return (
-    <section className="diff-viewer-section" aria-label="Localization Diff Viewer">
+    <section className="diff-viewer-section" aria-label={t('diff.viewerAria')}>
       <LocalizationSummary
         comparisonResult={comparisonResult}
         onOpenAddMissingModal={handleOpenAddMissingModal}
@@ -711,6 +713,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           editValue={editValue}
           isSavingKey={isSavingKey}
           translatingKey={translatingKey}
+          engine={settings?.engine || 'ai'}
           treeBodyRef={treeBodyRef}
           onToggleCollapse={handleToggleCollapse}
           onExpandAll={handleExpandAll}
