@@ -1,6 +1,7 @@
 import React from 'react'
 import type { FileTreeData } from '../../types/localization'
 import type { ProblemNavMode } from './MissingKeyNavigator'
+import { useTranslation } from '../../i18n/useTranslation'
 
 interface LocalizationFileTabsProps {
   files: { filename: string; path: string }[]
@@ -17,8 +18,10 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
   onSelectFile,
   onNavigateProblem,
 }) => {
+  const { t } = useTranslation()
+
   return (
-    <div className="file-tabs-container" aria-label="Localization files tabs">
+    <div className="file-tabs-container" aria-label={t('fileTabs.tabsAria')}>
       <div className="file-tabs-scroll">
         {files.map((file) => {
           const isActive = file.filename === activeFilename
@@ -38,10 +41,10 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
         })}
       </div>
 
-      <div className="active-tab-stats" aria-label="Active file stats">
+      <div className="active-tab-stats" aria-label={t('fileTabs.statsAria')}>
         <span className="active-tab-filename">{activeTreeData.filename}</span>
         <span className="active-tab-badge present-badge">
-          {activeTreeData.presentKeysCount} keys
+          {t('fileTabs.keysCount', { count: activeTreeData.presentKeysCount })}
         </span>
 
         {activeTreeData.missingKeysCount > 0 ? (
@@ -49,13 +52,13 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
             type="button"
             className="active-tab-badge missing-badge clickable-missing-badge"
             onClick={() => onNavigateProblem(activeFilename, 'missing')}
-            title="Click to navigate to first missing key"
-            aria-label={`${activeTreeData.missingKeysCount} missing keys, click to navigate`}
+            title={t('fileTabs.missingTitle')}
+            aria-label={t('fileTabs.missingAria', { count: activeTreeData.missingKeysCount })}
           >
-            {activeTreeData.missingKeysCount} missing
+            {t('fileTabs.missingBadge', { count: activeTreeData.missingKeysCount })}
           </button>
         ) : (
-          <span className="active-tab-badge complete-badge">0 missing</span>
+          <span className="active-tab-badge complete-badge">{t('fileTabs.zeroMissing')}</span>
         )}
 
         {activeTreeData.emptyKeysCount > 0 ? (
@@ -63,13 +66,13 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
             type="button"
             className="active-tab-badge empty-tab-badge clickable-empty-badge"
             onClick={() => onNavigateProblem(activeFilename, 'empty')}
-            title="Click to navigate to first empty translation"
-            aria-label={`${activeTreeData.emptyKeysCount} empty keys, click to navigate`}
+            title={t('fileTabs.emptyTitle')}
+            aria-label={t('fileTabs.emptyAria', { count: activeTreeData.emptyKeysCount })}
           >
-            {activeTreeData.emptyKeysCount} empty
+            {t('fileTabs.emptyBadge', { count: activeTreeData.emptyKeysCount })}
           </button>
         ) : (
-          <span className="active-tab-badge complete-badge">0 empty</span>
+          <span className="active-tab-badge complete-badge">{t('fileTabs.zeroEmpty')}</span>
         )}
       </div>
     </div>

@@ -3,6 +3,7 @@ import type {
   BatchTranslationPlan,
   BatchProgress,
 } from '../../services/aiBatchTranslation'
+import { useTranslation } from '../../i18n/useTranslation'
 
 interface BatchTranslationModalProps {
   plan: BatchTranslationPlan
@@ -29,11 +30,11 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
   onConfirmApplyAll,
   onClose,
 }) => {
+  const { t } = useTranslation()
   const [filter, setFilter] = useState<'all' | 'ready' | 'error'>('all')
 
   const readyCount = plan.items.filter((i) => i.status === 'translated').length
   const errorCount = plan.items.filter((i) => i.status === 'error').length
-  const skippedCount = plan.items.filter((i) => i.status === 'skipped').length
 
   const filteredItems = plan.items.filter((item) => {
     if (filter === 'ready') return item.status === 'translated'
@@ -60,12 +61,12 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
         <div className="modal-header">
           <div>
             <h2 id="batch-modal-title" className="modal-title">
-              {isTranslating ? 'Translating All Untranslated Keys' : 'Review Batch Translations'}
+              {isTranslating ? t('batch.progressTitle') : t('batch.reviewTitle')}
             </h2>
             <p className="modal-subtitle">
               {isTranslating
-                ? 'Generating optimized batch translations with rate-limit protection across all compared files...'
-                : 'Review, edit, and apply generated translations to your localization files.'}
+                ? t('batch.progressSubtitle')
+                : t('translation.reviewBatchInstructions')}
             </p>
           </div>
           {!isTranslating && (
@@ -74,7 +75,7 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
               className="modal-close-btn"
               onClick={onClose}
               disabled={isWriting}
-              aria-label="Close batch review"
+              aria-label={t('batch.closeAria')}
             >
               ✕
             </button>
@@ -91,10 +92,16 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
           <div className="batch-progress-body">
             <div className="batch-progress-header">
               <span className="batch-progress-count">
-                Translated {progress ? `${progress.successCount} / ${plan.totalCount}` : `0 / ${plan.totalCount}`}
+                {t('translation.progressTranslated', {
+                  current: progress ? progress.successCount : 0,
+                  total: plan.totalCount,
+                })}
               </span>
               <span className="batch-progress-batches">
-                Batches: {progress ? `${progress.currentBatch} / ${progress.totalBatches}` : '1 / 1'}
+                {t('translation.progressBatches', {
+                  current: progress ? progress.currentBatch : 1,
+                  total: progress ? progress.totalBatches : 1,
+                })}
               </span>
               <span className="batch-progress-pct">{progressPercent}%</span>
             </div>
@@ -113,208 +120,160 @@ export const BatchTranslationModal: React.FC<BatchTranslationModalProps> = ({
                     <span className="retry-spinner">⏳</span>
                     <span>
                       {progress.statusMessage ||
-                        `Rate limit reached — retrying attempt ${progress.retryAttempt || 1}...`}
+                        t('batch.retryingBanner', { attempt: progress.retryAttempt || 1 })}
                     </span>
                   </div>
                 )}
 
-                <div className="batch-detail-row">
-                  <span className="batch-detail-label">Status:</span>
-                  <span className="batch-detail-val">
-                    {progress.statusMessage ||
-                      `Translating batch ${progress.currentBatch} / ${progress.totalBatches} (${progress.keysInBatch} keys)...`}
-                  </span>
+                <div className="batch-current-step">
+                  <span className="batch-step-label">{t('common.file')}:</span>
+                  <span className="batch-step-val">{progress.targetFile || '...'}</span>
                 </div>
 
-                <div className="batch-detail-row">
-                  <span className="batch-detail-label">Current File:</span>
-                  <span className="batch-detail-val">{progress.targetFile || '...'}</span>
-                </div>
-
-                <div className="batch-detail-row">
-                  <span className="batch-detail-label">Current Key:</span>
-                  <span className="batch-detail-val key-highlight">
-                    {progress.currentKey || '...'}
+                <div className="batch-current-step">
+                  <span className="batch-step-label">{t('batch.batchSizeLabel')}</span>
+                  <span className="batch-step-val">
+                    {t('translation.batchSize', { count: progress.keysInBatch || 0 })}
                   </span>
-                </div>
-
-                <div className="batch-detail-stats">
-                  <span className="batch-success-count">
-                    ✓ {progress.successCount} translated
-                  </span>
-                  {progress.errorCount > 0 && (
-                    <span className="batch-error-count">
-                      ✕ {progress.errorCount} failed
-                    </span>
-                  )}
                 </div>
               </div>
             )}
 
-            <div className="modal-actions batch-translating-actions">
+            <div className="modal-footer">
               <button
                 type="button"
-                className="modal-cancel-btn"
+                className="modal-btn cancel-btn"
                 onClick={onCancelTranslate}
+                aria-label={t('batch.cancelAria')}
               >
-                Cancel Translation
+                {t('common.cancel')}
               </button>
             </div>
           </div>
         ) : (
-          <>
-            <div className="batch-stats-toolbar">
-              <div className="batch-filter-tabs">
+          <div className="batch-review-body">
+            <div className="batch-filter-tabs">
+              <button
+                type="button"
+                className={`batch-filter-tab ${filter === 'all' ? 'active-filter' : ''}`}
+                onClick={() => setFilter('all')}
+              >
+                {t('translation.filterAll', { count: plan.totalCount })}
+              </button>
+              <button
+                type="button"
+                className={`batch-filter-tab ${filter === 'ready' ? 'active-filter' : ''}`}
+                onClick={() => setFilter('ready')}
+              >
+                {t('translation.filterTranslated', { count: readyCount })}
+              </button>
+              {errorCount > 0 && (
                 <button
                   type="button"
-                  className={`batch-filter-btn ${filter === 'all' ? 'active' : ''}`}
-                  onClick={() => setFilter('all')}
+                  className={`batch-filter-tab error-filter ${filter === 'error' ? 'active-filter' : ''}`}
+                  onClick={() => setFilter('error')}
                 >
-                  All ({plan.totalCount})
+                  {t('translation.filterErrors', { count: errorCount })}
                 </button>
-                <button
-                  type="button"
-                  className={`batch-filter-btn ${filter === 'ready' ? 'active' : ''}`}
-                  onClick={() => setFilter('ready')}
-                >
-                  Ready to Apply ({readyCount})
-                </button>
-                {errorCount > 0 && (
-                  <button
-                    type="button"
-                    className={`batch-filter-btn error-tab ${filter === 'error' ? 'active' : ''}`}
-                    onClick={() => setFilter('error')}
-                  >
-                    Errors ({errorCount})
-                  </button>
-                )}
-              </div>
-
-              <div className="batch-summary-counts">
-                {errorCount > 0 && onRetryFailed && (
-                  <button
-                    type="button"
-                    className="batch-retry-failed-btn"
-                    onClick={onRetryFailed}
-                    disabled={isWriting}
-                  >
-                    ↻ Retry Failed ({errorCount})
-                  </button>
-                )}
-                {skippedCount > 0 && (
-                  <span className="batch-count-pill skipped-pill">
-                    {skippedCount} skipped
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="batch-items-list-container">
-              {filteredItems.length > 0 ? (
-                <div className="batch-items-table">
-                  <div className="batch-table-header">
-                    <span className="col-status">Status</span>
-                    <span className="col-file">File</span>
-                    <span className="col-key">Key</span>
-                    <span className="col-source">Source Text</span>
-                    <span className="col-translation">Proposed Translation</span>
-                  </div>
-
-                  <div className="batch-table-body">
-                    {filteredItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`batch-table-row status-${item.status}`}
-                        data-testid={`batch-row-${item.targetFile}-${item.key}`}
-                      >
-                        <div className="col-status">
-                          {item.status === 'translated' && (
-                            <span className="status-pill status-ready" title="Ready to apply">
-                              ✓ Ready
-                            </span>
-                          )}
-                          {item.status === 'error' && (
-                            <span
-                              className="status-pill status-failed"
-                              title={item.errorMessage || 'Translation failed'}
-                            >
-                              ✕ Error
-                            </span>
-                          )}
-                          {item.status === 'skipped' && (
-                            <span className="status-pill status-skipped" title="Skipped">
-                              ↷ Skipped
-                            </span>
-                          )}
-                          {item.status === 'pending' && (
-                            <span className="status-pill status-pending">Pending</span>
-                          )}
-                        </div>
-
-                        <div className="col-file">
-                          <span className="batch-filename">{item.targetFile}</span>
-                        </div>
-
-                        <div className="col-key" title={item.key}>
-                          <span className="batch-key">{item.key}</span>
-                        </div>
-
-                        <div className="col-source" title={item.sourceValue}>
-                          <span className="batch-source-text">
-                            {item.sourceValue || <em>(empty)</em>}
-                          </span>
-                        </div>
-
-                        <div className="col-translation">
-                          {item.status === 'translated' ? (
-                            <input
-                              type="text"
-                              className="batch-translation-input"
-                              value={item.proposedTranslation}
-                              onChange={(e) =>
-                                onUpdateProposedTranslation(item.id, e.target.value)
-                              }
-                              disabled={isWriting}
-                              aria-label={`Translation for ${item.key}`}
-                            />
-                          ) : (
-                            <span className="batch-error-msg">
-                              {item.errorMessage || 'No translation'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="batch-empty-message">
-                  No translation items found in this view.
-                </div>
               )}
             </div>
 
-            <div className="modal-actions">
+            <div className="batch-items-list">
+              {filteredItems.map((item) => (
+                <div
+                  key={item.id}
+                  className={`batch-item-card ${
+                    item.status === 'translated'
+                      ? 'item-ready'
+                      : item.status === 'error'
+                      ? 'item-error'
+                      : 'item-pending'
+                  }`}
+                  data-testid={`batch-row-${item.targetFile}-${item.key}`}
+                >
+                  <div className="batch-item-header">
+                    <div className="batch-item-key">
+                      <span className="item-file-badge">{item.targetFile}</span>
+                      <span className="item-key-text">{item.key}</span>
+                    </div>
+                    <div className="batch-item-status">
+                      {item.status === 'translated' && (
+                        <span className="status-pill ready-pill">{t('batch.statusTranslated')}</span>
+                      )}
+                      {item.status === 'error' && (
+                        <span className="status-pill error-pill">{t('batch.statusError')}</span>
+                      )}
+                      {item.status === 'skipped' && (
+                        <span className="status-pill skipped-pill">{t('batch.statusSkipped')}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="batch-item-source">
+                    <span className="source-label">{t('batch.sourceLabel', { lang: item.sourceLanguage })}</span>
+                    <span className="source-val">{item.sourceValue}</span>
+                  </div>
+
+                  {item.status === 'error' ? (
+                    <div className="batch-item-err-msg">
+                      <span>{t('batch.errorPrefix', { error: item.errorMessage || '' })}</span>
+                    </div>
+                  ) : (
+                    <div className="batch-item-target">
+                      <label
+                        htmlFor={`edit-input-${item.id}`}
+                        className="target-label"
+                      >
+                        {t('batch.targetLabel', { lang: item.targetLanguage })}
+                      </label>
+                      <input
+                        id={`edit-input-${item.id}`}
+                        type="text"
+                        className="batch-item-input"
+                        value={item.proposedTranslation}
+                        onChange={(e) =>
+                          onUpdateProposedTranslation(item.id, e.target.value)
+                        }
+                        disabled={isWriting}
+                        aria-label={t('batch.translationAria', { key: item.key })}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="modal-footer">
               <button
                 type="button"
-                className="modal-cancel-btn"
+                className="modal-btn cancel-btn"
                 onClick={onClose}
                 disabled={isWriting}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
+
+              {errorCount > 0 && onRetryFailed && (
+                <button
+                  type="button"
+                  className="modal-btn retry-btn"
+                  onClick={onRetryFailed}
+                  disabled={isWriting}
+                >
+                  {t('translation.retryFailed')} ({errorCount})
+                </button>
+              )}
+
               <button
                 type="button"
-                className="modal-confirm-btn"
+                className="modal-btn apply-all-btn"
                 onClick={onConfirmApplyAll}
-                disabled={isWriting || readyCount === 0}
+                disabled={readyCount === 0 || isWriting}
               >
-                {isWriting
-                  ? 'Applying...'
-                  : `✓ Apply All (${readyCount})`}
+                {isWriting ? t('tree.saving') : `${t('translation.applyAll')} (${readyCount})`}
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

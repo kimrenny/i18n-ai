@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import type { MissingKeysAdditionPlan } from '../../types/localization'
+import { useTranslation } from '../../i18n/useTranslation'
 
 interface AddMissingKeysModalProps {
   plan: MissingKeysAdditionPlan
@@ -14,6 +15,7 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
   onConfirm,
   onClose,
 }) => {
+  const { t } = useTranslation()
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
     new Set(plan.filesToModify.map((f) => f.filename))
   )
@@ -31,14 +33,13 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
   }
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Add Missing Keys Preview">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={t('addMissing.dialogAria')}>
       <div className="modal-container">
         <div className="modal-header">
           <div className="modal-title-group">
-            <h2 className="modal-title">Preview: Add Missing Keys</h2>
+            <h2 className="modal-title">{t('addMissing.title')}</h2>
             <p className="modal-subtitle">
-              The following missing keys will be added with empty values (<code>""</code>).
-              Existing values and hierarchy will be preserved.
+              {t('addMissing.subtitle')}
             </p>
           </div>
           <button
@@ -46,7 +47,7 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
             className="modal-close-btn"
             onClick={onClose}
             disabled={isWriting}
-            aria-label="Close modal"
+            aria-label={t('addMissing.closeAria')}
           >
             ✕
           </button>
@@ -54,11 +55,11 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
 
         <div className="modal-stats-bar">
           <div className="modal-stat">
-            <span className="modal-stat-label">Files to modify:</span>
+            <span className="modal-stat-label">{t('addMissing.filesToModify')}</span>
             <span className="modal-stat-value">{plan.filesToModify.length}</span>
           </div>
           <div className="modal-stat">
-            <span className="modal-stat-label">Total keys to add:</span>
+            <span className="modal-stat-label">{t('addMissing.totalKeysToAdd')}</span>
             <span className="modal-stat-value modal-stat-highlight">
               {plan.totalKeysToAdd}
             </span>
@@ -69,7 +70,7 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
           <div className="modal-conflicts-box" role="alert">
             <div className="conflict-header">
               <span className="conflict-icon">⚠️</span>
-              <strong>Structural Conflicts Detected:</strong>
+              <strong>{t('addMissing.conflictsDetected')}</strong>
             </div>
             <ul className="conflict-list">
               {plan.conflictMessages.map((msg, idx) => (
@@ -77,7 +78,7 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
               ))}
             </ul>
             <p className="conflict-note">
-              To prevent data loss, conflicting keys will be skipped and will not overwrite existing values.
+              {t('addMissing.conflictNote')}
             </p>
           </div>
         )}
@@ -99,7 +100,7 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
                     <span className="modal-file-path">{file.path}</span>
                   </div>
                   <span className="modal-file-badge">
-                    +{file.keysToAdd.length} keys
+                    {t('addMissing.keysBadge', { count: file.keysToAdd.length })}
                   </span>
                 </button>
 
@@ -126,7 +127,7 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
             onClick={onClose}
             disabled={isWriting}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -134,7 +135,7 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
             onClick={onConfirm}
             disabled={isWriting || plan.totalKeysToAdd === 0}
           >
-            {isWriting ? 'Writing to disk...' : 'Confirm & Write to Disk'}
+            {isWriting ? t('addMissing.writing') : t('addMissing.confirm')}
           </button>
         </div>
       </div>

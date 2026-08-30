@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { getProviderDefinition } from '../../services/aiProviderRegistry'
 import { getFreeProviderDefinition } from '../../services/freeProviderRegistry'
 import type { AiProviderId, FreeProviderId } from '../../types/settings'
+import { useTranslation } from '../../i18n/useTranslation'
 
 export interface AiTranslationProposal {
   key: string
@@ -30,13 +31,14 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
   onConfirm,
   onCancel,
 }) => {
+  const { t } = useTranslation()
   const [editedText, setEditedText] = useState(proposal.translatedText)
 
   const isFree =
     proposal.provider === 'libretranslate' || proposal.provider === 'mymemory'
 
   const engineDisplay = isFree
-    ? `${getFreeProviderDefinition(proposal.provider as FreeProviderId).name} · Free Translator`
+    ? `${getFreeProviderDefinition(proposal.provider as FreeProviderId).name} · Free`
     : `${getProviderDefinition(proposal.provider as AiProviderId).name} · ${proposal.model}`
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -59,10 +61,10 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
         <div className="modal-header">
           <div>
             <h2 id="ai-confirm-title" className="modal-title">
-              Review AI Translation
+              {isFree ? t('translation.translateWithFreeTitle') : t('translation.translateWithAiTitle')}
             </h2>
             <p className="modal-subtitle">
-              Verify the AI-generated translation before applying it to your localization file.
+              {t('translation.reviewInstructions')}
             </p>
           </div>
           <button
@@ -70,7 +72,7 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
             className="modal-close-btn"
             onClick={onCancel}
             disabled={isApplying}
-            aria-label="Close review"
+            aria-label={t('common.close')}
           >
             ✕
           </button>
@@ -86,55 +88,67 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
           <div className="ai-confirm-body">
             <div className="ai-meta-grid">
               <div className="ai-meta-item">
-                <span className="ai-meta-label">Key:</span>
+                <span className="ai-meta-label">{t('translation.key')}:</span>
                 <span className="ai-meta-value key-highlight">{proposal.key}</span>
               </div>
               <div className="ai-meta-item">
-                <span className="ai-meta-label">Target:</span>
+                <span className="ai-meta-label">{t('translation.targetFile')}:</span>
                 <span className="ai-meta-value">{proposal.targetFile}</span>
               </div>
               <div className="ai-meta-item">
-                <span className="ai-meta-label">Engine:</span>
+                <span className="ai-meta-label">{t('translation.engine')}:</span>
                 <span className="ai-meta-value ai-engine-badge">
                   {engineDisplay}
                 </span>
+              </div>
+              <div className="ai-meta-item">
+                <span className="ai-meta-label">{t('translation.sourceFile')}:</span>
+                <span className="ai-meta-value">{proposal.sourceFile}</span>
               </div>
             </div>
 
             <div className="ai-preview-card source-card">
               <div className="ai-card-header">
                 <span className="ai-card-title">
-                  Source Reference ({proposal.sourceFile}
-                  {proposal.sourceLanguage ? ` · ${proposal.sourceLanguage}` : ''})
+                  {t('translation.sourceReference', {
+                    file: proposal.sourceFile,
+                    lang: proposal.sourceLanguage ? ` · ${proposal.sourceLanguage}` : '',
+                  })}
+                </span>
+                <span className="modal-file-badge">
+                  {proposal.sourceLanguage || proposal.sourceFile}
                 </span>
               </div>
-              <div className="ai-card-content source-text-box">
-                {proposal.sourceValue ? (
-                  <span>{proposal.sourceValue}</span>
-                ) : (
-                  <span className="empty-source-italic">(empty value)</span>
-                )}
+              <div className="ai-card-content">
+                <div className="source-text-box">
+                  {proposal.sourceValue || (
+                    <span className="empty-source-italic">(empty)</span>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="ai-preview-card target-card">
               <div className="ai-card-header">
-                <span className="ai-card-title">
-                  Proposed Translation ({proposal.targetFile}
-                  {proposal.targetLanguage ? ` · ${proposal.targetLanguage}` : ''})
+                <label htmlFor="ai-confirm-textarea" className="ai-card-title">
+                  {isFree ? t('translation.proposedTranslation') : t('translation.aiProposedTranslation')}
+                  {proposal.targetLanguage ? ` (${proposal.targetLanguage})` : ''}
+                </label>
+                <span className="ai-badge">
+                  {isFree ? 'FREE' : 'AI'}
                 </span>
-                <span className="ai-badge">AI Proposal</span>
               </div>
               <div className="ai-card-content">
                 <textarea
+                  id="ai-confirm-textarea"
                   className="ai-translation-textarea"
                   value={editedText}
                   onChange={(e) => setEditedText(e.target.value)}
-                  disabled={isApplying}
                   rows={3}
-                  placeholder="Enter or adjust translation..."
+                  placeholder={t('tree.placeholderEnterTranslation')}
+                  disabled={isApplying}
                   autoFocus
-                  aria-label="AI proposed translation"
+                  aria-label={isFree ? t('translation.proposedTranslation') : t('translation.aiProposedTranslation')}
                 />
               </div>
             </div>
@@ -147,14 +161,14 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
               onClick={onCancel}
               disabled={isApplying}
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               className="modal-confirm-btn"
               disabled={isApplying}
             >
-              {isApplying ? 'Applying...' : 'Apply Translation'}
+              {isApplying ? t('tree.saving') : t('translation.applyTranslation')}
             </button>
           </div>
         </form>

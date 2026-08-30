@@ -1,6 +1,8 @@
 import React from 'react'
 import type { LocalizationTreeNode as TreeNodeType } from '../../types/localization'
+import type { TranslationEngine } from '../../types/settings'
 import { LocalizationTreeNode } from './LocalizationTreeNode'
+import { useTranslation } from '../../i18n/useTranslation'
 
 interface LocalizationTreeProps {
   rootNodes: TreeNodeType[]
@@ -10,6 +12,7 @@ interface LocalizationTreeProps {
   editValue?: string
   isSavingKey?: boolean
   translatingKey?: string | null
+  engine?: TranslationEngine
   treeBodyRef: React.RefObject<HTMLDivElement | null>
   onToggleCollapse: (id: string) => void
   onExpandAll: () => void
@@ -30,6 +33,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   editValue,
   isSavingKey,
   translatingKey,
+  engine = 'ai',
   treeBodyRef,
   onToggleCollapse,
   onExpandAll,
@@ -41,26 +45,28 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   onCancelEdit,
   onAiTranslate,
 }) => {
+  const { t } = useTranslation()
+
   return (
-    <div className="tree-container" aria-label="Localization Tree">
+    <div className="tree-container" aria-label={t('tree.treeAria')}>
       <div className="tree-toolbar">
-        <span className="toolbar-title">Explorer View</span>
+        <span className="toolbar-title">{t('tree.explorerView')}</span>
         <div className="toolbar-actions">
           <button
             type="button"
             className="tree-tool-btn"
             onClick={onExpandAll}
-            title="Expand all nodes"
+            title={t('tree.expandAll')}
           >
-            Expand All
+            {t('tree.expandAll')}
           </button>
           <button
             type="button"
             className="tree-tool-btn"
             onClick={onCollapseAll}
-            title="Collapse all nodes"
+            title={t('tree.collapseAll')}
           >
-            Collapse All
+            {t('tree.collapseAll')}
           </button>
         </div>
       </div>
@@ -78,6 +84,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
               editValue={editValue}
               isSavingKey={isSavingKey}
               translatingKey={translatingKey}
+              engine={engine}
               onToggleCollapse={onToggleCollapse}
               onSelectRow={onSelectRow}
               onStartEdit={onStartEdit}
@@ -88,7 +95,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
             />
           ))
         ) : (
-          <div className="empty-tree-message">No keys in this file.</div>
+          <div className="empty-tree-message">{t('tree.noKeys')}</div>
         )}
       </div>
     </div>

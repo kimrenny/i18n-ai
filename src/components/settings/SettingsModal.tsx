@@ -5,9 +5,11 @@ import type {
   AiProviderId,
   TranslationEngine,
   FreeProviderId,
+  AppLanguage,
 } from '../../types/settings'
 import {
   DEFAULT_FREE_TRANSLATION_SETTINGS,
+  SUPPORTED_LANGUAGES,
 } from '../../types/settings'
 import {
   AI_PROVIDERS,
@@ -17,6 +19,7 @@ import {
   FREE_PROVIDERS,
   getFreeProviderDefinition,
 } from '../../services/freeProviderRegistry'
+import { useTranslation } from '../../i18n/useTranslation'
 
 interface SettingsModalProps {
   settings: AppSettings
@@ -35,6 +38,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateTranslationSettings,
   onClose,
 }) => {
+  const { t } = useTranslation()
   const [selectedEngine, setSelectedEngine] = useState<TranslationEngine>(
     settings.engine || 'ai'
   )
@@ -65,6 +69,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const aiProviderDef = getProviderDefinition(currentAiProviderId)
   const freeProviderDef = getFreeProviderDefinition(currentFreeProviderId)
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLang = e.target.value as AppLanguage
+    if (onUpdateTranslationSettings) {
+      onUpdateTranslationSettings({ language: newLang })
+    }
+  }
 
   const handleEngineChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newEngine = e.target.value as TranslationEngine
@@ -238,17 +249,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="modal-header">
           <div>
             <h2 id="settings-modal-title" className="modal-title">
-              Settings
+              {t('settings.title')}
             </h2>
             <p className="modal-subtitle">
-              Configure translation engines, provider credentials, and review policies.
+              {t('settings.subtitle')}
             </p>
           </div>
           <button
             type="button"
             className="modal-close-btn"
             onClick={onClose}
-            aria-label="Close settings"
+            aria-label={t('settings.closeAria')}
           >
             ✕
           </button>
@@ -261,15 +272,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         )}
 
         <div className="settings-modal-body">
+          {/* Application Language Section */}
+          <section className="settings-section" aria-labelledby="language-settings-heading">
+            <h3 id="language-settings-heading" className="settings-section-title">
+              {t('settings.appLanguage')}
+            </h3>
+
+            <div className="setting-field-group">
+              <label htmlFor="app-language-select" className="setting-field-label">
+                {t('settings.languageLabel')}
+              </label>
+              <select
+                id="app-language-select"
+                className="setting-select"
+                value={settings.language || 'en'}
+                onChange={handleLanguageChange}
+                disabled={isSaving}
+                aria-label={t('settings.selectLanguageAria')}
+              >
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.nativeName} ({lang.englishName})
+                  </option>
+                ))}
+              </select>
+              <span className="setting-field-hint">
+                {t('settings.appLanguageHelp')}
+              </span>
+            </div>
+          </section>
+
           {/* Engine Selection Section */}
           <section className="settings-section" aria-labelledby="engine-settings-heading">
             <h3 id="engine-settings-heading" className="settings-section-title">
-              Translation Engine
+              {t('settings.translationEngine')}
             </h3>
 
             <div className="setting-field-group">
               <label htmlFor="translation-engine-select" className="setting-field-label">
-                Engine:
+                {t('settings.engineLabel')}
               </label>
               <select
                 id="translation-engine-select"
@@ -277,15 +318,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 value={currentEngine}
                 onChange={handleEngineChange}
                 disabled={isSaving}
-                aria-label="Select Translation Engine"
+                aria-label={t('settings.selectEngineAria')}
               >
-                <option value="ai">AI Translation (OpenAI, Gemini, Claude, Mistral, Ollama...)</option>
-                <option value="free">Free Translator (LibreTranslate, MyMemory)</option>
+                <option value="ai">{t('settings.engineAi')}</option>
+                <option value="free">{t('settings.engineFree')}</option>
               </select>
               <span className="setting-field-hint">
                 {currentEngine === 'ai'
-                  ? 'Uses generative AI models for context-aware localization.'
-                  : 'Uses free public translation services or self-hosted servers without AI API costs.'}
+                  ? t('settings.engineAiDesc')
+                  : t('settings.engineFreeDesc')}
               </span>
             </div>
           </section>
@@ -294,12 +335,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {currentEngine === 'ai' && (
             <section className="settings-section" aria-labelledby="ai-settings-heading">
               <h3 id="ai-settings-heading" className="settings-section-title">
-                AI Translation Provider
+                {t('settings.aiSettingsHeader')}
               </h3>
 
               <div className="setting-field-group">
                 <label htmlFor="ai-provider-select" className="setting-field-label">
-                  AI Provider:
+                  {t('settings.aiProvider')}:
                 </label>
                 <select
                   id="ai-provider-select"
@@ -307,20 +348,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   value={currentAiProviderId}
                   onChange={handleAiProviderChange}
                   disabled={isSaving}
-                  aria-label="Select AI Provider"
+                  aria-label={t('settings.selectAiProviderAria')}
                 >
                   {AI_PROVIDERS.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {t(`providers.${p.id}.name`) !== `providers.${p.id}.name` ? t(`providers.${p.id}.name`) : p.name}
                     </option>
                   ))}
                 </select>
-                <span className="setting-field-hint">{aiProviderDef.description}</span>
+                <span className="setting-field-hint">
+                  {t(`providers.${currentAiProviderId}.description`) !== `providers.${currentAiProviderId}.description`
+                    ? t(`providers.${currentAiProviderId}.description`)
+                    : aiProviderDef.description}
+                </span>
               </div>
 
               <div className="setting-field-group">
                 <label htmlFor="ai-model-input" className="setting-field-label">
-                  Model:
+                  {t('settings.model')}:
                 </label>
                 <div className="setting-input-wrapper">
                   <input
@@ -332,7 +377,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     disabled={isSaving}
                     list="popular-models-list"
                     placeholder={aiProviderDef.defaultModel}
-                    aria-label="AI Model"
+                    aria-label={t('settings.aiModelAria')}
                   />
                   <datalist id="popular-models-list">
                     {aiProviderDef.popularModels.map((m) => (
@@ -345,7 +390,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {aiProviderDef.requiresApiKey && (
                 <div className="setting-field-group">
                   <label htmlFor="ai-api-key-input" className="setting-field-label">
-                    API Key:
+                    {t('settings.apiKey')}:
                   </label>
                   <div className="setting-input-wrapper with-toggle">
                     <input
@@ -355,8 +400,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={currentAiConfig.apiKey || ''}
                       onChange={handleAiApiKeyChange}
                       disabled={isSaving}
-                      placeholder={`Enter ${aiProviderDef.name} API key...`}
-                      aria-label={`${aiProviderDef.name} API Key`}
+                      placeholder={t('settings.apiKeyPlaceholder')}
+                      aria-label={t('settings.apiKeyAria', { name: aiProviderDef.name })}
                       autoComplete="off"
                       spellCheck={false}
                     />
@@ -366,11 +411,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onClick={() => setShowAiApiKey((v) => !v)}
                       tabIndex={-1}
                     >
-                      {showAiApiKey ? 'Hide' : 'Show'}
+                      {showAiApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
                     </button>
                   </div>
                   <span className="setting-field-hint">
-                    Stored securely in local application settings. Never shared elsewhere.
+                    {t('settings.apiKeyStorageHint')}
                   </span>
                 </div>
               )}
@@ -378,7 +423,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {currentAiProviderId === 'ollama' && (
                 <div className="setting-field-group">
                   <label htmlFor="ai-base-url-input" className="setting-field-label">
-                    Ollama Base URL:
+                    {t('settings.ollamaBaseUrl')}
                   </label>
                   <input
                     id="ai-base-url-input"
@@ -388,7 +433,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onChange={handleAiBaseUrlChange}
                     disabled={isSaving}
                     placeholder="http://localhost:11434"
-                    aria-label="Ollama Base URL"
+                    aria-label={t('settings.ollamaBaseUrlAria')}
                   />
                 </div>
               )}
@@ -399,12 +444,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {currentEngine === 'free' && (
             <section className="settings-section" aria-labelledby="free-settings-heading">
               <h3 id="free-settings-heading" className="settings-section-title">
-                Free Translation Configuration
+                {t('settings.freeSettingsHeader')}
               </h3>
 
               <div className="setting-field-group">
                 <label htmlFor="free-provider-select" className="setting-field-label">
-                  Free Provider:
+                  {t('settings.freeProvider')}:
                 </label>
                 <select
                   id="free-provider-select"
@@ -412,22 +457,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   value={currentFreeProviderId}
                   onChange={handleFreeProviderChange}
                   disabled={isSaving}
-                  aria-label="Select Free Provider"
+                  aria-label={t('settings.selectFreeProviderAria')}
                 >
                   {FREE_PROVIDERS.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {t(`providers.${p.id}.name`) !== `providers.${p.id}.name` ? t(`providers.${p.id}.name`) : p.name}
                     </option>
                   ))}
                 </select>
-                <span className="setting-field-hint">{freeProviderDef.description}</span>
+                <span className="setting-field-hint">
+                  {t(`providers.${currentFreeProviderId}.description`) !== `providers.${currentFreeProviderId}.description`
+                    ? t(`providers.${currentFreeProviderId}.description`)
+                    : freeProviderDef.description}
+                </span>
               </div>
 
               {currentFreeProviderId === 'libretranslate' && (
                 <>
                   <div className="setting-field-group">
                     <label htmlFor="libre-base-url-input" className="setting-field-label">
-                      LibreTranslate Server URL:
+                      {t('settings.serverUrl')}:
                     </label>
                     <input
                       id="libre-base-url-input"
@@ -437,16 +486,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onChange={handleFreeBaseUrlChange}
                       disabled={isSaving}
                       placeholder="http://localhost:5000"
-                      aria-label="LibreTranslate Server URL"
+                      aria-label={t('settings.libreServerUrlAria')}
                     />
                     <span className="setting-field-hint">
-                      Connects to your local or self-hosted LibreTranslate instance.
+                      {t('settings.libreServerHint')}
                     </span>
                   </div>
 
                   <div className="setting-field-group">
                     <label htmlFor="libre-api-key-input" className="setting-field-label">
-                      API Key (Optional):
+                      {t('settings.apiKeyOptional')}
                     </label>
                     <div className="setting-input-wrapper with-toggle">
                       <input
@@ -456,8 +505,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         value={currentFreeConfig.apiKey || ''}
                         onChange={handleFreeApiKeyChange}
                         disabled={isSaving}
-                        placeholder="Leave empty if self-hosted without API key..."
-                        aria-label="LibreTranslate API Key"
+                        placeholder={t('settings.libreApiKeyPlaceholder')}
+                        aria-label={t('settings.libreApiKeyAria')}
                         autoComplete="off"
                         spellCheck={false}
                       />
@@ -467,7 +516,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onClick={() => setShowFreeApiKey((v) => !v)}
                         tabIndex={-1}
                       >
-                        {showFreeApiKey ? 'Hide' : 'Show'}
+                        {showFreeApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
                       </button>
                     </div>
                   </div>
@@ -478,7 +527,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <>
                   <div className="setting-field-group">
                     <label htmlFor="mymemory-email-input" className="setting-field-label">
-                      Contact Email (Optional):
+                      {t('settings.email')}
                     </label>
                     <input
                       id="mymemory-email-input"
@@ -488,16 +537,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onChange={handleFreeEmailChange}
                       disabled={isSaving}
                       placeholder="e.g. user@example.com"
-                      aria-label="MyMemory Email"
+                      aria-label={t('settings.mymemoryEmailAria')}
                     />
                     <span className="setting-field-hint">
-                      Providing an email raises MyMemory daily rate limits from 5,000 to 10,000 characters.
+                      {t('settings.mymemoryEmailHint')}
                     </span>
                   </div>
 
                   <div className="setting-field-group">
                     <label htmlFor="mymemory-api-key-input" className="setting-field-label">
-                      API Key (Optional):
+                      {t('settings.apiKeyOptional')}
                     </label>
                     <div className="setting-input-wrapper with-toggle">
                       <input
@@ -507,8 +556,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         value={currentFreeConfig.apiKey || ''}
                         onChange={handleFreeApiKeyChange}
                         disabled={isSaving}
-                        placeholder="Optional MyMemory API key..."
-                        aria-label="MyMemory API Key"
+                        placeholder={t('settings.mymemoryApiKeyPlaceholder')}
+                        aria-label={t('settings.mymemoryApiKeyAria')}
                         autoComplete="off"
                         spellCheck={false}
                       />
@@ -518,7 +567,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onClick={() => setShowFreeApiKey((v) => !v)}
                         tabIndex={-1}
                       >
-                        {showFreeApiKey ? 'Hide' : 'Show'}
+                        {showFreeApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
                       </button>
                     </div>
                   </div>
@@ -530,7 +579,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* General Confirmation Policy Section */}
           <section className="settings-section" aria-labelledby="confirmation-settings-heading">
             <h3 id="confirmation-settings-heading" className="settings-section-title">
-              Confirmation Policy
+              {t('settings.confirmationSectionTitle')}
             </h3>
 
             <div className="setting-control-group">
@@ -544,14 +593,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   aria-describedby="confirmation-desc"
                 />
                 <span className="setting-label-text">
-                  Ask for confirmation before applying generated translations
+                  {t('settings.confirmationLabel')}
                 </span>
               </label>
 
               <p id="confirmation-desc" className="setting-description">
-                {requireConfirmation
-                  ? 'When enabled, generated translations must be reviewed and confirmed in the review modal before they are written to localization files.'
-                  : 'Generated translations are validated and applied automatically without an intermediate review modal.'}
+                {t('settings.confirmationHelp')}
               </p>
             </div>
           </section>
@@ -563,7 +610,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             className="modal-confirm-btn settings-done-btn"
             onClick={onClose}
           >
-            Done
+            {t('common.done')}
           </button>
         </div>
       </div>
