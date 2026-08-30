@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "翻訳を入力...",
     "saving": "保存中...",
     "save": "保存",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "undo": "元に戻す",
+    "redo": "やり直す",
+    "undoTooltip": "最後のアクションを元に戻す ({shortcut})",
+    "redoTooltip": "最後のアクションをやり直す ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "ローカリゼーションのコンテキストメニュー",
+    "deleteEntry": "エントリを削除",
+    "deleteSection": "セクションを削除 ({count} 個のキー)",
+    "deleteSectionTitle": "セクションの削除の確認",
+    "deleteSectionSubtitle": "この操作により、セクション全体とすべてのネストされたエントリが削除されます。",
+    "deleteSectionMessage": "{file} からセクション「{section}」とそのすべての {count} 件のエントリを削除してもよろしいですか？",
+    "deleteUndoNote": "元に戻す (Ctrl+Z) を使用して、いつでもこの操作を取り消すことができます。",
+    "confirmDeleteSectionBtn": "セクションを削除",
+    "alreadyMissing": "このファイルにはキーが存在しません",
+    "sectionEmpty": "このファイルに削除対象のキーはありません"
   },
   "translation": {
     "translateWithAi": "✨ AI で翻訳",

@@ -141,3 +141,32 @@ export function buildLocalizationTree(
     rootNodes,
   }
 }
+
+/**
+ * Recursively counts the total number of leaf translation keys under a tree node.
+ */
+export function countLeafDescendants(node: LocalizationTreeNode): number {
+  if (node.type === 'leaf' || node.children.length === 0) {
+    return 1
+  }
+  let count = 0
+  for (const child of node.children) {
+    count += countLeafDescendants(child)
+  }
+  return count
+}
+
+/**
+ * Recursively counts the number of leaf translation keys present in the current target file.
+ */
+export function countPresentLeafDescendants(node: LocalizationTreeNode): number {
+  if (node.type === 'leaf' || node.children.length === 0) {
+    return node.isPresent ? 1 : 0
+  }
+  let count = 0
+  for (const child of node.children) {
+    count += countPresentLeafDescendants(child)
+  }
+  return count
+}
+

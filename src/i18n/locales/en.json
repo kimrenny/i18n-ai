@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "Enter translation...",
     "saving": "Saving...",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "undo": "Undo",
+    "redo": "Redo",
+    "undoTooltip": "Undo last action ({shortcut})",
+    "redoTooltip": "Redo last action ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Localization context menu",
+    "deleteEntry": "Delete Entry",
+    "deleteSection": "Delete Section ({count} keys)",
+    "deleteSectionTitle": "Confirm Section Deletion",
+    "deleteSectionSubtitle": "This action removes the entire section and all nested entries.",
+    "deleteSectionMessage": "Are you sure you want to delete section \"{section}\" and all of its {count} entries from {file}?",
+    "deleteUndoNote": "You can safely revert this action at any time using Undo (Ctrl+Z).",
+    "confirmDeleteSectionBtn": "Delete Section",
+    "alreadyMissing": "Key is not present in this file",
+    "sectionEmpty": "No keys present to delete in this file"
   },
   "translation": {
     "translateWithAi": "✨ Translate with AI",

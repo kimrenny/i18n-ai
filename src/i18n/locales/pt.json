@@ -83,10 +83,26 @@
     "expandAll": "Expandir Tudo",
     "collapseAll": "Recolher Tudo",
     "editTranslation": "Editar",
-    "placeholderEnterTranslation": "Introduza a tradução...",
-    "saving": "A guardar...",
-    "save": "Guardar",
-    "cancel": "Cancelar"
+    "placeholderEnterTranslation": "Insira a tradução...",
+    "saving": "Salvando...",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "undo": "Desfazer",
+    "redo": "Refazer",
+    "undoTooltip": "Desfazer última ação ({shortcut})",
+    "redoTooltip": "Refazer última ação ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Menu de contexto de localização",
+    "deleteEntry": "Excluir entrada",
+    "deleteSection": "Excluir seção ({count} chaves)",
+    "deleteSectionTitle": "Confirmar exclusão de seção",
+    "deleteSectionSubtitle": "Esta ação remove toda a seção e todas as entradas aninhadas.",
+    "deleteSectionMessage": "Tem certeza de que deseja excluir a seção \"{section}\" e todas as suas {count} entradas de {file}?",
+    "deleteUndoNote": "Você pode reverter esta ação a qualquer momento usando Desfazer (Ctrl+Z).",
+    "confirmDeleteSectionBtn": "Eliminar secção",
+    "alreadyMissing": "A chave não está presente neste ficheiro",
+    "sectionEmpty": "Nenhuma chave presente para eliminar neste ficheiro"
   },
   "translation": {
     "translateWithAi": "✨ Traduzir com IA",

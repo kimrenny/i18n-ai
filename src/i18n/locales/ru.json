@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "Введите перевод...",
     "saving": "Сохранение...",
     "save": "Сохранить",
-    "cancel": "Отмена"
+    "cancel": "Отмена",
+    "undo": "Отменить",
+    "redo": "Повторить",
+    "undoTooltip": "Отменить последнее действие ({shortcut})",
+    "redoTooltip": "Повторить последнее действие ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Контекстное меню локализации",
+    "deleteEntry": "Удалить запись",
+    "deleteSection": "Удалить секцию ({count} ключей)",
+    "deleteSectionTitle": "Подтверждение удаления секции",
+    "deleteSectionSubtitle": "Это действие удалит всю секцию и все вложенные записи.",
+    "deleteSectionMessage": "Вы уверены, что хотите удалить секцию \"{section}\" и все её {count} записей из {file}?",
+    "deleteUndoNote": "Вы всегда можете безопасно отменить это действие с помощью Отмены (Ctrl+Z).",
+    "confirmDeleteSectionBtn": "Удалить раздел",
+    "alreadyMissing": "Ключ отсутствует в этом файле",
+    "sectionEmpty": "В этом файле нет ключей для удаления"
   },
   "translation": {
     "translateWithAi": "✨ Перевести с помощью AI",

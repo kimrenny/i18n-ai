@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "Übersetzung eingeben...",
     "saving": "Speichern...",
     "save": "Speichern",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "undo": "Rückgängig",
+    "redo": "Wiederholen",
+    "undoTooltip": "Letzte Aktion rückgängig machen ({shortcut})",
+    "redoTooltip": "Letzte Aktion wiederholen ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Lokalisierungs-Kontextmenü",
+    "deleteEntry": "Eintrag löschen",
+    "deleteSection": "Abschnitt löschen ({count} Schlüssel)",
+    "deleteSectionTitle": "Abschnitt löschen bestätigen",
+    "deleteSectionSubtitle": "Diese Aktion entfernt den gesamten Abschnitt und alle verschachtelten Einträge.",
+    "deleteSectionMessage": "Möchten Sie den Abschnitt \"{section}\" und alle {count} Einträge wirklich aus {file} löschen?",
+    "deleteUndoNote": "Sie können diese Aktion jederzeit mit Rückgängig (Ctrl+Z) rückgängig machen.",
+    "confirmDeleteSectionBtn": "Abschnitt löschen",
+    "alreadyMissing": "Schlüssel ist in dieser Datei nicht vorhanden",
+    "sectionEmpty": "Keine Schlüssel zum Löschen in dieser Datei vorhanden"
   },
   "translation": {
     "translateWithAi": "✨ Mit KI übersetzen",

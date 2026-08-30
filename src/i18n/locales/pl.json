@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "Wprowadź tłumaczenie...",
     "saving": "Zapisywanie...",
     "save": "Zapisz",
-    "cancel": "Anuluj"
+    "cancel": "Anuluj",
+    "undo": "Cofnij",
+    "redo": "Ponów",
+    "undoTooltip": "Cofnij ostatnią akcję ({shortcut})",
+    "redoTooltip": "Ponów ostatnią akcję ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Menu kontekstowe lokalizacji",
+    "deleteEntry": "Usuń wpis",
+    "deleteSection": "Usuń sekcję ({count} kluczy)",
+    "deleteSectionTitle": "Potwierdź usunięcie sekcji",
+    "deleteSectionSubtitle": "Ta akcja usunie całą sekcję i wszystkie zagnieżdżone wpisy.",
+    "deleteSectionMessage": "Czy na pewno chcesz usunąć sekcję \"{section}\" i wszystkie jej {count} wpisów z {file}?",
+    "deleteUndoNote": "Możesz bezpiecznie cofnąć tę akcję w dowolnym momencie, używając opcji Cofnij (Ctrl+Z).",
+    "confirmDeleteSectionBtn": "Usuń sekcję",
+    "alreadyMissing": "Klucz nie istnieje w tym pliku",
+    "sectionEmpty": "Brak kluczy do usunięcia w tym pliku"
   },
   "translation": {
     "translateWithAi": "✨ Przetłumacz za pomocą AI",

@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "Inserisci traduzione...",
     "saving": "Salvataggio...",
     "save": "Salva",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "undo": "Annulla",
+    "redo": "Ripeti",
+    "undoTooltip": "Annulla l'ultima azione ({shortcut})",
+    "redoTooltip": "Ripeti l'ultima azione ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Menu contestuale di localizzazione",
+    "deleteEntry": "Elimina voce",
+    "deleteSection": "Elimina sezione ({count} chiavi)",
+    "deleteSectionTitle": "Conferma eliminazione sezione",
+    "deleteSectionSubtitle": "Questa azione rimuove l'intera sezione e tutte le voci nidificate.",
+    "deleteSectionMessage": "Sei sicuro di voler eliminare la sezione \"{section}\" e tutte le sue {count} voci da {file}?",
+    "deleteUndoNote": "Puoi annullare questa azione in qualsiasi momento usando Annulla (Ctrl+Z).",
+    "confirmDeleteSectionBtn": "Elimina sezione",
+    "alreadyMissing": "La chiave non è presente in questo file",
+    "sectionEmpty": "Nessuna chiave presente da eliminare in questo file"
   },
   "translation": {
     "translateWithAi": "✨ Traduci con IA",
