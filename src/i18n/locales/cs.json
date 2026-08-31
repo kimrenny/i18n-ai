@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "Zadejte překlad...",
     "saving": "Ukládání...",
     "save": "Uložit",
-    "cancel": "Zrušit"
+    "cancel": "Zrušit",
+    "undo": "Zpět",
+    "redo": "Znovu",
+    "undoTooltip": "Vrátit poslední akci ({shortcut})",
+    "redoTooltip": "Zopakovat poslední akci ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Kontextová nabídka lokalizace",
+    "deleteEntry": "Smazat položku",
+    "deleteSection": "Smazat sekci ({count} klíčů)",
+    "deleteSectionTitle": "Potvrdit smazání sekce",
+    "deleteSectionSubtitle": "Tato akce odstraní celou sekci a všechny vnořené položky.",
+    "deleteSectionMessage": "Opravdu chcete smazat sekci \"{section}\" a všech jejích {count} položek z {file}?",
+    "deleteUndoNote": "Tuto akci můžete kdykoli vrátit pomocí tlačítka Zpět (Ctrl+Z).",
+    "confirmDeleteSectionBtn": "Smazat sekci",
+    "alreadyMissing": "Klíč v tomto souboru neexistuje",
+    "sectionEmpty": "V tomto souboru nejsou žádné klíče ke smazání"
   },
   "translation": {
     "translateWithAi": "✨ Přeložit pomocí AI",

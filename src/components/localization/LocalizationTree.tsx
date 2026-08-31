@@ -13,6 +13,8 @@ interface LocalizationTreeProps {
   isSavingKey?: boolean
   translatingKey?: string | null
   engine?: TranslationEngine
+  canUndo?: boolean
+  canRedo?: boolean
   treeBodyRef: React.RefObject<HTMLDivElement | null>
   onToggleCollapse: (id: string) => void
   onExpandAll: () => void
@@ -23,6 +25,9 @@ interface LocalizationTreeProps {
   onSaveEdit?: () => void
   onCancelEdit?: () => void
   onAiTranslate?: (fullKey: string) => void
+  onUndo?: () => void
+  onRedo?: () => void
+  onContextMenu?: (e: React.MouseEvent, node: TreeNodeType) => void
 }
 
 export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
@@ -34,6 +39,8 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   isSavingKey,
   translatingKey,
   engine = 'ai',
+  canUndo = false,
+  canRedo = false,
   treeBodyRef,
   onToggleCollapse,
   onExpandAll,
@@ -44,6 +51,9 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   onSaveEdit,
   onCancelEdit,
   onAiTranslate,
+  onUndo,
+  onRedo,
+  onContextMenu,
 }) => {
   const { t } = useTranslation()
 
@@ -52,6 +62,31 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
       <div className="tree-toolbar">
         <span className="toolbar-title">{t('tree.explorerView')}</span>
         <div className="toolbar-actions">
+          {onUndo && (
+            <button
+              type="button"
+              className="tree-tool-btn history-btn undo-btn"
+              onClick={onUndo}
+              disabled={!canUndo}
+              title={t('tree.undoTooltip', { shortcut: 'Ctrl+Z' })}
+              aria-label={t('tree.undo')}
+            >
+              ↶ {t('tree.undo')}
+            </button>
+          )}
+          {onRedo && (
+            <button
+              type="button"
+              className="tree-tool-btn history-btn redo-btn"
+              onClick={onRedo}
+              disabled={!canRedo}
+              title={t('tree.redoTooltip', { shortcut: 'Ctrl+Y' })}
+              aria-label={t('tree.redo')}
+            >
+              ↷ {t('tree.redo')}
+            </button>
+          )}
+          <span className="toolbar-divider" />
           <button
             type="button"
             className="tree-tool-btn"
@@ -92,6 +127,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
               onSaveEdit={onSaveEdit}
               onCancelEdit={onCancelEdit}
               onAiTranslate={onAiTranslate}
+              onContextMenu={onContextMenu}
             />
           ))
         ) : (

@@ -83,10 +83,26 @@
     "expandAll": "Tout développer",
     "collapseAll": "Tout réduire",
     "editTranslation": "Modifier",
-    "placeholderEnterTranslation": "Saisir la traduction...",
+    "placeholderEnterTranslation": "Entrez la traduction...",
     "saving": "Enregistrement...",
     "save": "Enregistrer",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "undoTooltip": "Annuler la dernière action ({shortcut})",
+    "redoTooltip": "Rétablir la dernière action ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Menu contextuel de localisation",
+    "deleteEntry": "Supprimer l'entrée",
+    "deleteSection": "Supprimer la section ({count} clés)",
+    "deleteSectionTitle": "Confirmer la suppression de la section",
+    "deleteSectionSubtitle": "Cette action supprime toute la section et toutes les entrées imbriquées.",
+    "deleteSectionMessage": "Voulez-vous vraiment supprimer la section \"{section}\" et toutes ses {count} entrées de {file} ?",
+    "deleteUndoNote": "Vous pouvez annuler cette action à tout moment avec Annuler (Ctrl+Z).",
+    "confirmDeleteSectionBtn": "Supprimer la section",
+    "alreadyMissing": "La clé n'est pas présente dans ce fichier",
+    "sectionEmpty": "Aucune clé à supprimer dans ce fichier"
   },
   "translation": {
     "translateWithAi": "✨ Traduire avec l'IA",

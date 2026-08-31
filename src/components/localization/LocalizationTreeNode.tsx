@@ -25,6 +25,7 @@ interface LocalizationTreeNodeProps {
   onSaveEdit?: () => void
   onCancelEdit?: () => void
   onAiTranslate?: (fullKey: string) => void
+  onContextMenu?: (e: React.MouseEvent, node: TreeNodeType) => void
 }
 
 function formatJsonValue(value: JsonValue | undefined): string {
@@ -63,6 +64,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
   onSaveEdit,
   onCancelEdit,
   onAiTranslate,
+  onContextMenu,
 }) => {
   const { t } = useTranslation()
   const isFolder = node.type === 'folder' || node.children.length > 0
@@ -99,6 +101,12 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
     }
   }
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onContextMenu?.(e, node)
+  }
+
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (isFolder) {
@@ -133,12 +141,14 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
         data-key={node.fullKey}
         data-testid={`tree-node-${node.fullKey}`}
         onClick={handleRowClick}
+        onContextMenu={handleContextMenu}
       >
         {isFolder ? (
           <button
             type="button"
             className="folder-toggle-btn"
             onClick={handleToggle}
+            onContextMenu={handleContextMenu}
             aria-expanded={!isCollapsed}
             aria-label={t('tree.toggleFolderAria', { name: node.segment })}
           >
@@ -146,7 +156,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
             <span className="folder-name">{node.segment}</span>
           </button>
         ) : (
-          <div className="leaf-content">
+          <div className="leaf-content" onContextMenu={handleContextMenu}>
             <span className="leaf-key" title={node.fullKey}>
               {node.segment}
             </span>
@@ -275,6 +285,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
               onSaveEdit={onSaveEdit}
               onCancelEdit={onCancelEdit}
               onAiTranslate={onAiTranslate}
+              onContextMenu={onContextMenu}
             />
           ))}
         </div>

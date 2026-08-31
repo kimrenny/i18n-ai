@@ -4,6 +4,7 @@ import type {
   ParsedLocalizationFile,
   LocalizationTreeNode as TreeNodeType,
   MissingKeysAdditionPlan,
+  JsonValue,
 } from '../../types/localization'
 import type { AppSettings } from '../../types/settings'
 import { buildLocalizationTree } from '../../services/localizationTree'
@@ -15,7 +16,11 @@ import {
 import {
   planMissingKeysAddition,
   updateSingleKeyInFile,
+  deleteKeyFromFile,
+  deleteSectionFromFile,
 } from '../../services/localizationWriter'
+import { LocalizationHistoryManager } from '../../services/localizationHistory'
+import { countLeafDescendants } from '../../services/localizationTree'
 import { shouldConfirmAiEdit } from '../../services/aiEditPolicy'
 import {
   executeAiTranslation,
@@ -40,6 +45,8 @@ import {
   type AiTranslationProposal,
 } from './AiTranslationConfirmModal'
 import { BatchTranslationModal } from './BatchTranslationModal'
+import { LocalizationContextMenu, type ContextMenuState } from './LocalizationContextMenu'
+import { DeleteSectionModal } from './DeleteSectionModal'
 import { useTranslation } from '../../i18n/useTranslation'
 
 interface LocalizationDiffViewerProps {
@@ -81,6 +88,19 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const [editValue, setEditValue] = useState<string>('')
   const [isSavingKey, setIsSavingKey] = useState(false)
   const [saveKeyError, setSaveKeyError] = useState<string | null>(null)
+
+  // History & Context Menu state
+  const historyManagerRef = useRef<LocalizationHistoryManager>(new LocalizationHistoryManager())
+  const [, setHistoryVersion] = useState(0)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [deleteSectionTarget, setDeleteSectionTarget] = useState<{
+    sectionPath: string
+    targetFilename: string
+    targetFilePath: string
+    entryCount: number
+    node: TreeNodeType
+  } | null>(null)
+  const [isDeletingSection, setIsDeletingSection] = useState(false)
 
   // Single AI Translation state
   const [translatingKey, setTranslatingKey] = useState<string | null>(null)
@@ -237,7 +257,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     setSaveKeyError(null)
 
     try {
-      const { formattedJson } = updateSingleKeyInFile(
+      const { updatedRaw, formattedJson } = updateSingleKeyInFile(
         activeFileData.raw,
         editingKey,
         editValue
@@ -250,6 +270,17 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         },
       ])
 
+      historyManagerRef.current.push({
+        targetFile: activeFileData.filename,
+        targetFilePath: activeFileData.path,
+        type: 'edit_key',
+        description: `Edit ${editingKey}`,
+        key: editingKey,
+        beforeRawJson: activeFileData.raw as Record<string, JsonValue>,
+        afterRawJson: updatedRaw as Record<string, JsonValue>,
+      })
+      setHistoryVersion((v) => v + 1)
+
       setEditingKey(null)
       await onRefreshFiles()
     } catch (err) {
@@ -260,6 +291,214 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       setIsSavingKey(false)
     }
   }, [editingKey, activeFileData, editValue, onRefreshFiles, t])
+
+  const handleDeleteKey = useCallback(
+    async (fullKey: string) => {
+      if (!activeFileData) return
+      if (!window.electronAPI?.writeJsonFiles) {
+        setSaveKeyError('Unable to write files: Electron API is unavailable.')
+        return
+      }
+
+      setSaveKeyError(null)
+      try {
+        const { updatedRaw, formattedJson, deleted } = deleteKeyFromFile(
+          activeFileData.raw,
+          fullKey
+        )
+        if (!deleted) return
+
+        const res = await window.electronAPI.writeJsonFiles([
+          {
+            path: activeFileData.path,
+            content: formattedJson,
+          },
+        ])
+        if (!res || res.success === false) {
+          throw new Error('Failed to write file')
+        }
+
+        historyManagerRef.current.push({
+          targetFile: activeFileData.filename,
+          targetFilePath: activeFileData.path,
+          type: 'delete_key',
+          description: `Delete ${fullKey}`,
+          key: fullKey,
+          beforeRawJson: activeFileData.raw as Record<string, JsonValue>,
+          afterRawJson: updatedRaw as Record<string, JsonValue>,
+        })
+        setHistoryVersion((v) => v + 1)
+        setEditingKey(null)
+        await onRefreshFiles()
+      } catch (err) {
+        setSaveKeyError(
+          err instanceof Error ? err.message : t('errors.failedToSaveKey')
+        )
+      }
+    },
+    [activeFileData, onRefreshFiles, t]
+  )
+
+  const handleRequestDeleteSection = useCallback(
+    (sectionPath: string, node: TreeNodeType) => {
+      if (!activeFileData) return
+      const entryCount = countLeafDescendants(node)
+      setDeleteSectionTarget({
+        sectionPath,
+        targetFilename: activeFileData.filename,
+        targetFilePath: activeFileData.path,
+        entryCount,
+        node,
+      })
+    },
+    [activeFileData]
+  )
+
+  const handleConfirmDeleteSection = useCallback(async () => {
+    if (!deleteSectionTarget || !activeFileData) return
+    if (!window.electronAPI?.writeJsonFiles) {
+      setSaveKeyError('Unable to write files: Electron API is unavailable.')
+      return
+    }
+
+    setIsDeletingSection(true)
+    setSaveKeyError(null)
+    try {
+      const { updatedRaw, formattedJson, deleted } = deleteSectionFromFile(
+        activeFileData.raw,
+        deleteSectionTarget.sectionPath
+      )
+      if (deleted) {
+        const res = await window.electronAPI.writeJsonFiles([
+          {
+            path: deleteSectionTarget.targetFilePath,
+            content: formattedJson,
+          },
+        ])
+        if (!res || res.success === false) {
+          throw new Error('Failed to write file')
+        }
+
+        historyManagerRef.current.push({
+          targetFile: deleteSectionTarget.targetFilename,
+          targetFilePath: deleteSectionTarget.targetFilePath,
+          type: 'delete_section',
+          description: `Delete section ${deleteSectionTarget.sectionPath}`,
+          sectionPath: deleteSectionTarget.sectionPath,
+          count: deleteSectionTarget.entryCount,
+          beforeRawJson: activeFileData.raw as Record<string, JsonValue>,
+          afterRawJson: updatedRaw as Record<string, JsonValue>,
+        })
+        setHistoryVersion((v) => v + 1)
+        setDeleteSectionTarget(null)
+        setEditingKey(null)
+        await onRefreshFiles()
+      }
+    } catch (err) {
+      setSaveKeyError(
+        err instanceof Error ? err.message : t('errors.failedToSaveKey')
+      )
+    } finally {
+      setIsDeletingSection(false)
+    }
+  }, [deleteSectionTarget, activeFileData, onRefreshFiles, t])
+
+  const handleUndo = useCallback(async () => {
+    if (!window.electronAPI?.writeJsonFiles) return
+    const action = historyManagerRef.current.undo(activeFilename)
+    if (!action) return
+
+    setSaveKeyError(null)
+    try {
+      const res = await window.electronAPI.writeJsonFiles([
+        {
+          path: action.targetFilePath,
+          content: JSON.stringify(action.beforeRawJson, null, 2) + '\n',
+        },
+      ])
+      if (!res || res.success === false) {
+        throw new Error('Failed to write file')
+      }
+      setHistoryVersion((v) => v + 1)
+      setEditingKey(null)
+      await onRefreshFiles()
+    } catch (err) {
+      setSaveKeyError(
+        err instanceof Error ? err.message : t('errors.failedToSaveKey')
+      )
+    }
+  }, [activeFilename, onRefreshFiles, t])
+
+  const handleRedo = useCallback(async () => {
+    if (!window.electronAPI?.writeJsonFiles) return
+    const action = historyManagerRef.current.redo(activeFilename)
+    if (!action) return
+
+    setSaveKeyError(null)
+    try {
+      const res = await window.electronAPI.writeJsonFiles([
+        {
+          path: action.targetFilePath,
+          content: JSON.stringify(action.afterRawJson, null, 2) + '\n',
+        },
+      ])
+      if (!res || res.success === false) {
+        throw new Error('Failed to write file')
+      }
+      setHistoryVersion((v) => v + 1)
+      setEditingKey(null)
+      await onRefreshFiles()
+    } catch (err) {
+      setSaveKeyError(
+        err instanceof Error ? err.message : t('errors.failedToSaveKey')
+      )
+    }
+  }, [activeFilename, onRefreshFiles, t])
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, node: TreeNodeType) => {
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        node,
+        targetFilename: activeFilename,
+      })
+    },
+    [activeFilename]
+  )
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return
+      }
+
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey
+
+      if (isCtrlOrMeta && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (historyManagerRef.current.canUndo(activeFilename)) {
+          handleUndo()
+        }
+      } else if (
+        isCtrlOrMeta &&
+        (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))
+      ) {
+        e.preventDefault()
+        if (historyManagerRef.current.canRedo(activeFilename)) {
+          handleRedo()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [activeFilename, handleUndo, handleRedo])
 
   // AI Translation Execution Logic
   const executeApplyAiTranslation = useCallback(
@@ -714,6 +953,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           isSavingKey={isSavingKey}
           translatingKey={translatingKey}
           engine={settings?.engine || 'ai'}
+          canUndo={historyManagerRef.current.canUndo(activeFilename)}
+          canRedo={historyManagerRef.current.canRedo(activeFilename)}
           treeBodyRef={treeBodyRef}
           onToggleCollapse={handleToggleCollapse}
           onExpandAll={handleExpandAll}
@@ -724,8 +965,35 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           onSaveEdit={handleSaveEdit}
           onCancelEdit={handleCancelEdit}
           onAiTranslate={handleAiTranslate}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onContextMenu={handleContextMenu}
         />
       </div>
+
+      {contextMenu && (
+        <LocalizationContextMenu
+          state={contextMenu}
+          canUndo={historyManagerRef.current.canUndo(activeFilename)}
+          canRedo={historyManagerRef.current.canRedo(activeFilename)}
+          onDeleteKey={handleDeleteKey}
+          onDeleteSection={handleRequestDeleteSection}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {deleteSectionTarget && (
+        <DeleteSectionModal
+          sectionPath={deleteSectionTarget.sectionPath}
+          targetFilename={deleteSectionTarget.targetFilename}
+          entryCount={deleteSectionTarget.entryCount}
+          isDeleting={isDeletingSection}
+          onConfirm={handleConfirmDeleteSection}
+          onCancel={() => setDeleteSectionTarget(null)}
+        />
+      )}
 
       {additionPlan && (
         <AddMissingKeysModal

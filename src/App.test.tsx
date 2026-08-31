@@ -1114,4 +1114,138 @@ describe('App', () => {
       screen.getByText(/unable to open folder selection dialog: electron api is unavailable/i)
     ).toBeInTheDocument()
   })
+
+  it('supports context-menu deletion, section deletion, undo/redo, and keyboard shortcuts', async () => {
+    const enContent = JSON.stringify({
+      APP: {
+        TITLE: 'My App',
+        MENU: {
+          OPEN: 'Open',
+          CLOSE: 'Close',
+        },
+      },
+    })
+    const ruContent = JSON.stringify({
+      APP: {
+        TITLE: 'Мое приложение',
+        MENU: {
+          OPEN: 'Открыть',
+          CLOSE: 'Закрыть',
+        },
+      },
+    })
+
+    let ruState = JSON.parse(ruContent)
+    const mockWriteJsonFiles = vi
+      .fn()
+      .mockImplementation(async (files: { path: string; content: string }[]) => {
+        for (const f of files) {
+          if (f.path.endsWith('ru.json')) {
+            ruState = JSON.parse(f.content)
+          }
+        }
+        return { success: true }
+      })
+
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) {
+        return JSON.parse(enContent)
+      }
+      if (filePath.endsWith('ru.json')) {
+        return ruState
+      }
+      throw new Error('File not found')
+    })
+
+    window.electronAPI = createMockElectronAPI({
+      selectDirectory: vi.fn().mockResolvedValue('C:/Projects/locales'),
+      getJsonFiles: vi.fn().mockResolvedValue([
+        { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+        { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+      ]),
+      readJsonFile: mockReadJsonFile,
+      writeJsonFiles: mockWriteJsonFiles,
+    })
+
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
+
+    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+
+    // Switch to ru.json
+    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+
+    // Right-click APP.TITLE to open context menu
+    const titleRow = screen.getByTestId('tree-node-APP.TITLE')
+    fireEvent.contextMenu(titleRow)
+
+    // Context menu should appear
+    expect(screen.getByRole('menu', { name: /localization context menu/i })).toBeInTheDocument()
+    const deleteEntryBtn = screen.getByRole('menuitem', { name: /delete entry/i })
+    expect(deleteEntryBtn).toBeInTheDocument()
+
+    // Click Delete Entry
+    fireEvent.click(deleteEntryBtn)
+
+    await waitFor(() => {
+      expect(mockWriteJsonFiles).toHaveBeenCalled()
+      expect('TITLE' in (ruState.APP || {})).toBe(false)
+    })
+
+    // Undo button in toolbar should now be enabled
+    const undoBtn = screen.getByRole('button', { name: /^undo$/i })
+    expect(undoBtn).toBeEnabled()
+
+    // Click Undo
+    fireEvent.click(undoBtn)
+    await waitFor(() => {
+      expect(mockWriteJsonFiles).toHaveBeenCalledTimes(2)
+      expect(ruState.APP.TITLE).toBe('Мое приложение')
+    })
+
+    // Click Redo
+    const redoBtn = screen.getByRole('button', { name: /^redo$/i })
+    expect(redoBtn).toBeEnabled()
+    fireEvent.click(redoBtn)
+    await waitFor(() => {
+      expect(mockWriteJsonFiles).toHaveBeenCalledTimes(3)
+      expect('TITLE' in (ruState.APP || {})).toBe(false)
+    })
+
+    // Right-click APP.MENU folder to open context menu
+    const menuFolderRow = screen.getByTestId('tree-node-APP.MENU')
+    fireEvent.contextMenu(menuFolderRow)
+
+    const deleteSectionBtn = screen.getByRole('menuitem', { name: /delete section/i })
+    expect(deleteSectionBtn).toBeInTheDocument()
+    fireEvent.click(deleteSectionBtn)
+
+    // DeleteSectionModal confirmation should appear
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /confirm section deletion/i })).toBeInTheDocument()
+    })
+
+    // Confirm deletion
+    const confirmDeleteBtn = screen.getByRole('button', { name: /^delete section$/i })
+    fireEvent.click(confirmDeleteBtn)
+
+    await waitFor(() => {
+      expect(mockWriteJsonFiles).toHaveBeenCalledTimes(4)
+      expect('MENU' in (ruState.APP || {})).toBe(false)
+    })
+
+    // Use Ctrl+Z keyboard shortcut to undo section deletion
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    await waitFor(() => {
+      expect(mockWriteJsonFiles).toHaveBeenCalledTimes(5)
+      expect('MENU' in (ruState.APP || {})).toBe(true)
+      expect(ruState.APP.MENU.OPEN).toBe('Открыть')
+    })
+  })
 })
+

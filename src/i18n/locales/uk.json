@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "Введіть переклад...",
     "saving": "Збереження...",
     "save": "Зберегти",
-    "cancel": "Скасувати"
+    "cancel": "Скасувати",
+    "undo": "Скасувати",
+    "redo": "Повторити",
+    "undoTooltip": "Скасувати останню дію ({shortcut})",
+    "redoTooltip": "Повторити останню дію ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Контекстне меню локалізації",
+    "deleteEntry": "Видалити запис",
+    "deleteSection": "Видалити секцію ({count} ключів)",
+    "deleteSectionTitle": "Підтвердження видалення секції",
+    "deleteSectionSubtitle": "Ця дія видалить усю секцію та всі вкладені записи.",
+    "deleteSectionMessage": "Ви впевнені, що хочете видалити секцію \"{section}\" та всі її {count} записів із {file}?",
+    "deleteUndoNote": "Ви можете будь-коли повернути цю дію за допомогою кнопки Скасувати (Ctrl+Z).",
+    "confirmDeleteSectionBtn": "Видалити розділ",
+    "alreadyMissing": "Ключ відсутній у цьому файлі",
+    "sectionEmpty": "У цьому файлі немає ключів для видалення"
   },
   "translation": {
     "translateWithAi": "✨ Перекласти за допомогою AI",

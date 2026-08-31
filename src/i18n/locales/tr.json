@@ -86,7 +86,23 @@
     "placeholderEnterTranslation": "Çeviriyi girin...",
     "saving": "Kaydediliyor...",
     "save": "Kaydet",
-    "cancel": "İptal"
+    "cancel": "İptal",
+    "undo": "Geri Al",
+    "redo": "Yinele",
+    "undoTooltip": "Son eylemi geri al ({shortcut})",
+    "redoTooltip": "Son eylemi yinele ({shortcut})"
+  },
+  "contextMenu": {
+    "menuAria": "Yerelleştirme bağlam menüsü",
+    "deleteEntry": "Girdiyi Sil",
+    "deleteSection": "Bölümü Sil ({count} anahtar)",
+    "deleteSectionTitle": "Bölüm Silmeyi Onayla",
+    "deleteSectionSubtitle": "Bu işlem tüm bölümü ve tüm iç içe girdileri kaldırır.",
+    "deleteSectionMessage": "\"{section}\" bölümünü ve {file} dosyasındaki {count} girdisini silmek istediğinizden emin misiniz?",
+    "deleteUndoNote": "Geri Al (Ctrl+Z) kullanarak bu işlemi istediğiniz zaman geri alabilirsiniz.",
+    "confirmDeleteSectionBtn": "Bölümü Sil",
+    "alreadyMissing": "Anahtar bu dosyada mevcut değil",
+    "sectionEmpty": "Bu dosyada silinecek anahtar yok"
   },
   "translation": {
     "translateWithAi": "✨ Yapay Zeka ile Çevir",

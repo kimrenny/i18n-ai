@@ -117,7 +117,7 @@ export function planMissingKeysAddition(
  * Rules:
  * - Pure function: deeply clones input and does not mutate it.
  * - Preserves all unrelated keys, values, and formatting.
- * - Safely handles nested paths (e.g. 'MENU.PLAY').
+ * - Safely handles nested paths (e.g. 'MENU.PLAY') and flat keys.
  * - Throws error if attempting to overwrite an incompatible non-object parent.
  */
 export function updateSingleKeyInFile(
@@ -133,6 +133,15 @@ export function updateSingleKeyInFile(
     raw && typeof raw === 'object' && !Array.isArray(raw)
       ? JSON.parse(JSON.stringify(raw))
       : {}
+
+  // Direct flat key match
+  if (Object.prototype.hasOwnProperty.call(clonedRaw, fullKey)) {
+    clonedRaw[fullKey] = newValue
+    return {
+      updatedRaw: clonedRaw,
+      formattedJson: JSON.stringify(clonedRaw, null, 2) + '\n',
+    }
+  }
 
   const segments = fullKey.split('.')
   let current: Record<string, JsonValue> = clonedRaw
@@ -163,5 +172,163 @@ export function updateSingleKeyInFile(
   return {
     updatedRaw: clonedRaw,
     formattedJson: JSON.stringify(clonedRaw, null, 2) + '\n',
+  }
+}
+
+/**
+ * Recursively deletes a key from a nested/hybrid/flat JSON object structure,
+ * and removes any empty parent objects that are left with no keys.
+ */
+function deleteKeyRecursive(
+  obj: Record<string, JsonValue>,
+  remainingPath: string
+): boolean {
+  // 1. Direct property match (e.g. flat key or current leaf property)
+  if (Object.prototype.hasOwnProperty.call(obj, remainingPath)) {
+    delete obj[remainingPath]
+    return true
+  }
+
+  // 2. Try prefix matching for nested / hybrid paths
+  const segments = remainingPath.split('.')
+  for (let i = 1; i <= segments.length - 1; i++) {
+    const prefix = segments.slice(0, i).join('.')
+    const suffix = segments.slice(i).join('.')
+
+    if (
+      Object.prototype.hasOwnProperty.call(obj, prefix) &&
+      typeof obj[prefix] === 'object' &&
+      obj[prefix] !== null &&
+      !Array.isArray(obj[prefix])
+    ) {
+      const childObj = obj[prefix] as Record<string, JsonValue>
+      const deleted = deleteKeyRecursive(childObj, suffix)
+      if (deleted) {
+        // Clean up empty parent object
+        if (Object.keys(childObj).length === 0) {
+          delete obj[prefix]
+        }
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
+ * Recursively deletes a section / subtree from a nested/hybrid/flat JSON object structure,
+ * and removes any empty parent objects left with no keys.
+ */
+function deleteSectionRecursive(
+  obj: Record<string, JsonValue>,
+  sectionPath: string
+): boolean {
+  let anyDeleted = false
+
+  // 1. Direct match on section object
+  if (Object.prototype.hasOwnProperty.call(obj, sectionPath)) {
+    delete obj[sectionPath]
+    anyDeleted = true
+  }
+
+  // 2. Flat keys starting with `${sectionPath}.`
+  const prefixDot = `${sectionPath}.`
+  for (const key of Object.keys(obj)) {
+    if (key.startsWith(prefixDot)) {
+      delete obj[key]
+      anyDeleted = true
+    }
+  }
+
+  // 3. Nested traversal
+  const segments = sectionPath.split('.')
+  for (let i = 1; i <= segments.length; i++) {
+    const prefix = segments.slice(0, i).join('.')
+    const suffix = segments.slice(i).join('.')
+
+    if (
+      Object.prototype.hasOwnProperty.call(obj, prefix) &&
+      typeof obj[prefix] === 'object' &&
+      obj[prefix] !== null &&
+      !Array.isArray(obj[prefix])
+    ) {
+      const childObj = obj[prefix] as Record<string, JsonValue>
+      if (suffix === '') {
+        delete obj[prefix]
+        anyDeleted = true
+      } else {
+        const deleted = deleteSectionRecursive(childObj, suffix)
+        if (deleted) {
+          anyDeleted = true
+          if (Object.keys(childObj).length === 0) {
+            delete obj[prefix]
+          }
+        }
+      }
+    }
+  }
+
+  return anyDeleted
+}
+
+/**
+ * Physically deletes a single key from a localization file's raw JSON representation.
+ *
+ * Rules:
+ * - Pure function: deeply clones input and does not mutate it.
+ * - Physically deletes the key from the JSON object.
+ * - Safely handles nested paths and flat dotted keys.
+ * - Cleans up intermediate empty parent objects left behind.
+ */
+export function deleteKeyFromFile(
+  raw: JsonValue,
+  fullKey: string
+): { updatedRaw: JsonValue; formattedJson: string; deleted: boolean } {
+  if (!fullKey || typeof fullKey !== 'string') {
+    throw new Error('Invalid key')
+  }
+
+  const clonedRaw: Record<string, JsonValue> =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? JSON.parse(JSON.stringify(raw))
+      : {}
+
+  const deleted = deleteKeyRecursive(clonedRaw, fullKey)
+
+  return {
+    updatedRaw: clonedRaw,
+    formattedJson: JSON.stringify(clonedRaw, null, 2) + '\n',
+    deleted,
+  }
+}
+
+/**
+ * Physically deletes an entire section / object subtree from a localization file's raw JSON representation.
+ *
+ * Rules:
+ * - Pure function: deeply clones input and does not mutate it.
+ * - Deletes the entire subtree and all of its descendants physically.
+ * - Cleans up intermediate empty parent objects left behind.
+ */
+export function deleteSectionFromFile(
+  raw: JsonValue,
+  sectionPath: string
+): { updatedRaw: JsonValue; formattedJson: string; deleted: boolean } {
+  if (!sectionPath || typeof sectionPath !== 'string') {
+    throw new Error('Invalid section path')
+  }
+
+  const clonedRaw: Record<string, JsonValue> =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? JSON.parse(JSON.stringify(raw))
+      : {}
+
+  const deleted = deleteSectionRecursive(clonedRaw, sectionPath)
+
+  return {
+    updatedRaw: clonedRaw,
+    formattedJson: JSON.stringify(clonedRaw, null, 2) + '\n',
+    deleted,
   }
 }

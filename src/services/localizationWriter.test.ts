@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   planMissingKeysAddition,
   updateSingleKeyInFile,
+  deleteKeyFromFile,
+  deleteSectionFromFile,
 } from './localizationWriter'
 import { compareLocalizationFiles } from './localizationComparator'
 import { parseLocalizationData } from './localizationParser'
@@ -264,4 +266,138 @@ describe('localizationWriter service', () => {
       )
     })
   })
+
+  describe('deleteKeyFromFile', () => {
+    it('physically removes a root-level key without leaving empty string or null', () => {
+      const raw = {
+        welcome: 'Hello',
+        goodbye: 'Goodbye',
+      }
+      const { updatedRaw, formattedJson, deleted } = deleteKeyFromFile(raw, 'welcome')
+      expect(deleted).toBe(true)
+      expect(updatedRaw).toEqual({ goodbye: 'Goodbye' })
+      expect('welcome' in (updatedRaw as Record<string, unknown>)).toBe(false)
+      expect(formattedJson).not.toContain('"welcome"')
+      expect(formattedJson).toContain('"goodbye": "Goodbye"')
+    })
+
+    it('physically removes a nested leaf key, preserves sibling properties, and cleans up empty parents', () => {
+      const raw = {
+        admin: {
+          dashboard: {
+            title: 'Dashboard',
+            subtitle: 'Overview',
+          },
+          users: {
+            title: 'Users',
+          },
+        },
+      }
+
+      const { updatedRaw, formattedJson, deleted } = deleteKeyFromFile(
+        raw,
+        'admin.dashboard.title'
+      )
+      expect(deleted).toBe(true)
+      expect(updatedRaw).toEqual({
+        admin: {
+          dashboard: {
+            subtitle: 'Overview',
+          },
+          users: {
+            title: 'Users',
+          },
+        },
+      })
+      const adminObj = (updatedRaw as Record<string, unknown>).admin as Record<string, unknown>
+      const dashboardObj = adminObj.dashboard as Record<string, unknown>
+      expect('title' in dashboardObj).toBe(false)
+      expect(dashboardObj.subtitle).toBe('Overview')
+      expect(formattedJson).not.toContain('"title": "Dashboard"')
+
+      // Deleting the remaining sibling in dashboard cleans up the empty dashboard object
+      const { updatedRaw: afterSecond } = deleteKeyFromFile(
+        updatedRaw,
+        'admin.dashboard.subtitle'
+      )
+      expect(afterSecond).toEqual({
+        admin: {
+          users: {
+            title: 'Users',
+          },
+        },
+      })
+      const adminObjAfter = (afterSecond as Record<string, unknown>).admin as Record<string, unknown>
+      expect('dashboard' in adminObjAfter).toBe(false)
+    })
+
+    it('handles non-existent keys gracefully without modifying data', () => {
+      const raw = { A: { B: '1' } }
+      const { updatedRaw, deleted } = deleteKeyFromFile(raw, 'A.NON_EXISTENT')
+      expect(deleted).toBe(false)
+      expect(updatedRaw).toEqual({ A: { B: '1' } })
+    })
+
+    it('does not mutate original object', () => {
+      const raw = { A: { B: '1', C: '2' } }
+      const clone = JSON.parse(JSON.stringify(raw))
+      deleteKeyFromFile(raw, 'A.B')
+      expect(raw).toEqual(clone)
+    })
+  })
+
+  describe('deleteSectionFromFile', () => {
+    it('physically removes an entire nested section and all of its descendants', () => {
+      const raw = {
+        admin: {
+          dashboard: {
+            title: 'Dashboard',
+            subtitle: 'Overview',
+          },
+          users: {
+            title: 'Users',
+          },
+        },
+      }
+
+      const { updatedRaw, formattedJson, deleted } = deleteSectionFromFile(
+        raw,
+        'admin.dashboard'
+      )
+      expect(deleted).toBe(true)
+      expect(updatedRaw).toEqual({
+        admin: {
+          users: {
+            title: 'Users',
+          },
+        },
+      })
+      const adminObj = (updatedRaw as Record<string, unknown>).admin as Record<string, unknown>
+      expect('dashboard' in adminObj).toBe(false)
+      expect(formattedJson).not.toContain('dashboard')
+      expect(formattedJson).toContain('"title": "Users"')
+    })
+
+    it('deletes an entire top-level section', () => {
+      const raw = {
+        AUTH: {
+          LOGIN: 'Log In',
+          LOGOUT: 'Log Out',
+        },
+        SETTINGS: {
+          THEME: 'Dark',
+        },
+      }
+
+      const { updatedRaw, deleted } = deleteSectionFromFile(raw, 'AUTH')
+      expect(deleted).toBe(true)
+      expect(updatedRaw).toEqual({
+        SETTINGS: {
+          THEME: 'Dark',
+        },
+      })
+      expect('AUTH' in (updatedRaw as Record<string, unknown>)).toBe(false)
+    })
+  })
 })
+

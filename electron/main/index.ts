@@ -160,8 +160,7 @@ app.whenReady().then(() => {
           }
           console.error(`[main] Failed to write file ${file.path}:`, err)
           throw new Error(
-            `Atomic write failed for ${path.basename(file.path)}: ${
-              err instanceof Error ? err.message : String(err)
+            `Atomic write failed for ${path.basename(file.path)}: ${err instanceof Error ? err.message : String(err)
             }`
           )
         }
