@@ -8,9 +8,15 @@ import { SettingsModal } from './components/settings/SettingsModal'
 import { LocalizationDiffViewer } from './components/localization/LocalizationDiffViewer'
 import { ProjectExplorer } from './components/explorer/ProjectExplorer'
 import { FilePreview } from './components/preview/FilePreview'
+import { TranslationCoverageDashboard } from './components/dashboard/TranslationCoverageDashboard'
 import { parseLocalizationData } from './services/localizationParser'
 import { compareLocalizationFiles } from './services/localizationComparator'
 import { isLocalizationFile } from './services/localizationDetector'
+import {
+  calculateWorkspaceCoverage,
+  getFirstProblemKeyForFile,
+} from './services/localizationCoverage'
+import type { ProblemNavigationTarget } from './types/localizationCoverage'
 import type {
   ParsedLocalizationFile,
   LocalizationComparisonResult,
@@ -71,10 +77,13 @@ const AppContent: React.FC<AppContentProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewIsBinary, setPreviewIsBinary] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'workspace' | 'preview'>('workspace')
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'dashboard' | 'diff' | 'preview'>('dashboard')
+  const [selectedLanguageTarget, setSelectedLanguageTarget] = useState<{
+    filename: string
+    problem: ProblemNavigationTarget | null
+  } | null>(null)
 
   // Parsing & Comparison State
-  const [isParsing, setIsParsing] = useState(false)
   const [parseResults, setParseResults] = useState<FileParseResult[] | null>(null)
   const [noSelectionWarning, setNoSelectionWarning] = useState<string | null>(null)
   const [comparisonResult, setComparisonResult] = useState<LocalizationComparisonResult | null>(null)
@@ -85,7 +94,8 @@ const AppContent: React.FC<AppContentProps> = ({
     setComparisonResult(null)
     setNoSelectionWarning(null)
     setSelectedPreviewFile(null)
-    setActiveWorkspaceTab('workspace')
+    setSelectedLanguageTarget(null)
+    setActiveWorkspaceTab('dashboard')
 
     let discoveredCandidates: DiscoveredFile[] = []
     let treeSuccess = false
@@ -146,6 +156,46 @@ const AppContent: React.FC<AppContentProps> = ({
     setSelectedDirectory(directory)
     setJsonFiles(discoveredCandidates)
     setCheckedPaths(new Set(discoveredCandidates.map((f) => f.path)))
+
+    // Parse discovered localization candidates in a single pass
+    if (window.electronAPI?.readJsonFile && discoveredCandidates.length > 0) {
+      const results: FileParseResult[] = []
+      for (const file of discoveredCandidates) {
+        try {
+          const rawJson = await window.electronAPI.readJsonFile(file.path)
+          const parsed = parseLocalizationData(file.name, file.path, rawJson)
+          results.push({
+            filename: file.name,
+            path: file.path,
+            success: true,
+            data: parsed,
+          })
+        } catch (err) {
+          results.push({
+            filename: file.name,
+            path: file.path,
+            success: false,
+            error: err instanceof Error ? err.message : 'Invalid JSON',
+          })
+        }
+      }
+      setParseResults(results)
+
+      const validFiles = results
+        .filter(
+          (r): r is FileParseResult & { data: NonNullable<FileParseResult['data']> } =>
+            r.success && !!r.data
+        )
+        .map((r) => r.data)
+
+      if (validFiles.length >= 2) {
+        const newComparison = compareLocalizationFiles(validFiles)
+        setComparisonResult(newComparison)
+      } else {
+        setComparisonResult(null)
+      }
+    }
+
     return true
   }, [])
 
@@ -280,49 +330,6 @@ const AppContent: React.FC<AppContentProps> = ({
     }
   }, [])
 
-  const handleParseFiles = async () => {
-    if (checkedPaths.size === 0) {
-      setNoSelectionWarning(t('app.noFilesSelectedWarning'))
-      return
-    }
-
-    if (!window.electronAPI?.readJsonFile) {
-      setErrorMessage(t('app.unableToReadJsonFiles'))
-      return
-    }
-
-    setNoSelectionWarning(null)
-    setComparisonResult(null)
-    setIsParsing(true)
-    setActiveWorkspaceTab('workspace')
-
-    const filesToParse = jsonFiles.filter((f) => checkedPaths.has(f.path))
-    const results: FileParseResult[] = []
-
-    for (const file of filesToParse) {
-      try {
-        const rawJson = await window.electronAPI.readJsonFile(file.path)
-        const parsed = parseLocalizationData(file.name, file.path, rawJson)
-        results.push({
-          filename: file.name,
-          path: file.path,
-          success: true,
-          data: parsed,
-        })
-      } catch (err) {
-        results.push({
-          filename: file.name,
-          path: file.path,
-          success: false,
-          error: err instanceof Error ? err.message : t('app.invalidJsonBadge'),
-        })
-      }
-    }
-
-    setParseResults(results)
-    setIsParsing(false)
-  }
-
   const handleRefreshFiles = useCallback(async () => {
     if (!window.electronAPI?.readJsonFile) {
       return
@@ -376,16 +383,23 @@ const AppContent: React.FC<AppContentProps> = ({
       .map((r) => r.data)
   }, [parseResults])
 
-  const canCompare = successfulParsedFiles.length >= 2
+  const coverageSummary = useMemo(() => {
+    return calculateWorkspaceCoverage(successfulParsedFiles)
+  }, [successfulParsedFiles])
 
-  const handleCompareFiles = () => {
-    if (!canCompare) {
-      return
-    }
-    const result = compareLocalizationFiles(successfulParsedFiles)
-    setComparisonResult(result)
-    setActiveWorkspaceTab('workspace')
-  }
+  const handleSelectDashboardLanguage = useCallback(
+    (filename: string) => {
+      let currentComparison = comparisonResult
+      if (!currentComparison && successfulParsedFiles.length >= 2) {
+        currentComparison = compareLocalizationFiles(successfulParsedFiles)
+        setComparisonResult(currentComparison)
+      }
+      const problem = getFirstProblemKeyForFile(filename, currentComparison)
+      setSelectedLanguageTarget({ filename, problem })
+      setActiveWorkspaceTab('diff')
+    },
+    [comparisonResult, successfulParsedFiles]
+  )
 
   const folderName = useMemo(() => {
     if (!selectedDirectory) return null
@@ -433,8 +447,8 @@ const AppContent: React.FC<AppContentProps> = ({
           {comparisonResult && selectedPreviewFile && (
             <button
               type="button"
-              className={`app-btn app-btn-md ide-tab-toggle-btn ${activeWorkspaceTab === 'workspace' ? 'is-active-tab' : ''}`}
-              onClick={() => setActiveWorkspaceTab('workspace')}
+              className={`app-btn app-btn-md ide-tab-toggle-btn ${activeWorkspaceTab === 'diff' ? 'is-active-tab' : ''}`}
+              onClick={() => setActiveWorkspaceTab('diff')}
               title={t('diff.viewDiffTooltip')}
             >
               📊 {t('app.compareFiles')}
@@ -523,84 +537,26 @@ const AppContent: React.FC<AppContentProps> = ({
               onToggleCheckFile={() => handleToggleFile(selectedPreviewFile.path)}
               onClosePreview={() => {
                 setSelectedPreviewFile(null)
-                setActiveWorkspaceTab('workspace')
+                setActiveWorkspaceTab(selectedLanguageTarget && comparisonResult ? 'diff' : 'dashboard')
               }}
             />
-          ) : comparisonResult ? (
-            /* If comparison is active, render Diff Viewer */
+          ) : activeWorkspaceTab === 'diff' && comparisonResult ? (
+            /* If Diff Viewer is active, render Diff Viewer */
             <LocalizationDiffViewer
               comparisonResult={comparisonResult}
               parsedFiles={successfulParsedFiles}
               settings={settings}
               onRefreshFiles={handleRefreshFiles}
+              initialActiveFilename={selectedLanguageTarget?.filename}
+              initialProblem={selectedLanguageTarget?.problem}
             />
-          ) : parseResults && parseResults.length > 0 ? (
-            /* If files are parsed, render Parse Results grid */
-            <section className="parse-results-section" aria-label={t('app.parseResultsAria')}>
-              <h2 className="results-title">{t('app.parseResultsTitle')}</h2>
-              <div className="results-grid">
-                {parseResults.map((res) => (
-                  <div
-                    key={res.path}
-                    className={`result-card ${res.success ? 'result-success' : 'result-error'}`}
-                    data-testid={`parse-result-${res.filename}`}
-                  >
-                    <div className="result-filename">{res.filename}</div>
-                    {res.success && res.data ? (
-                      <div className="result-details">
-                        <span className="status-badge success-badge">{t('app.parsedBadge')}</span>
-                        <span className="key-count">{t('app.keyCount', { count: res.data.keyCount })}</span>
-                      </div>
-                    ) : (
-                      <div className="result-details">
-                        <span className="status-badge error-badge">{t('app.invalidJsonBadge')}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="action-row comparison-action-row">
-                <button
-                  type="button"
-                  className="app-btn app-btn-md compare-button"
-                  onClick={handleCompareFiles}
-                  disabled={!canCompare}
-                >
-                  {t('app.compareFiles')}
-                </button>
-                {!canCompare && parseResults.length > 0 && (
-                  <span className="compare-hint">
-                    {t('app.compareHint')}
-                  </span>
-                )}
-              </div>
-            </section>
-          ) : selectedDirectory && jsonFiles.length > 0 ? (
-            /* Discovered files overview / prompt */
-            <section className="files-section ide-files-overview" aria-label={t('app.discoveredFilesAria')}>
-              <div className="ide-overview-header">
-                <h2 className="files-title">{t('app.jsonFilesTitle')}</h2>
-                <span className="ide-files-count-badge">
-                  {t('explorer.selectedCount', { count: checkedPaths.size, total: jsonFiles.length })}
-                </span>
-              </div>
-
-              <p className="description ide-ready-desc">
-                {t('app.subtitle')}
-              </p>
-
-              <div className="action-row">
-                <button
-                  type="button"
-                  className="app-btn app-btn-md parse-button"
-                  onClick={handleParseFiles}
-                  disabled={isParsing || checkedPaths.size === 0}
-                >
-                  {isParsing ? t('app.parsing') : t('app.parseJsonFiles')}
-                </button>
-              </div>
-            </section>
+          ) : selectedDirectory ? (
+            /* If workspace is open, render Translation Coverage Dashboard as default view */
+            <TranslationCoverageDashboard
+              summary={coverageSummary}
+              onSelectLanguage={handleSelectDashboardLanguage}
+              onOpenFolder={handleSelectFolder}
+            />
           ) : (
             /* Welcome / Empty workspace screen */
             <div className="ide-welcome-dashboard">

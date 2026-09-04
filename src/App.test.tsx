@@ -203,15 +203,11 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
-
-    // Switch to ru.json
-    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+    // Switch to ru.json tab
+    await waitFor(() => expect(screen.getByRole('tab', { name: /ru\.json/i })).toBeInTheDocument())
 
     // Click "✨ Translate with AI" on MENU.PLAY
     const aiTranslateBtn = screen.getByRole('button', { name: /translate menu\.play with ai/i })
@@ -297,10 +293,10 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+    await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+    await waitFor(() => expect(screen.getByTestId('file-tab-en.json')).toBeInTheDocument())
 
     // Missing keys counter: 2
     const missingBtn = screen.getByRole('button', { name: /navigate 2 missing keys/i })
@@ -365,14 +361,12 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+    await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
     // Click "✨ Translate All (2)"
+    await waitFor(() => expect(screen.getByRole('button', { name: /translate all \(2\)/i })).toBeEnabled())
     const translateAllBtn = screen.getByRole('button', { name: /translate all \(2\)/i })
-    expect(translateAllBtn).toBeEnabled()
     fireEvent.click(translateAllBtn)
 
     // Review Modal should appear
@@ -468,11 +462,10 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+    await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
+    await waitFor(() => expect(screen.getByRole('button', { name: /translate all \(1\)/i })).toBeInTheDocument())
     const translateAllBtn = screen.getByRole('button', { name: /translate all \(1\)/i })
     fireEvent.click(translateAllBtn)
 
@@ -530,12 +523,10 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+    await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
-    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+    await waitFor(() => expect(screen.getByRole('tab', { name: /ru\.json/i })).toBeInTheDocument())
 
     const aiTranslateBtn = screen.getByRole('button', { name: /translate menu\.play with ai/i })
     fireEvent.click(aiTranslateBtn)
@@ -547,7 +538,7 @@ describe('App', () => {
     expect(mockWriteJsonFiles).not.toHaveBeenCalled()
   })
 
-  it('displays discovered JSON files with checkboxes and parse button', async () => {
+  it('displays discovered JSON files with checkboxes in Explorer', async () => {
     const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
     const mockGetJsonFiles = vi.fn().mockResolvedValue([
       { name: 'en.json', path: 'C:/Projects/locales/en.json' },
@@ -568,12 +559,8 @@ describe('App', () => {
       expect(screen.getByText('C:/Projects/locales')).toBeInTheDocument()
     })
 
-    expect(screen.getByText(/json files:/i)).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /select en\.json/i })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: /select ru\.json/i })).toBeChecked()
-    expect(
-      screen.getByRole('button', { name: /parse json files/i })
-    ).toBeInTheDocument()
   })
 
   it('parses files, compares them, and enables navigation between missing keys', async () => {
@@ -619,33 +606,22 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('en.json')).toBeInTheDocument()
+      expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
     await waitFor(() => {
-      expect(screen.getByText(/parse results:/i)).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /ru\.json/i })).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
-
-    // Switch tab to ru.json (which has 3 missing keys: ADMIN.PANEL.BUTTON.CANCEL, ADMIN.PANEL.BUTTON.SAVE, AUTH.LOGOUT)
-    const ruTab = screen.getByRole('tab', { name: /ru\.json/i })
-    fireEvent.click(ruTab)
-
-    expect(screen.getByTestId('navigator-position')).toHaveTextContent('3 missing translations in this file')
+    // Dashboard navigation automatically focuses first missing key
+    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Missing translation 1 of 3')
 
     const prevBtn = screen.getByRole('button', { name: /previous key/i })
     const nextBtn = screen.getByRole('button', { name: /next key/i })
     const topBtn = screen.getByRole('button', { name: /scroll to top/i })
 
-    expect(prevBtn).toBeDisabled()
-    expect(nextBtn).toBeEnabled()
-
-    // Click Next -> moves to 1st missing key (ADMIN.PANEL.BUTTON.CANCEL)
-    fireEvent.click(nextBtn)
-    expect(screen.getByTestId('navigator-position')).toHaveTextContent('Missing translation 1 of 3')
     expect(prevBtn).toBeDisabled()
     expect(nextBtn).toBeEnabled()
 
@@ -732,12 +708,12 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+    // Switch to ru.json
+    await waitFor(() => expect(screen.getByRole('tab', { name: /ru\.json/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
 
     // Add Missing Keys button should be enabled
     const addMissingBtn = screen.getByRole('button', { name: /add missing keys/i })
@@ -837,16 +813,11 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
-
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+    await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
     // Switch to ru.json
-    const ruTab = screen.getByRole('tab', { name: /ru\.json/i })
-    fireEvent.click(ruTab)
+    await waitFor(() => expect(screen.getByRole('tab', { name: /ru\.json/i })).toBeInTheDocument())
 
     // Check [ EMPTY ] badge is present for MENU.PLAY
     const playNode = screen.getByTestId('tree-node-MENU.PLAY')
@@ -1017,12 +988,10 @@ describe('App', () => {
 
     await waitFor(() => expect(mockGetSettings).toHaveBeenCalled())
 
-    // Load and compare
+    // Load and compare via Dashboard
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /parse json files/i })).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
+    await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
     // Switch to ru.json
     await waitFor(() => expect(screen.getByRole('tab', { name: /ru\.json/i })).toBeInTheDocument())
@@ -1170,15 +1139,10 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
-    await waitFor(() => expect(screen.getByText('en.json')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
 
-    fireEvent.click(screen.getByRole('button', { name: /parse json files/i }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /compare selected files/i })).toBeEnabled())
-
-    fireEvent.click(screen.getByRole('button', { name: /compare selected files/i }))
-
-    // Switch to ru.json
-    fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+    await waitFor(() => expect(screen.getByTestId('tree-node-APP.TITLE')).toBeInTheDocument())
 
     // Right-click APP.TITLE to open context menu
     const titleRow = screen.getByTestId('tree-node-APP.TITLE')
@@ -1608,17 +1572,9 @@ describe('App', () => {
     const closePreviewBtn = screen.getByRole('button', { name: /close/i })
     fireEvent.click(closePreviewBtn)
 
-    // Click Parse JSON Files
-    const parseBtn = screen.getByRole('button', { name: /parse json files/i })
-    fireEvent.click(parseBtn)
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /compare selected files/i })).toBeInTheDocument()
-    })
-
-    // Click Compare Files
-    const compareBtn = screen.getByRole('button', { name: /compare selected files/i })
-    fireEvent.click(compareBtn)
+    // Click language row on Dashboard to open Diff Viewer
+    await waitFor(() => expect(screen.getByTestId('coverage-row-uk.json')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('coverage-row-uk.json'))
 
     await waitFor(() => {
       expect(screen.getByLabelText(/localization diff viewer/i)).toBeInTheDocument()
@@ -1737,6 +1693,180 @@ describe('App', () => {
       await waitFor(() => {
         expect(mockSetLastWorkspace).toHaveBeenCalledWith('C:/Projects/ProjectB')
       })
+    })
+  })
+
+  describe('Translation Coverage Dashboard Integration', () => {
+    const mockFiles = [
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'ua.json', path: 'C:/Projects/locales/ua.json' },
+      { name: 'de.json', path: 'C:/Projects/locales/de.json' },
+    ]
+
+    const mockJsonData: Record<string, unknown> = {
+      'C:/Projects/locales/en.json': {
+        app: { title: 'App Title', desc: 'Description' },
+        actions: { save: 'Save', cancel: 'Cancel', delete: 'Delete' },
+      },
+      'C:/Projects/locales/ua.json': {
+        app: { title: 'Назва', desc: 'Опис' },
+        actions: { save: 'Зберегти', cancel: 'Скасувати', delete: 'Видалити' },
+      },
+      'C:/Projects/locales/de.json': {
+        app: { title: 'Titel', desc: '' }, // empty: app.desc
+        actions: { save: 'Speichern', cancel: 'Abbrechen' }, // missing: actions.delete
+      },
+    }
+
+    it('renders the Dashboard by default when a workspace is opened, displaying metrics & language coverage', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        readDirectoryTree: vi.fn().mockResolvedValue({
+          rootPath: 'C:/Projects/MyProject',
+          rootName: 'MyProject',
+          entries: [
+            {
+              name: 'locales',
+              path: 'C:/Projects/locales',
+              isDirectory: true,
+              children: [
+                { name: 'en.json', path: 'C:/Projects/locales/en.json', isDirectory: false, isLocalizationCandidate: true },
+                { name: 'ua.json', path: 'C:/Projects/locales/ua.json', isDirectory: false, isLocalizationCandidate: true },
+                { name: 'de.json', path: 'C:/Projects/locales/de.json', isDirectory: false, isLocalizationCandidate: true },
+              ],
+            },
+            { name: 'package.json', path: 'C:/Projects/package.json', isDirectory: false, isLocalizationCandidate: false },
+          ],
+        }),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      const selectBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(selectBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument()
+      })
+
+      // Top metrics
+      expect(screen.getByTestId('metric-languages')).toHaveTextContent('3')
+      expect(screen.getByTestId('metric-files')).toHaveTextContent('3')
+      expect(screen.getByTestId('metric-total-keys')).toHaveTextContent('5')
+      // Non-reference average coverage: ua is 100% (5/5), de is 60% (3/5) -> avg is (100+60)/2 = 80%
+      expect(screen.getByTestId('metric-average-coverage')).toHaveTextContent('80%')
+
+      // Language rows
+      expect(screen.getByTestId('coverage-row-en.json')).toHaveTextContent('English')
+      expect(screen.getByTestId('ref-pill-en.json')).toHaveTextContent('Reference')
+      expect(screen.getByTestId('coverage-row-ua.json')).toHaveTextContent('Ukrainian')
+      expect(screen.getByTestId('coverage-row-ua.json')).toHaveTextContent('100%')
+      expect(screen.getByTestId('coverage-row-de.json')).toHaveTextContent('German')
+      expect(screen.getByTestId('coverage-row-de.json')).toHaveTextContent('60%')
+    })
+
+    it('clicking a language with missing keys switches to Diff Viewer and focuses first missing key (actions.delete)', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      const selectBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(selectBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument()
+      })
+
+      // Click German row
+      const deRow = screen.getByTestId('coverage-row-de.json')
+      fireEvent.click(deRow)
+
+      // Diff Viewer opens
+      await waitFor(() => {
+        expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument()
+      })
+
+      // de.json tab is active
+      expect(screen.getByTestId('file-tab-de.json')).toHaveClass('active-tab')
+
+      // Problem navigator is in missing mode for actions.delete
+      expect(screen.getByTestId('navigator-position')).toHaveTextContent(/missing translation 1 of 1/i)
+      expect(screen.getByTestId('tree-node-actions.delete')).toBeInTheDocument()
+    })
+
+    it('clicking a language with only empty keys focuses first empty key (alphabetical)', async () => {
+      const fileWithOnlyEmptyData: Record<string, unknown> = {
+        'C:/Projects/locales/en.json': {
+          app: { title: 'App Title', desc: 'Description' },
+          actions: { save: 'Save', cancel: 'Cancel', delete: 'Delete' },
+        },
+        'C:/Projects/locales/de.json': {
+          app: { title: 'Titel', desc: '' }, // empty: app.desc
+          actions: { save: 'Speichern', cancel: '', delete: 'Löschen' }, // empty: actions.cancel
+        },
+      }
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue([
+          { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+          { name: 'de.json', path: 'C:/Projects/locales/de.json' },
+        ]),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => fileWithOnlyEmptyData[path] || {}),
+      })
+
+      render(<App />)
+
+      const selectBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(selectBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument()
+      })
+
+      // Click German row
+      fireEvent.click(screen.getByTestId('coverage-row-de.json'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument()
+      })
+
+      // First empty key alphabetically is actions.cancel
+      expect(screen.getByTestId('navigator-position')).toHaveTextContent(/empty translation 1 of 2/i)
+      expect(screen.getByTestId('tree-node-actions.cancel')).toBeInTheDocument()
+    })
+
+    it('clicking a complete language opens Diff Viewer normally without problem navigation', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      const selectBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(selectBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument()
+      })
+
+      // Click Ukrainian row (100% complete)
+      fireEvent.click(screen.getByTestId('coverage-row-ua.json'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument()
+      })
+
+      expect(screen.getByTestId('file-tab-ua.json')).toHaveClass('active-tab')
+      // No active missing problem selected (0 missing)
+      expect(screen.getByTestId('navigator-position')).toHaveTextContent('0 missing translations in this file')
     })
   })
 })
