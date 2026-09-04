@@ -321,6 +321,21 @@
   color: var(--color-text-bright, #ffffff);
 }
 
+.coverage-problems-btn {
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
+  font-size: 12px;
+  background-color: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.coverage-problems-btn:hover {
+  background-color: rgba(99, 102, 241, 0.25);
+  color: #ffffff;
+}
+
 .least-complete-list {
   display: flex;
   flex-direction: column;

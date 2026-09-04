@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react'
 import type { ProjectFileEntry } from '../../types/explorer'
 import { isLocalizationFile } from '../../services/localizationDetector'
 import { useTranslation } from '../../i18n/useTranslation'
+import { ResizeHandle, type ResizeHandleProps } from '../common/ResizeHandle'
 import './ProjectExplorer.css'
 
 export interface ProjectExplorerProps {
@@ -19,6 +20,9 @@ export interface ProjectExplorerProps {
   onRefreshTree?: () => void
   isCollapsed?: boolean
   onToggleCollapseSidebar?: () => void
+  width?: number
+  isResizing?: boolean
+  resizeHandleProps?: Partial<ResizeHandleProps>
 }
 
 interface TreeNodeProps {
@@ -216,6 +220,9 @@ export const ProjectExplorer: React.FC<ProjectExplorerProps> = ({
   onRefreshTree,
   isCollapsed = false,
   onToggleCollapseSidebar,
+  width,
+  isResizing = false,
+  resizeHandleProps,
 }) => {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
@@ -309,7 +316,7 @@ export const ProjectExplorer: React.FC<ProjectExplorerProps> = ({
 
   if (isCollapsed) {
     return (
-      <aside className="project-explorer is-collapsed" aria-label={t('explorer.title')}>
+      <aside className="project-explorer is-collapsed" data-testid="project-explorer" aria-label={t('explorer.title')}>
         <button
           type="button"
           className="explorer-toggle-btn collapsed-bar-btn"
@@ -326,7 +333,21 @@ export const ProjectExplorer: React.FC<ProjectExplorerProps> = ({
   const displayRootName = rootName || (rootPath ? rootPath.split(/[/|\\]/).filter(Boolean).pop() || rootPath : null)
 
   return (
-    <aside className="project-explorer" aria-label={t('explorer.title')}>
+    <aside
+      className={`project-explorer ${isResizing ? 'is-resizing' : ''}`}
+      data-testid="project-explorer"
+      style={
+        width !== undefined
+          ? {
+              width: `${width}px`,
+              minWidth: '180px',
+              maxWidth: '600px',
+              transition: isResizing ? 'none' : undefined,
+            }
+          : undefined
+      }
+      aria-label={t('explorer.title')}
+    >
       {/* Header bar */}
       <div className="explorer-header">
         <div className="explorer-header-left">
@@ -522,6 +543,20 @@ export const ProjectExplorer: React.FC<ProjectExplorerProps> = ({
           </div>
         )}
       </div>
+
+      {resizeHandleProps?.onPointerDown && (
+        <ResizeHandle
+          direction="horizontal"
+          onPointerDown={resizeHandleProps.onPointerDown}
+          onPointerMove={resizeHandleProps.onPointerMove}
+          onPointerUp={resizeHandleProps.onPointerUp}
+          onKeyDown={resizeHandleProps.onKeyDown}
+          isResizing={isResizing}
+          valueNow={resizeHandleProps.valueNow ?? width}
+          valueMin={resizeHandleProps.valueMin ?? 180}
+          valueMax={resizeHandleProps.valueMax ?? 600}
+        />
+      )}
     </aside>
   )
 }

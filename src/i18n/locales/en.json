@@ -336,6 +336,26 @@
     "singleLanguageHint": "Add more localization files to compare coverage across languages.",
     "openInEditor": "Open in editor"
   },
+  "problems": {
+    "title": "Problems",
+    "ariaLabel": "Localization Problems Panel",
+    "allLanguages": "All Languages",
+    "allTypes": "All Problems",
+    "typeMissing": "Missing",
+    "typeEmpty": "Empty",
+    "missingCount": "{count} missing",
+    "emptyCount": "{count} empty",
+    "noProblemsTitle": "No localization problems",
+    "noProblemsDesc": "All detected translations are complete.",
+    "noFilteredProblems": "No problems match the current filters.",
+    "closePanel": "Close Problems Panel",
+    "problemItemAria": "{key} ({type}) in {language}",
+    "dashboardProblemsCardTitle": "Localization Problems",
+    "dashboardProblemsView": "View Problems",
+    "statusBarItem": "Problems {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} problems"
+  },
   "common": {
     "save": "Save",
     "done": "Done",

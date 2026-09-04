@@ -336,6 +336,26 @@
     "singleLanguageHint": "添加更多本地化文件以比较各语言翻译覆盖率。",
     "openInEditor": "在编辑器中打开"
   },
+  "problems": {
+    "title": "问题",
+    "ariaLabel": "本地化问题面板",
+    "allLanguages": "所有语言",
+    "allTypes": "所有问题",
+    "typeMissing": "缺失",
+    "typeEmpty": "空值",
+    "missingCount": "{count} 个缺失",
+    "emptyCount": "{count} 个空值",
+    "noProblemsTitle": "无本地化问题",
+    "noProblemsDesc": "所有检测到的翻译均已完整。",
+    "noFilteredProblems": "没有符合当前筛选条件的问题。",
+    "closePanel": "关闭问题面板",
+    "problemItemAria": "{language} 中的 {key} ({type})",
+    "dashboardProblemsCardTitle": "本地化问题",
+    "dashboardProblemsView": "查看问题",
+    "statusBarItem": "问题 {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} 个问题"
+  },
   "common": {
     "save": "保存",
     "done": "完成",

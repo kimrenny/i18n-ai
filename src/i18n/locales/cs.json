@@ -336,6 +336,26 @@
     "singleLanguageHint": "Přidejte další lokalizační soubory pro porovnání pokrytí.",
     "openInEditor": "Otevřít v editoru"
   },
+  "problems": {
+    "title": "Problémy",
+    "ariaLabel": "Panel problémů lokalizace",
+    "allLanguages": "Všechny jazyky",
+    "allTypes": "Všechny problémy",
+    "typeMissing": "Chybějící",
+    "typeEmpty": "Prázdné",
+    "missingCount": "{count} chybějících",
+    "emptyCount": "{count} prázdných",
+    "noProblemsTitle": "Žádné problémy s lokalizací",
+    "noProblemsDesc": "Všechny zjištěné překlady jsou kompletní.",
+    "noFilteredProblems": "Žádné problémy neodpovídají vybraným filtrům.",
+    "closePanel": "Zavřít panel problémů",
+    "problemItemAria": "{key} ({type}) v {language}",
+    "dashboardProblemsCardTitle": "Problémy lokalizace",
+    "dashboardProblemsView": "Zobrazit problémy",
+    "statusBarItem": "Problémy {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} problémů"
+  },
   "common": {
     "save": "Uložit",
     "done": "Hotovo",

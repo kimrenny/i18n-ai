@@ -153,7 +153,17 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   }, [missingKeys, emptyKeys, activeMissingKey, navMode])
 
   useEffect(() => {
+    if (initialActiveFilename) {
+      setActiveFilename(initialActiveFilename)
+    }
+  }, [initialActiveFilename])
+
+  useEffect(() => {
     if (initialProblem?.key) {
+      setActiveMissingKey(initialProblem.key)
+      if (initialProblem.mode) {
+        setNavMode(initialProblem.mode)
+      }
       const parentPaths = getParentPaths(initialProblem.key)
       if (parentPaths.length > 0) {
         setCollapsedSet((prev) => {

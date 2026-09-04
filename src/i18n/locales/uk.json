@@ -336,6 +336,26 @@
     "singleLanguageHint": "Додайте більше файлів локалізації для порівняння покриття.",
     "openInEditor": "Відкрити в редакторі"
   },
+  "problems": {
+    "title": "Проблеми",
+    "ariaLabel": "Панель проблем локалізації",
+    "allLanguages": "Усі мови",
+    "allTypes": "Усі проблеми",
+    "typeMissing": "Відсутні",
+    "typeEmpty": "Порожні",
+    "missingCount": "{count} відсутніх",
+    "emptyCount": "{count} порожніх",
+    "noProblemsTitle": "Немає проблем локалізації",
+    "noProblemsDesc": "Усі виявлені переклади повністю заповнені.",
+    "noFilteredProblems": "Жодна проблема не відповідає вибраним фільтрам.",
+    "closePanel": "Закрити панель проблем",
+    "problemItemAria": "{key} ({type}) у {language}",
+    "dashboardProblemsCardTitle": "Проблеми локалізації",
+    "dashboardProblemsView": "Переглянути проблеми",
+    "statusBarItem": "Проблеми {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} проблем"
+  },
   "common": {
     "save": "Зберегти",
     "done": "Готово",
