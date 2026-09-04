@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Použití překladu se nezdařilo.",
     "failedToApplyBatch": "Dávkové použití překladů se nezdařilo."
   },
+  "explorer": {
+    "title": "Průzkumník",
+    "openFolder": "Otevřít složku",
+    "searchPlaceholder": "Hledat soubory...",
+    "searchFiles": "Hledat soubory",
+    "clearSearch": "Vymazat hledání",
+    "refresh": "Obnovit průzkumníka",
+    "collapseAll": "Sbalit všechny složky",
+    "expandAll": "Rozbalit všechny složky",
+    "collapseSidebar": "Sbalit průzkumníka",
+    "expandSidebar": "Rozbalit průzkumníka",
+    "selectAll": "Vše",
+    "unselectAll": "Nic",
+    "selectFile": "Vybrat soubor k porovnání",
+    "unselectFile": "Odznačit soubor",
+    "selectedCount": "Vybráno {count} z {total}",
+    "noFolderOpened": "Není otevřena žádná složka",
+    "noFolderHint": "Otevřete složku s lokalizačními soubory pro zahájení porovnávání.",
+    "noFilesFound": "Nebyly nalezeny žádné soubory"
+  },
+  "statusbar": {
+    "noFolder": "Není otevřena žádná složka",
+    "totalFiles": "{count} souborů",
+    "localizationCandidates": "{count} i18n JSONů",
+    "selectedCount": "{count} porovnáno",
+    "encoding": "UTF-8",
+    "engineAi": "AI modul ({provider})",
+    "engineFree": "Bezplatný modul ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Pouze pro čtení",
+    "localizationBadge": "Překladový soubor",
+    "includeInCompare": "+ Zahrnout do porovnání",
+    "includedInCompare": "✓ V porovnání",
+    "lines": "řádků",
+    "loadingFile": "Načítání náhledu...",
+    "binaryFileTitle": "Náhled není k dispozici pro binární soubor",
+    "binaryFileDesc": "Tento formát souboru nelze zobrazit v textovém náhledu."
+  },
   "common": {
     "save": "Uložit",
     "done": "Hotovo",

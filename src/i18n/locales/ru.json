@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Не удалось применить перевод.",
     "failedToApplyBatch": "Не удалось применить пакет переводов."
   },
+  "explorer": {
+    "title": "Проводник",
+    "openFolder": "Открыть папку",
+    "searchPlaceholder": "Поиск файлов...",
+    "searchFiles": "Поиск файлов",
+    "clearSearch": "Очистить поиск",
+    "refresh": "Обновить проводник",
+    "collapseAll": "Свернуть все папки",
+    "expandAll": "Развернуть все папки",
+    "collapseSidebar": "Свернуть проводник",
+    "expandSidebar": "Развернуть проводник",
+    "selectAll": "Все",
+    "unselectAll": "Снять все",
+    "selectFile": "Выбрать файл для сравнения",
+    "unselectFile": "Исключить файл из сравнения",
+    "selectedCount": "Выбрано: {count} из {total}",
+    "noFolderOpened": "Папка не открыта",
+    "noFolderHint": "Откройте папку с файлами локализации для начала сравнения и перевода.",
+    "noFilesFound": "Файлы по фильтру не найдены"
+  },
+  "statusbar": {
+    "noFolder": "Папка не открыта",
+    "totalFiles": "Файлов: {count}",
+    "localizationCandidates": "JSON-локализаций: {count}",
+    "selectedCount": "Сравнивается: {count}",
+    "encoding": "UTF-8",
+    "engineAi": "AI-движок ({provider})",
+    "engineFree": "Free-движок ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Только чтение",
+    "localizationBadge": "Файл перевода",
+    "includeInCompare": "+ Включить в сравнение",
+    "includedInCompare": "✓ В сравнении",
+    "lines": "строк",
+    "loadingFile": "Загрузка предпросмотра...",
+    "binaryFileTitle": "Предпросмотр недоступен для бинарного файла",
+    "binaryFileDesc": "Этот формат файла не может быть отображен в текстовом виде."
+  },
   "common": {
     "save": "Сохранить",
     "done": "Готово",

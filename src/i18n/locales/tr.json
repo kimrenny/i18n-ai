@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Çeviri uygulanamadı.",
     "failedToApplyBatch": "Toplu çeviriler uygulanamadı."
   },
+  "explorer": {
+    "title": "Gezgin",
+    "openFolder": "Klasör Aç",
+    "searchPlaceholder": "Dosyaları ara...",
+    "searchFiles": "Dosyaları ara",
+    "clearSearch": "Aramayı temizle",
+    "refresh": "Gezgini yenile",
+    "collapseAll": "Tüm klasörleri daralt",
+    "expandAll": "Tüm klasörleri genişlet",
+    "collapseSidebar": "Gezgini daralt",
+    "expandSidebar": "Gezgini genişlet",
+    "selectAll": "Tümü",
+    "unselectAll": "Hiçbiri",
+    "selectFile": "Karşılaştırma için dosya seç",
+    "unselectFile": "Dosya seçimini kaldır",
+    "selectedCount": "{count}/{total} seçildi",
+    "noFolderOpened": "Açık klasör yok",
+    "noFolderHint": "Karşılaştırma ve çeviri için yerelleştirme dosyaları içeren bir klasör açın.",
+    "noFilesFound": "Eşleşen dosya bulunamadı"
+  },
+  "statusbar": {
+    "noFolder": "Açık klasör yok",
+    "totalFiles": "{count} dosya",
+    "localizationCandidates": "{count} i18n JSON",
+    "selectedCount": "{count} karşılaştırılıyor",
+    "encoding": "UTF-8",
+    "engineAi": "Yapay Zeka Motoru ({provider})",
+    "engineFree": "Ücretsiz Motor ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Salt Okunur",
+    "localizationBadge": "Çeviri Dosyası",
+    "includeInCompare": "+ Karşılaştırmaya Ekle",
+    "includedInCompare": "✓ Karşılaştırmada",
+    "lines": "satır",
+    "loadingFile": "Önizleme yükleniyor...",
+    "binaryFileTitle": "İkili dosya için önizleme kullanılamıyor",
+    "binaryFileDesc": "Bu dosya biçimi metin önizlemesinde görüntülenemez."
+  },
   "common": {
     "save": "Kaydet",
     "done": "Tamam",

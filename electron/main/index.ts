@@ -12,6 +12,7 @@ import {
   performFreeTranslation,
   performBatchFreeTranslation,
 } from './freeTranslationService'
+import { isLocalizationFile } from '../../src/services/localizationDetector'
 import {
   migrateAppSettings,
   DEFAULT_APP_SETTINGS,
@@ -45,6 +46,60 @@ const preload = path.join(__dirname, '../preload/index.cjs')
 
 function getSettingsFilePath(): string {
   return path.join(app.getPath('userData'), 'settings.json')
+}
+
+function getWorkspaceFilePath(): string {
+  return path.join(app.getPath('userData'), 'last-workspace.json')
+}
+
+export async function getLastWorkspacePath(): Promise<string | null> {
+  try {
+    const wsFile = getWorkspaceFilePath()
+    const content = await fs.readFile(wsFile, 'utf-8')
+    const parsed = JSON.parse(content)
+    const savedPath = parsed?.lastWorkspacePath
+    if (!savedPath || typeof savedPath !== 'string' || !savedPath.trim()) {
+      return null
+    }
+
+    const trimmedPath = savedPath.trim()
+    const stat = await fs.stat(trimmedPath)
+    if (stat.isDirectory()) {
+      return trimmedPath
+    }
+
+    await clearLastWorkspacePath()
+    return null
+  } catch {
+    try {
+      await clearLastWorkspacePath()
+    } catch {
+      // ignore
+    }
+    return null
+  }
+}
+
+export async function setLastWorkspacePath(dirPath: string): Promise<void> {
+  try {
+    const wsFile = getWorkspaceFilePath()
+    await fs.writeFile(
+      wsFile,
+      JSON.stringify({ lastWorkspacePath: dirPath.trim() }, null, 2),
+      'utf-8'
+    )
+  } catch (err) {
+    console.error('[main] Failed to persist last workspace path:', err)
+  }
+}
+
+export async function clearLastWorkspacePath(): Promise<void> {
+  try {
+    const wsFile = getWorkspaceFilePath()
+    await fs.unlink(wsFile)
+  } catch {
+    // ignore if file does not exist
+  }
 }
 
 async function loadPersistedSettings(): Promise<AppSettings> {
@@ -97,6 +152,21 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // IPC: Workspace persistence
+  ipcMain.handle('workspace:getLast', async () => {
+    return getLastWorkspacePath()
+  })
+
+  ipcMain.handle('workspace:setLast', async (_, dirPath: string) => {
+    if (typeof dirPath === 'string' && dirPath.trim()) {
+      await setLastWorkspacePath(dirPath.trim())
+    }
+  })
+
+  ipcMain.handle('workspace:clear', async () => {
+    await clearLastWorkspacePath()
+  })
+
   // IPC: Dialog selectDirectory
   ipcMain.handle('dialog:selectDirectory', async () => {
     if (!win) return null
@@ -114,7 +184,7 @@ app.whenReady().then(() => {
     try {
       const entries = await fs.readdir(directoryPath, { withFileTypes: true })
       const jsonFiles = entries
-        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.json'))
+        .filter((entry) => entry.isFile() && isLocalizationFile(entry.name, entry.name))
         .map((entry) => ({
           name: entry.name,
           path: path.join(directoryPath, entry.name),
@@ -123,6 +193,159 @@ app.whenReady().then(() => {
     } catch (err) {
       console.error('[main] Error reading directory:', err)
       throw new Error(`Failed to read directory: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  })
+
+  // IPC: Read directory tree recursively for Project Explorer
+  const IGNORED_DIRS = new Set([
+    'node_modules',
+    '.git',
+    'dist',
+    'dist-electron',
+    '.next',
+    '.turbo',
+    '.vscode',
+    '.idea',
+    'build',
+    'coverage',
+    '.cache',
+  ])
+
+  async function scanDirectory(
+    dirPath: string,
+    rootPath: string,
+    currentDepth = 0,
+    maxDepth = 8
+  ): Promise<{ entries: Array<{ name: string; path: string; relativePath: string; isDirectory: boolean; isLocalizationCandidate?: boolean; children?: unknown[] }>; localizationCount: number }> {
+    if (currentDepth > maxDepth) {
+      return { entries: [], localizationCount: 0 }
+    }
+
+    let dirEntries: import('node:fs').Dirent[]
+    try {
+      dirEntries = await fs.readdir(dirPath, { withFileTypes: true })
+    } catch (err) {
+      console.error(`[main] Failed to read directory ${dirPath}:`, err)
+      return { entries: [], localizationCount: 0 }
+    }
+
+    const resultEntries: Array<{ name: string; path: string; relativePath: string; isDirectory: boolean; isLocalizationCandidate?: boolean; children?: unknown[] }> = []
+    let totalLocCount = 0
+
+    for (const entry of dirEntries) {
+      if (entry.isDirectory()) {
+        if (IGNORED_DIRS.has(entry.name)) {
+          continue
+        }
+        const fullPath = path.join(dirPath, entry.name)
+        const relativePath = path.relative(rootPath, fullPath).replace(/\\/g, '/')
+        const subResult = await scanDirectory(fullPath, rootPath, currentDepth + 1, maxDepth)
+        totalLocCount += subResult.localizationCount
+
+        resultEntries.push({
+          name: entry.name,
+          path: fullPath,
+          relativePath,
+          isDirectory: true,
+          children: subResult.entries,
+        })
+      } else if (entry.isFile()) {
+        const fullPath = path.join(dirPath, entry.name)
+        const relativePath = path.relative(rootPath, fullPath).replace(/\\/g, '/')
+        const isLocalizationCandidate = isLocalizationFile(entry.name, relativePath)
+        if (isLocalizationCandidate) {
+          totalLocCount += 1
+        }
+        resultEntries.push({
+          name: entry.name,
+          path: fullPath,
+          relativePath,
+          isDirectory: false,
+          isLocalizationCandidate,
+        })
+      }
+    }
+
+    resultEntries.sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1
+      if (!a.isDirectory && b.isDirectory) return 1
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    })
+
+    return { entries: resultEntries, localizationCount: totalLocCount }
+  }
+
+  ipcMain.handle('fs:readDirectoryTree', async (_, directoryPath: string) => {
+    try {
+      const rootName = path.basename(directoryPath) || directoryPath
+      const { entries, localizationCount } = await scanDirectory(directoryPath, directoryPath)
+      return {
+        rootPath: directoryPath,
+        rootName,
+        entries,
+        totalLocalizationCandidates: localizationCount,
+      }
+    } catch (err) {
+      console.error('[main] Error scanning directory tree:', err)
+      throw new Error(`Failed to scan directory tree: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  })
+
+  // IPC: Read arbitrary text or code file content for File Preview
+  const BINARY_EXTENSIONS = new Set([
+    '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.bmp', '.svgz',
+    '.exe', '.dll', '.bin', '.so', '.dylib', '.node',
+    '.zip', '.tar', '.gz', '.7z', '.rar',
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+    '.woff', '.woff2', '.ttf', '.eot', '.otf',
+    '.mp3', '.mp4', '.wav', '.mov', '.avi', '.mkv',
+  ])
+
+  ipcMain.handle('fs:readFileText', async (_, filePath: string) => {
+    try {
+      const ext = path.extname(filePath).toLowerCase()
+      if (BINARY_EXTENSIONS.has(ext)) {
+        return {
+          success: true,
+          isBinary: true,
+          content: '',
+        }
+      }
+
+      const stats = await fs.stat(filePath)
+      if (stats.size > 10 * 1024 * 1024) {
+        return {
+          success: false,
+          error: 'File size exceeds maximum preview limit (10 MB)',
+        }
+      }
+
+      const buffer = await fs.readFile(filePath)
+      // Check for null bytes to detect binary files
+      const sampleLength = Math.min(buffer.length, 1024)
+      for (let i = 0; i < sampleLength; i++) {
+        if (buffer[i] === 0) {
+          return {
+            success: true,
+            isBinary: true,
+            content: '',
+          }
+        }
+      }
+
+      const content = buffer.toString('utf-8')
+      return {
+        success: true,
+        isBinary: false,
+        content,
+        size: stats.size,
+      }
+    } catch (err) {
+      console.error(`[main] Error reading file text ${filePath}:`, err)
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
     }
   })
 

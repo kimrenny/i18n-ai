@@ -1247,5 +1247,498 @@ describe('App', () => {
       expect(ruState.APP.MENU.OPEN).toBe('Открыть')
     })
   })
+
+  it('renders opened folder as root in Explorer, strictly gives checkboxes only to translation files, and previews files on click', async () => {
+    const mockTreeResult = {
+      rootPath: 'C:/Users/dev/MyProject',
+      rootName: 'MyProject',
+      entries: [
+        {
+          name: 'src',
+          path: 'C:/Users/dev/MyProject/src',
+          relativePath: 'src',
+          isDirectory: true,
+          children: [
+            {
+              name: 'locales',
+              path: 'C:/Users/dev/MyProject/src/locales',
+              relativePath: 'src/locales',
+              isDirectory: true,
+              children: [
+                {
+                  name: 'en.json',
+                  path: 'C:/Users/dev/MyProject/src/locales/en.json',
+                  relativePath: 'src/locales/en.json',
+                  isDirectory: false,
+                  isLocalizationCandidate: true,
+                },
+                {
+                  name: 'ru.json',
+                  path: 'C:/Users/dev/MyProject/src/locales/ru.json',
+                  relativePath: 'src/locales/ru.json',
+                  isDirectory: false,
+                  isLocalizationCandidate: true,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          name: 'package.json',
+          path: 'C:/Users/dev/MyProject/package.json',
+          relativePath: 'package.json',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+        {
+          name: 'tsconfig.json',
+          path: 'C:/Users/dev/MyProject/tsconfig.json',
+          relativePath: 'tsconfig.json',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+        {
+          name: 'README.md',
+          path: 'C:/Users/dev/MyProject/README.md',
+          relativePath: 'README.md',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+      ],
+    }
+
+    const mockReadFileText = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('package.json')) {
+        return { success: true, content: '{\n  "name": "my-project",\n  "version": "1.0.0"\n}\n' }
+      }
+      if (filePath.endsWith('en.json')) {
+        return { success: true, content: '{\n  "APP": {\n    "TITLE": "Hello"\n  }\n}\n' }
+      }
+      if (filePath.endsWith('README.md')) {
+        return { success: true, content: '# My Project\nDocumentation here.\n' }
+      }
+      return { success: false, error: 'File not found' }
+    })
+
+    window.electronAPI = createMockElectronAPI({
+      selectDirectory: vi.fn().mockResolvedValue('C:/Users/dev/MyProject'),
+      readDirectoryTree: vi.fn().mockResolvedValue(mockTreeResult),
+      readFileText: mockReadFileText,
+    })
+
+    render(<App />)
+
+    // Click "Select Folder"
+    const selectFolderBtn = screen.getByRole('button', { name: /select folder/i })
+    fireEvent.click(selectFolderBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('explorer-root-folder')).toBeInTheDocument()
+    })
+
+    // 1. Root folder is displayed as root node
+    const rootNode = screen.getByTestId('explorer-root-folder')
+    expect(rootNode).toHaveTextContent('MyProject')
+
+    // 2. Expand nested folders
+    const srcFolder = screen.getByText('src')
+    fireEvent.click(srcFolder)
+    const localesFolder = screen.getByText('locales')
+    fireEvent.click(localesFolder)
+
+    // 3. Translation files en.json and ru.json have checkboxes
+    expect(screen.getByRole('checkbox', { name: /select en\.json/i })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /select ru\.json/i })).toBeInTheDocument()
+
+    // 4. package.json, tsconfig.json, README.md MUST NOT have checkboxes
+    expect(screen.queryByRole('checkbox', { name: /select package\.json/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /select tsconfig\.json/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /select readme\.md/i })).not.toBeInTheDocument()
+
+    // 5. Click en.json -> opens File Preview in workspace
+    const enJsonRow = screen.getByTestId('explorer-file-en.json')
+    fireEvent.click(enJsonRow)
+
+    await waitFor(() => {
+      expect(mockReadFileText).toHaveBeenCalledWith('C:/Users/dev/MyProject/src/locales/en.json')
+      expect(screen.getByTestId('file-preview-container')).toBeInTheDocument()
+      expect(screen.getByTestId('preview-filename')).toHaveTextContent('en.json')
+      expect(screen.getByText(/read-only/i)).toBeInTheDocument()
+      expect(screen.getByText(/translation file/i)).toBeInTheDocument()
+      expect(screen.getByText(/"TITLE": "Hello"/)).toBeInTheDocument()
+    })
+
+    // 6. Click package.json -> opens Preview for package.json without making it selectable as translation
+    const packageJsonRow = screen.getByTestId('explorer-file-package.json')
+    fireEvent.click(packageJsonRow)
+
+    await waitFor(() => {
+      expect(mockReadFileText).toHaveBeenCalledWith('C:/Users/dev/MyProject/package.json')
+      expect(screen.getByTestId('preview-filename')).toHaveTextContent('package.json')
+      expect(screen.queryByText(/translation file/i)).not.toBeInTheDocument()
+      expect(screen.getByText(/"name": "my-project"/)).toBeInTheDocument()
+    })
+
+    // 7. Close preview
+    const closeBtn = screen.getByRole('button', { name: /close/i })
+    fireEvent.click(closeBtn)
+    expect(screen.queryByTestId('file-preview-container')).not.toBeInTheDocument()
+  })
+
+  it('performs full runtime verification on the exact realistic project structure', async () => {
+    const realisticTreeResult = {
+      rootPath: 'C:/Users/dev/MyProject',
+      rootName: 'MyProject',
+      entries: [
+        {
+          name: 'src',
+          path: 'C:/Users/dev/MyProject/src',
+          relativePath: 'src',
+          isDirectory: true,
+          children: [
+            {
+              name: 'components',
+              path: 'C:/Users/dev/MyProject/src/components',
+              relativePath: 'src/components',
+              isDirectory: true,
+              children: [],
+            },
+            {
+              name: 'locales',
+              path: 'C:/Users/dev/MyProject/src/locales',
+              relativePath: 'src/locales',
+              isDirectory: true,
+              children: [
+                {
+                  name: 'en.json',
+                  path: 'C:/Users/dev/MyProject/src/locales/en.json',
+                  relativePath: 'src/locales/en.json',
+                  isDirectory: false,
+                  isLocalizationCandidate: true,
+                },
+                {
+                  name: 'ru.json',
+                  path: 'C:/Users/dev/MyProject/src/locales/ru.json',
+                  relativePath: 'src/locales/ru.json',
+                  isDirectory: false,
+                  isLocalizationCandidate: true,
+                },
+                {
+                  name: 'uk.json',
+                  path: 'C:/Users/dev/MyProject/src/locales/uk.json',
+                  relativePath: 'src/locales/uk.json',
+                  isDirectory: false,
+                  isLocalizationCandidate: true,
+                },
+                {
+                  name: 'ua.json',
+                  path: 'C:/Users/dev/MyProject/src/locales/ua.json',
+                  relativePath: 'src/locales/ua.json',
+                  isDirectory: false,
+                  isLocalizationCandidate: true,
+                },
+                {
+                  name: 'unrelated.json',
+                  path: 'C:/Users/dev/MyProject/src/locales/unrelated.json',
+                  relativePath: 'src/locales/unrelated.json',
+                  isDirectory: false,
+                  isLocalizationCandidate: false,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          name: 'package.json',
+          path: 'C:/Users/dev/MyProject/package.json',
+          relativePath: 'package.json',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+        {
+          name: 'package-lock.json',
+          path: 'C:/Users/dev/MyProject/package-lock.json',
+          relativePath: 'package-lock.json',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+        {
+          name: 'tsconfig.json',
+          path: 'C:/Users/dev/MyProject/tsconfig.json',
+          relativePath: 'tsconfig.json',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+        {
+          name: 'README.md',
+          path: 'C:/Users/dev/MyProject/README.md',
+          relativePath: 'README.md',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+        {
+          name: 'example.ts',
+          path: 'C:/Users/dev/MyProject/example.ts',
+          relativePath: 'example.ts',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+        {
+          name: 'config.json',
+          path: 'C:/Users/dev/MyProject/config.json',
+          relativePath: 'config.json',
+          isDirectory: false,
+          isLocalizationCandidate: false,
+        },
+      ],
+    }
+
+    const mockEnJson = { APP: { TITLE: 'Welcome' } }
+    const mockRuJson = { APP: { TITLE: 'Добро пожаловать' } }
+    const mockUkJson = { APP: { TITLE: 'Ласкаво просимо' } }
+    const mockUaJson = { APP: { TITLE: 'Ласкаво просимо (UA)' } }
+
+    const mockReadFileText = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) return { success: true, content: JSON.stringify(mockEnJson, null, 2) }
+      if (filePath.endsWith('ru.json')) return { success: true, content: JSON.stringify(mockRuJson, null, 2) }
+      if (filePath.endsWith('uk.json')) return { success: true, content: JSON.stringify(mockUkJson, null, 2) }
+      if (filePath.endsWith('ua.json')) return { success: true, content: JSON.stringify(mockUaJson, null, 2) }
+      if (filePath.endsWith('package.json')) return { success: true, content: '{"name": "test-app"}' }
+      if (filePath.endsWith('unrelated.json')) return { success: true, content: '{"foo": "bar"}' }
+      return { success: false, error: 'File error' }
+    })
+
+    const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+      if (filePath.endsWith('en.json')) return mockEnJson
+      if (filePath.endsWith('ru.json')) return mockRuJson
+      if (filePath.endsWith('uk.json')) return mockUkJson
+      if (filePath.endsWith('ua.json')) return mockUaJson
+      throw new Error('Not a translation file')
+    })
+
+    window.electronAPI = createMockElectronAPI({
+      selectDirectory: vi.fn().mockResolvedValue('C:/Users/dev/MyProject'),
+      readDirectoryTree: vi.fn().mockResolvedValue(realisticTreeResult),
+      readFileText: mockReadFileText,
+      readJsonFile: mockReadJsonFile,
+    })
+
+    render(<App />)
+
+    // Select directory
+    const selectFolderBtn = screen.getByRole('button', { name: /select folder/i })
+    fireEvent.click(selectFolderBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('explorer-root-folder')).toBeInTheDocument()
+    })
+
+    // 1. MyProject is displayed as Explorer root
+    const rootNode = screen.getByTestId('explorer-root-folder')
+    expect(rootNode).toHaveTextContent('MyProject')
+
+    // 2. Complete project structure is shown
+    expect(screen.getByText('src')).toBeInTheDocument()
+    expect(screen.getByText('package.json')).toBeInTheDocument()
+    expect(screen.getByText('package-lock.json')).toBeInTheDocument()
+    expect(screen.getByText('tsconfig.json')).toBeInTheDocument()
+    expect(screen.getByText('README.md')).toBeInTheDocument()
+    expect(screen.getByText('example.ts')).toBeInTheDocument()
+    expect(screen.getByText('config.json')).toBeInTheDocument()
+
+    // 3. Expanding src/ or locales/ does NOT change the workspace root
+    const srcDir = screen.getByText('src')
+    fireEvent.click(srcDir)
+    expect(screen.getByTestId('selected-path-display')).toHaveTextContent('C:/Users/dev/MyProject')
+
+    const localesDir = screen.getByText('locales')
+    fireEvent.click(localesDir)
+    expect(screen.getByTestId('selected-path-display')).toHaveTextContent('C:/Users/dev/MyProject')
+
+    // 4. en.json, ru.json, uk.json, and ua.json receive translation checkboxes
+    const enCheckbox = screen.getByRole('checkbox', { name: /select en\.json/i })
+    const ruCheckbox = screen.getByRole('checkbox', { name: /select ru\.json/i })
+    const ukCheckbox = screen.getByRole('checkbox', { name: /select uk\.json/i })
+    const uaCheckbox = screen.getByRole('checkbox', { name: /select ua\.json/i })
+    expect(enCheckbox).toBeInTheDocument()
+    expect(ruCheckbox).toBeInTheDocument()
+    expect(ukCheckbox).toBeInTheDocument()
+    expect(uaCheckbox).toBeInTheDocument()
+
+    // 5. package.json has NO checkbox
+    expect(screen.queryByRole('checkbox', { name: /select package\.json/i })).not.toBeInTheDocument()
+    // 6. package-lock.json has NO checkbox
+    expect(screen.queryByRole('checkbox', { name: /select package-lock\.json/i })).not.toBeInTheDocument()
+    // 7. tsconfig.json has NO checkbox
+    expect(screen.queryByRole('checkbox', { name: /select tsconfig\.json/i })).not.toBeInTheDocument()
+    // 8. config.json has NO checkbox
+    expect(screen.queryByRole('checkbox', { name: /select config\.json/i })).not.toBeInTheDocument()
+    // 9. README.md, example.ts have NO checkbox
+    expect(screen.queryByRole('checkbox', { name: /select readme\.md/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /select example\.ts/i })).not.toBeInTheDocument()
+    // 10. unrelated.json inside locales/ has NO checkbox
+    expect(screen.queryByRole('checkbox', { name: /select unrelated\.json/i })).not.toBeInTheDocument()
+
+    // 11. Clicking en.json opens its current contents in the read-only preview
+    const enFileRow = screen.getByTestId('explorer-file-en.json')
+    fireEvent.click(enFileRow)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('file-preview-container')).toBeInTheDocument()
+      expect(screen.getByTestId('preview-filename')).toHaveTextContent('en.json')
+      expect(screen.getByText(/read-only/i)).toBeInTheDocument()
+      expect(screen.getByText(/"TITLE": "Welcome"/)).toBeInTheDocument()
+    })
+
+    // 12. Clicking package.json opens its contents in preview but does NOT make it a localization candidate
+    const pkgFileRow = screen.getByTestId('explorer-file-package.json')
+    fireEvent.click(pkgFileRow)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('preview-filename')).toHaveTextContent('package.json')
+      expect(screen.queryByText(/translation file/i)).not.toBeInTheDocument()
+      expect(screen.getByText(/"name": "test-app"/)).toBeInTheDocument()
+    })
+
+    // 13. Selecting/unselecting translation checkboxes affects existing comparison workflow
+    // Uncheck ru.json
+    fireEvent.click(ruCheckbox)
+    // 14. Compare still opens the existing Diff Viewer with checked files
+    // Close preview to return to main workspace overview
+    const closePreviewBtn = screen.getByRole('button', { name: /close/i })
+    fireEvent.click(closePreviewBtn)
+
+    // Click Parse JSON Files
+    const parseBtn = screen.getByRole('button', { name: /parse json files/i })
+    fireEvent.click(parseBtn)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /compare selected files/i })).toBeInTheDocument()
+    })
+
+    // Click Compare Files
+    const compareBtn = screen.getByRole('button', { name: /compare selected files/i })
+    fireEvent.click(compareBtn)
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/localization diff viewer/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('Workspace Persistence & Auto-Restoration', () => {
+    it('persists selected folder path to lastWorkspace when opened', async () => {
+      const mockSetLastWorkspace = vi.fn()
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        setLastWorkspace: mockSetLastWorkspace,
+        getJsonFiles: vi.fn().mockResolvedValue([{ name: 'en.json', path: 'C:/Projects/MyProject/en.json' }]),
+      })
+
+      render(<App />)
+
+      const openBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(openBtn)
+
+      await waitFor(() => {
+        expect(mockSetLastWorkspace).toHaveBeenCalledWith('C:/Projects/MyProject')
+      })
+    })
+
+    it('automatically restores workspace on application startup when valid path exists', async () => {
+      const mockTreeResult = {
+        rootPath: 'C:/Projects/RestoredProject',
+        rootName: 'RestoredProject',
+        entries: [
+          {
+            name: 'en.json',
+            path: 'C:/Projects/RestoredProject/en.json',
+            relativePath: 'en.json',
+            isDirectory: false,
+            isLocalizationCandidate: true,
+          },
+          {
+            name: 'ua.json',
+            path: 'C:/Projects/RestoredProject/ua.json',
+            relativePath: 'ua.json',
+            isDirectory: false,
+            isLocalizationCandidate: true,
+          },
+          {
+            name: 'package.json',
+            path: 'C:/Projects/RestoredProject/package.json',
+            relativePath: 'package.json',
+            isDirectory: false,
+            isLocalizationCandidate: false,
+          },
+        ],
+      }
+
+      window.electronAPI = createMockElectronAPI({
+        getLastWorkspace: vi.fn().mockResolvedValue('C:/Projects/RestoredProject'),
+        readDirectoryTree: vi.fn().mockResolvedValue(mockTreeResult),
+      })
+
+      render(<App />)
+
+      // Automatically populates Explorer with RestoredProject without clicking select folder
+      await waitFor(() => {
+        expect(screen.getByTestId('explorer-root-folder')).toBeInTheDocument()
+      })
+
+      expect(screen.getByTestId('selected-path-display')).toHaveTextContent('C:/Projects/RestoredProject')
+      expect(screen.getAllByText('RestoredProject').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getByRole('checkbox', { name: /select en\.json/i })).toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: /select ua\.json/i })).toBeInTheDocument()
+      expect(screen.queryByRole('checkbox', { name: /select package\.json/i })).not.toBeInTheDocument()
+    })
+
+    it('gracefully handles deleted/invalid workspace by clearing path and showing welcome state', async () => {
+      const mockClearLastWorkspace = vi.fn()
+      window.electronAPI = createMockElectronAPI({
+        getLastWorkspace: vi.fn().mockResolvedValue('C:/Projects/DeletedProject'),
+        readDirectoryTree: vi.fn().mockRejectedValue(new Error('ENOENT: no such file or directory')),
+        getJsonFiles: vi.fn().mockRejectedValue(new Error('ENOENT: no such file or directory')),
+        clearLastWorkspace: mockClearLastWorkspace,
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(mockClearLastWorkspace).toHaveBeenCalled()
+      })
+
+      // Remains in clean welcome state without crash or broken Explorer
+      expect(screen.getAllByText(/no folder opened/i).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByRole('button', { name: /open folder/i }).length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('updates persisted workspace path when switching from Project A to Project B', async () => {
+      const mockSetLastWorkspace = vi.fn()
+      let currentSelection = 'C:/Projects/ProjectA'
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockImplementation(async () => currentSelection),
+        setLastWorkspace: mockSetLastWorkspace,
+        getJsonFiles: vi.fn().mockResolvedValue([{ name: 'en.json', path: 'C:/Projects/en.json' }]),
+      })
+
+      render(<App />)
+
+      const openBtn = screen.getByRole('button', { name: /select folder/i })
+      // Open Project A
+      fireEvent.click(openBtn)
+      await waitFor(() => {
+        expect(mockSetLastWorkspace).toHaveBeenCalledWith('C:/Projects/ProjectA')
+      })
+
+      // Open Project B
+      currentSelection = 'C:/Projects/ProjectB'
+      fireEvent.click(openBtn)
+      await waitFor(() => {
+        expect(mockSetLastWorkspace).toHaveBeenCalledWith('C:/Projects/ProjectB')
+      })
+    })
+  })
 })
+
 

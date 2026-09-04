@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "번역 적용에 실패했습니다.",
     "failedToApplyBatch": "일괄 번역 적용에 실패했습니다."
   },
+  "explorer": {
+    "title": "탐색기",
+    "openFolder": "폴더 열기",
+    "searchPlaceholder": "파일 검색...",
+    "searchFiles": "파일 검색",
+    "clearSearch": "검색 지우기",
+    "refresh": "탐색기 새로고침",
+    "collapseAll": "모든 폴더 접기",
+    "expandAll": "모든 폴더 펼치기",
+    "collapseSidebar": "사이드바 접기",
+    "expandSidebar": "사이드바 펼치기",
+    "selectAll": "전체 선택",
+    "unselectAll": "선택 해제",
+    "selectFile": "비교할 파일 선택",
+    "unselectFile": "파일 선택 해제",
+    "selectedCount": "{count}/{total}개 선택됨",
+    "noFolderOpened": "열린 폴더 없음",
+    "noFolderHint": "비교 및 번역을 시작하려면 로컬라이제이션 파일이 포함된 폴더를 여세요.",
+    "noFilesFound": "일치하는 파일이 없습니다"
+  },
+  "statusbar": {
+    "noFolder": "열린 폴더 없음",
+    "totalFiles": "{count}개 파일",
+    "localizationCandidates": "{count}개 i18n JSON",
+    "selectedCount": "{count}개 비교 중",
+    "encoding": "UTF-8",
+    "engineAi": "AI 엔진 ({provider})",
+    "engineFree": "무료 엔진 ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "읽기 전용",
+    "localizationBadge": "번역 파일",
+    "includeInCompare": "+ 비교에 포함",
+    "includedInCompare": "✓ 비교 중",
+    "lines": "줄",
+    "loadingFile": "파일 미리보기 로드 중...",
+    "binaryFileTitle": "바이너리 파일은 미리보기를 지원하지 않습니다",
+    "binaryFileDesc": "이 파일 형식은 텍스트 미리보기로 표시할 수 없습니다."
+  },
   "common": {
     "save": "저장",
     "done": "완료",

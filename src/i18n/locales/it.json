@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Impossibile applicare la traduzione.",
     "failedToApplyBatch": "Impossibile applicare le traduzioni in lotto."
   },
+  "explorer": {
+    "title": "Esplora risorse",
+    "openFolder": "Apri cartella",
+    "searchPlaceholder": "Cerca file...",
+    "searchFiles": "Cerca file",
+    "clearSearch": "Cancella ricerca",
+    "refresh": "Aggiorna esplora risorse",
+    "collapseAll": "Comprimi tutte le cartelle",
+    "expandAll": "Espandi tutte le cartelle",
+    "collapseSidebar": "Comprimi esplora risorse",
+    "expandSidebar": "Espandi esplora risorse",
+    "selectAll": "Tutti",
+    "unselectAll": "Nessuno",
+    "selectFile": "Seleziona file per il confronto",
+    "unselectFile": "Deseleziona file",
+    "selectedCount": "{count}/{total} selezionati",
+    "noFolderOpened": "Nessuna cartella aperta",
+    "noFolderHint": "Apri una cartella contenente file di localizzazione per iniziare.",
+    "noFilesFound": "Nessun file trovato"
+  },
+  "statusbar": {
+    "noFolder": "Nessuna cartella aperta",
+    "totalFiles": "{count} file",
+    "localizationCandidates": "{count} JSON i18n",
+    "selectedCount": "{count} confrontati",
+    "encoding": "UTF-8",
+    "engineAi": "Motore IA ({provider})",
+    "engineFree": "Motore gratuito ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Sola lettura",
+    "localizationBadge": "File di traduzione",
+    "includeInCompare": "+ Includi nel confronto",
+    "includedInCompare": "✓ Nel confronto",
+    "lines": "righe",
+    "loadingFile": "Caricamento anteprima...",
+    "binaryFileTitle": "Anteprima non disponibile per file binario",
+    "binaryFileDesc": "Questo formato di file non può essere visualizzato come testo."
+  },
   "common": {
     "save": "Salva",
     "done": "Fine",
