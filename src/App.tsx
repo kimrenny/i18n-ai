@@ -16,7 +16,11 @@ import {
   calculateWorkspaceCoverage,
   getFirstProblemKeyForFile,
 } from './services/localizationCoverage'
+import { calculateWorkspaceProblems } from './services/localizationProblems'
 import type { ProblemNavigationTarget } from './types/localizationCoverage'
+import type { LocalizationProblem } from './types/localizationProblems'
+import { ProblemsPanel } from './components/problems/ProblemsPanel'
+import { useResizablePanel } from './hooks/useResizablePanel'
 import type {
   ParsedLocalizationFile,
   LocalizationComparisonResult,
@@ -77,6 +81,32 @@ const AppContent: React.FC<AppContentProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewIsBinary, setPreviewIsBinary] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
+  const [isProblemsOpen, setIsProblemsOpen] = useState(false)
+
+  // Explorer Resizing Hook (horizontal: min 180px, max 600px, default 280px, collapseThreshold 120px)
+  const explorerResize = useResizablePanel({
+    direction: 'horizontal',
+    initialSize: 280,
+    minSize: 180,
+    maxSize: 600,
+    collapseThreshold: 120,
+    isCollapsed: isExplorerCollapsed,
+    onCollapse: () => setIsExplorerCollapsed(true),
+    onExpand: () => setIsExplorerCollapsed(false),
+  })
+
+  // Problems Panel Resizing Hook (vertical: min 120px, max 600px, default 220px, collapseThreshold 80px)
+  const problemsResize = useResizablePanel({
+    direction: 'vertical',
+    initialSize: 220,
+    minSize: 120,
+    maxSize: 600,
+    collapseThreshold: 80,
+    isCollapsed: !isProblemsOpen,
+    onCollapse: () => setIsProblemsOpen(false),
+    onExpand: () => setIsProblemsOpen(true),
+  })
+
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'dashboard' | 'diff' | 'preview'>('dashboard')
   const [selectedLanguageTarget, setSelectedLanguageTarget] = useState<{
     filename: string
@@ -95,6 +125,7 @@ const AppContent: React.FC<AppContentProps> = ({
     setNoSelectionWarning(null)
     setSelectedPreviewFile(null)
     setSelectedLanguageTarget(null)
+    setIsProblemsOpen(false)
     setActiveWorkspaceTab('dashboard')
 
     let discoveredCandidates: DiscoveredFile[] = []
@@ -387,6 +418,10 @@ const AppContent: React.FC<AppContentProps> = ({
     return calculateWorkspaceCoverage(successfulParsedFiles)
   }, [successfulParsedFiles])
 
+  const workspaceProblems = useMemo(() => {
+    return calculateWorkspaceProblems(successfulParsedFiles)
+  }, [successfulParsedFiles])
+
   const handleSelectDashboardLanguage = useCallback(
     (filename: string) => {
       let currentComparison = comparisonResult
@@ -396,6 +431,25 @@ const AppContent: React.FC<AppContentProps> = ({
       }
       const problem = getFirstProblemKeyForFile(filename, currentComparison)
       setSelectedLanguageTarget({ filename, problem })
+      setActiveWorkspaceTab('diff')
+    },
+    [comparisonResult, successfulParsedFiles]
+  )
+
+  const handleNavigateFromProblem = useCallback(
+    (problem: LocalizationProblem) => {
+      let currentComparison = comparisonResult
+      if (!currentComparison && successfulParsedFiles.length >= 2) {
+        currentComparison = compareLocalizationFiles(successfulParsedFiles)
+        setComparisonResult(currentComparison)
+      }
+      setSelectedLanguageTarget({
+        filename: problem.filename,
+        problem: {
+          key: problem.key,
+          mode: problem.type,
+        },
+      })
       setActiveWorkspaceTab('diff')
     },
     [comparisonResult, successfulParsedFiles]
@@ -506,93 +560,139 @@ const AppContent: React.FC<AppContentProps> = ({
           onOpenFolder={handleSelectFolder}
           onRefreshTree={handleRefreshTree}
           isCollapsed={isExplorerCollapsed}
-          onToggleCollapseSidebar={() => setIsExplorerCollapsed((prev) => !prev)}
+          onToggleCollapseSidebar={() => {
+            if (isExplorerCollapsed) {
+              explorerResize.resetToLastSize()
+              setIsExplorerCollapsed(false)
+            } else {
+              setIsExplorerCollapsed(true)
+            }
+          }}
+          width={explorerResize.size}
+          isResizing={explorerResize.isResizing}
+          resizeHandleProps={{
+            onPointerDown: explorerResize.handlePointerDown,
+            onPointerMove: explorerResize.handlePointerMove,
+            onPointerUp: explorerResize.handlePointerUp,
+            onKeyDown: explorerResize.handleKeyDown,
+            valueNow: explorerResize.size,
+            valueMin: 180,
+            valueMax: 600,
+          }}
         />
 
         {/* Right Column: Main Editor Workspace */}
         <main className="ide-main-workspace" aria-label="Main Workspace">
-          {errorMessage && (
-            <div className="error-message" role="alert">
-              {errorMessage}
-            </div>
-          )}
+          <div className="ide-main-workspace-content">
+            {errorMessage && (
+              <div className="error-message" role="alert">
+                {errorMessage}
+              </div>
+            )}
 
-          {noSelectionWarning && (
-            <div className="warning-message" role="status">
-              {noSelectionWarning}
-            </div>
-          )}
+            {noSelectionWarning && (
+              <div className="warning-message" role="status">
+                {noSelectionWarning}
+              </div>
+            )}
 
-          {/* If preview mode is active, render FilePreview */}
-          {activeWorkspaceTab === 'preview' && selectedPreviewFile ? (
-            <FilePreview
-              filePath={selectedPreviewFile.path}
-              fileName={selectedPreviewFile.name}
-              content={previewContent}
-              isLoading={previewLoading}
-              isBinary={previewIsBinary}
-              errorMessage={previewError}
-              isLocalizationCandidate={selectedPreviewFile.isLocalizationCandidate}
-              isCheckedForComparison={checkedPaths.has(selectedPreviewFile.path)}
-              onToggleCheckFile={() => handleToggleFile(selectedPreviewFile.path)}
-              onClosePreview={() => {
-                setSelectedPreviewFile(null)
-                setActiveWorkspaceTab(selectedLanguageTarget && comparisonResult ? 'diff' : 'dashboard')
-              }}
-            />
-          ) : activeWorkspaceTab === 'diff' && comparisonResult ? (
-            /* If Diff Viewer is active, render Diff Viewer */
-            <LocalizationDiffViewer
-              comparisonResult={comparisonResult}
-              parsedFiles={successfulParsedFiles}
-              settings={settings}
-              onRefreshFiles={handleRefreshFiles}
-              initialActiveFilename={selectedLanguageTarget?.filename}
-              initialProblem={selectedLanguageTarget?.problem}
-            />
-          ) : selectedDirectory ? (
-            /* If workspace is open, render Translation Coverage Dashboard as default view */
-            <TranslationCoverageDashboard
-              summary={coverageSummary}
-              onSelectLanguage={handleSelectDashboardLanguage}
-              onOpenFolder={handleSelectFolder}
-            />
-          ) : (
-            /* Welcome / Empty workspace screen */
-            <div className="ide-welcome-dashboard">
-              <div className="ide-welcome-card">
-                <div className="ide-welcome-hero-icon">🌐</div>
-                <h2 className="ide-welcome-title">{t('app.title')}</h2>
-                <p className="description ide-welcome-desc">
-                  {t('app.subtitle')}
-                </p>
+            {/* If preview mode is active, render FilePreview */}
+            {activeWorkspaceTab === 'preview' && selectedPreviewFile ? (
+              <FilePreview
+                filePath={selectedPreviewFile.path}
+                fileName={selectedPreviewFile.name}
+                content={previewContent}
+                isLoading={previewLoading}
+                isBinary={previewIsBinary}
+                errorMessage={previewError}
+                isLocalizationCandidate={selectedPreviewFile.isLocalizationCandidate}
+                isCheckedForComparison={checkedPaths.has(selectedPreviewFile.path)}
+                onToggleCheckFile={() => handleToggleFile(selectedPreviewFile.path)}
+                onClosePreview={() => {
+                  setSelectedPreviewFile(null)
+                  setActiveWorkspaceTab(selectedLanguageTarget && comparisonResult ? 'diff' : 'dashboard')
+                }}
+              />
+            ) : activeWorkspaceTab === 'diff' && comparisonResult ? (
+              /* If Diff Viewer is active, render Diff Viewer */
+              <LocalizationDiffViewer
+                comparisonResult={comparisonResult}
+                parsedFiles={successfulParsedFiles}
+                settings={settings}
+                onRefreshFiles={handleRefreshFiles}
+                initialActiveFilename={selectedLanguageTarget?.filename}
+                initialProblem={selectedLanguageTarget?.problem}
+              />
+            ) : selectedDirectory ? (
+              /* If workspace is open, render Translation Coverage Dashboard as default view */
+              <TranslationCoverageDashboard
+                summary={coverageSummary}
+                onSelectLanguage={handleSelectDashboardLanguage}
+                onOpenFolder={handleSelectFolder}
+                onOpenProblems={() => {
+                  problemsResize.resetToLastSize()
+                  setIsProblemsOpen(true)
+                }}
+                totalProblems={workspaceProblems.totalProblems}
+              />
+            ) : (
+              /* Welcome / Empty workspace screen */
+              <div className="ide-welcome-dashboard">
+                <div className="ide-welcome-card">
+                  <div className="ide-welcome-hero-icon">🌐</div>
+                  <h2 className="ide-welcome-title">{t('app.title')}</h2>
+                  <p className="description ide-welcome-desc">
+                    {t('app.subtitle')}
+                  </p>
 
-                <div className="ide-welcome-actions">
-                  <button
-                    type="button"
-                    className="app-btn app-btn-md ide-welcome-btn select-button"
-                    onClick={handleSelectFolder}
-                  >
-                    📂 {t('explorer.openFolder')}
-                  </button>
-                </div>
-
-                <div className="ide-welcome-tips">
-                  <div className="ide-tip-item">
-                    <span className="ide-tip-icon">✨</span>
-                    <span>AI & Free Translation with auto-batching and rate-limit handling</span>
+                  <div className="ide-welcome-actions">
+                    <button
+                      type="button"
+                      className="app-btn app-btn-md ide-welcome-btn select-button"
+                      onClick={handleSelectFolder}
+                    >
+                      📂 {t('explorer.openFolder')}
+                    </button>
                   </div>
-                  <div className="ide-tip-item">
-                    <span className="ide-tip-icon">🔍</span>
-                    <span>Instant missing & empty key comparison and navigation</span>
-                  </div>
-                  <div className="ide-tip-item">
-                    <span className="ide-tip-icon">⚡</span>
-                    <span>Physical JSON key deletion with atomic file writes and Undo/Redo</span>
+
+                  <div className="ide-welcome-tips">
+                    <div className="ide-tip-item">
+                      <span className="ide-tip-icon">✨</span>
+                      <span>AI & Free Translation with auto-batching and rate-limit handling</span>
+                    </div>
+                    <div className="ide-tip-item">
+                      <span className="ide-tip-icon">🔍</span>
+                      <span>Instant missing & empty key comparison and navigation</span>
+                    </div>
+                    <div className="ide-tip-item">
+                      <span className="ide-tip-icon">⚡</span>
+                      <span>Physical JSON key deletion with atomic file writes and Undo/Redo</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+          </div>
+
+          {/* Bottom Problems Panel */}
+          {selectedDirectory && (
+            <ProblemsPanel
+              isOpen={isProblemsOpen}
+              onClose={() => setIsProblemsOpen(false)}
+              summary={workspaceProblems}
+              onNavigateProblem={handleNavigateFromProblem}
+              height={problemsResize.size}
+              isResizing={problemsResize.isResizing}
+              resizeHandleProps={{
+                onPointerDown: problemsResize.handlePointerDown,
+                onPointerMove: problemsResize.handlePointerMove,
+                onPointerUp: problemsResize.handlePointerUp,
+                onKeyDown: problemsResize.handleKeyDown,
+                valueNow: problemsResize.size,
+                valueMin: 120,
+                valueMax: 600,
+              }}
+            />
           )}
         </main>
       </div>
@@ -613,6 +713,25 @@ const AppContent: React.FC<AppContentProps> = ({
               <span className="statusbar-item">
                 {t('statusbar.selectedCount', { count: checkedPaths.size })}
               </span>
+              <span className="statusbar-separator">|</span>
+              <button
+                type="button"
+                className={`statusbar-btn statusbar-problems-btn ${
+                  workspaceProblems.totalProblems > 0 ? 'has-problems' : 'no-problems'
+                }`}
+                data-testid="statusbar-problems-btn"
+                onClick={() => {
+                  if (!isProblemsOpen) {
+                    problemsResize.resetToLastSize()
+                    setIsProblemsOpen(true)
+                  } else {
+                    setIsProblemsOpen(false)
+                  }
+                }}
+                title={t('problems.ariaLabel')}
+              >
+                {t('problems.statusBarItem', { count: workspaceProblems.totalProblems })}
+              </button>
             </>
           )}
         </div>

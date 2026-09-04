@@ -336,6 +336,26 @@
     "singleLanguageHint": "언어별 커버리지를 비교하려면 로컬라이제이션 파일을 추가하세요.",
     "openInEditor": "편집기에서 열기"
   },
+  "problems": {
+    "title": "문제",
+    "ariaLabel": "로컬라이제이션 문제 패널",
+    "allLanguages": "모든 언어",
+    "allTypes": "모든 문제",
+    "typeMissing": "누락",
+    "typeEmpty": "비어 있음",
+    "missingCount": "{count}개 누락",
+    "emptyCount": "{count}개 비어 있음",
+    "noProblemsTitle": "로컬라이제이션 문제 없음",
+    "noProblemsDesc": "감지된 모든 번역이 완료되었습니다.",
+    "noFilteredProblems": "현재 필터와 일치하는 문제가 없습니다.",
+    "closePanel": "문제 패널 닫기",
+    "problemItemAria": "{language}의 {key} ({type})",
+    "dashboardProblemsCardTitle": "로컬라이제이션 문제",
+    "dashboardProblemsView": "문제 보기",
+    "statusBarItem": "문제 {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count}개 문제"
+  },
   "common": {
     "save": "저장",
     "done": "완료",

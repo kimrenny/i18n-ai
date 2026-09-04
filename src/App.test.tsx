@@ -1869,6 +1869,213 @@ describe('App', () => {
       expect(screen.getByTestId('navigator-position')).toHaveTextContent('0 missing translations in this file')
     })
   })
+
+  describe('Problems Panel Integration', () => {
+    const mockFiles = [
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'ua.json', path: 'C:/Projects/locales/ua.json' },
+      { name: 'de.json', path: 'C:/Projects/locales/de.json' },
+    ]
+
+    const mockJsonData: Record<string, unknown> = {
+      'C:/Projects/locales/en.json': {
+        app: { title: 'App Title', desc: 'Description' },
+        actions: { save: 'Save', cancel: 'Cancel', delete: 'Delete' },
+      },
+      'C:/Projects/locales/ua.json': {
+        app: { title: 'Назва', desc: 'Опис' },
+        actions: { save: 'Зберегти', cancel: 'Скасувати', delete: 'Видалити' },
+      },
+      'C:/Projects/locales/de.json': {
+        app: { title: 'Titel', desc: '' }, // empty: app.desc
+        actions: { save: 'Speichern', cancel: 'Abbrechen' }, // missing: actions.delete
+      },
+    }
+
+    it('renders problem count in status bar and opens panel via status bar and dashboard buttons', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      const selectBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(selectBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument()
+      })
+
+      // Status bar displays "Problems 2"
+      const statusbarBtn = screen.getByTestId('statusbar-problems-btn')
+      expect(statusbarBtn).toHaveTextContent('Problems 2')
+      expect(statusbarBtn).toHaveClass('has-problems')
+
+      // Dashboard shows problems button with "Problems (2)"
+      const dashboardProblemsBtn = screen.getByTestId('dashboard-open-problems-btn')
+      expect(dashboardProblemsBtn).toHaveTextContent('Problems (2)')
+
+      // Click status bar button to open Problems Panel
+      fireEvent.click(statusbarBtn)
+      await waitFor(() => {
+        expect(screen.getByTestId('problems-panel')).toBeInTheDocument()
+      })
+
+      // Total badge in panel header shows 2
+      expect(screen.getByTestId('problems-total-badge')).toHaveTextContent('2')
+
+      // Close panel via close button
+      fireEvent.click(screen.getByTestId('problems-close-btn'))
+      expect(screen.queryByTestId('problems-panel')).not.toBeInTheDocument()
+
+      // Open panel via dashboard button
+      fireEvent.click(dashboardProblemsBtn)
+      expect(screen.getByTestId('problems-panel')).toBeInTheDocument()
+    })
+
+    it('clicking a missing problem in Problems Panel navigates to Diff Viewer with key focused', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument())
+
+      // Open Problems Panel
+      fireEvent.click(screen.getByTestId('statusbar-problems-btn'))
+      await waitFor(() => expect(screen.getByTestId('problems-panel')).toBeInTheDocument())
+
+      // Click missing problem item for German (actions.delete)
+      const missingItem = screen.getByTestId('problem-item-de.json:missing:actions.delete')
+      expect(missingItem).toHaveTextContent('actions.delete')
+      fireEvent.click(missingItem)
+
+      // Switches to Diff Viewer, activates de.json, focuses actions.delete
+      await waitFor(() => {
+        expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument()
+      })
+
+      expect(screen.getByTestId('file-tab-de.json')).toHaveClass('active-tab')
+      expect(screen.getByTestId('navigator-position')).toHaveTextContent(/missing translation 1 of 1/i)
+      expect(screen.getByTestId('tree-node-actions.delete')).toBeInTheDocument()
+    })
+
+    it('clicking an empty problem in Problems Panel navigates to Diff Viewer with empty key focused', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument())
+
+      // Open Problems Panel
+      fireEvent.click(screen.getByTestId('statusbar-problems-btn'))
+      await waitFor(() => expect(screen.getByTestId('problems-panel')).toBeInTheDocument())
+
+      // Click empty problem item for German (app.desc)
+      const emptyItem = screen.getByTestId('problem-item-de.json:empty:app.desc')
+      expect(emptyItem).toHaveTextContent('app.desc')
+      fireEvent.click(emptyItem)
+
+      // Switches to Diff Viewer, activates de.json, focuses app.desc in empty mode
+      await waitFor(() => {
+        expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument()
+      })
+
+      expect(screen.getByTestId('file-tab-de.json')).toHaveClass('active-tab')
+      expect(screen.getByTestId('navigator-position')).toHaveTextContent(/empty translation 1 of 1/i)
+      expect(screen.getByTestId('tree-node-app.desc')).toBeInTheDocument()
+    })
+  })
+
+  describe('Resizable Explorer and Problems Panels', () => {
+    it('renders explorer and problems resize handles with accessible attributes and responds to drag interactions', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        readDirectoryTree: vi.fn().mockResolvedValue({
+          rootPath: 'C:/Projects/MyProject',
+          rootName: 'MyProject',
+          entries: [
+            { name: 'en.json', path: 'C:/Projects/locales/en.json', isDirectory: false, isLocalizationCandidate: true },
+            { name: 'de.json', path: 'C:/Projects/locales/de.json', isDirectory: false, isLocalizationCandidate: true },
+          ],
+        }),
+        readJsonFile: vi.fn().mockResolvedValue({ hello: 'world' }),
+      })
+
+      render(<App />)
+
+      // Open workspace
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => {
+        expect(screen.getByTestId('project-explorer')).toBeInTheDocument()
+      })
+
+      // Explorer resize handle exists and has correct accessibility semantics
+      const explorerHandle = screen.getByTestId('explorer-resize-handle')
+      expect(explorerHandle).toBeInTheDocument()
+      expect(explorerHandle).toHaveAttribute('role', 'separator')
+      expect(explorerHandle).toHaveAttribute('aria-orientation', 'vertical')
+      expect(explorerHandle).toHaveAttribute('aria-label', 'Resize Explorer')
+      expect(explorerHandle).toHaveAttribute('aria-valuenow', '280')
+
+      // Explorer container has initial width style
+      const explorer = screen.getByTestId('project-explorer')
+      expect(explorer).toHaveStyle({ width: '280px' })
+
+      // Keyboard resizing: press ArrowRight twice to increase width by +20px (280 -> 300)
+      fireEvent.keyDown(explorerHandle, { key: 'ArrowRight' })
+      fireEvent.keyDown(explorerHandle, { key: 'ArrowRight' })
+      expect(explorer).toHaveStyle({ width: '300px' })
+      expect(explorerHandle).toHaveAttribute('aria-valuenow', '300')
+
+      // Collapse and reopen explorer restores width
+      const collapseExplorerBtn = screen.getByRole('button', { name: /collapse explorer/i })
+      fireEvent.click(collapseExplorerBtn)
+      expect(explorer).toHaveClass('is-collapsed')
+
+      // Reopen
+      const expandExplorerBtn = screen.getByRole('button', { name: /expand/i })
+      fireEvent.click(expandExplorerBtn)
+      expect(screen.getByTestId('project-explorer')).not.toHaveClass('is-collapsed')
+      expect(screen.getByTestId('project-explorer')).toHaveStyle({ width: '300px' })
+
+      // Open Problems Panel
+      fireEvent.click(screen.getByTestId('statusbar-problems-btn'))
+      await waitFor(() => {
+        expect(screen.getByTestId('problems-panel')).toBeInTheDocument()
+      })
+
+      // Problems resize handle exists and has correct accessibility semantics
+      const problemsHandle = screen.getByTestId('problems-resize-handle')
+      expect(problemsHandle).toBeInTheDocument()
+      expect(problemsHandle).toHaveAttribute('role', 'separator')
+      expect(problemsHandle).toHaveAttribute('aria-orientation', 'horizontal')
+      expect(problemsHandle).toHaveAttribute('aria-label', 'Resize Problems Panel')
+      expect(problemsHandle).toHaveAttribute('aria-valuenow', '220')
+
+      // Problems container has initial height style
+      const problemsPanel = screen.getByTestId('problems-panel')
+      expect(problemsPanel).toHaveStyle({ height: '220px' })
+
+      // Keyboard resizing: press ArrowUp 3 times to increase height by +30px (220 -> 250)
+      fireEvent.keyDown(problemsHandle, { key: 'ArrowUp' })
+      fireEvent.keyDown(problemsHandle, { key: 'ArrowUp' })
+      fireEvent.keyDown(problemsHandle, { key: 'ArrowUp' })
+      expect(problemsPanel).toHaveStyle({ height: '250px' })
+      expect(problemsHandle).toHaveAttribute('aria-valuenow', '250')
+    })
+  })
 })
 
 

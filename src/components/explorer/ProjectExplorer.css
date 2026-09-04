@@ -2,8 +2,8 @@
 
 .project-explorer {
   width: 280px;
-  min-width: 220px;
-  max-width: 450px;
+  min-width: 180px;
+  max-width: 600px;
   height: 100%;
   background-color: var(--color-explorer-bg, #181824);
   border-right: 1px solid var(--color-border, #2e2e42);
@@ -13,6 +13,19 @@
   overflow: hidden;
   transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
+  position: relative;
+}
+
+.project-explorer.is-resizing {
+  transition: none !important;
+}
+
+.project-explorer .resize-handle-horizontal {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
 }
 
 .project-explorer.is-collapsed {

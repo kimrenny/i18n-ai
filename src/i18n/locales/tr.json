@@ -336,6 +336,26 @@
     "singleLanguageHint": "Kapsamı karşılaştırmak için daha fazla yerelleştirme dosyası ekleyin.",
     "openInEditor": "Düzenleyicide aç"
   },
+  "problems": {
+    "title": "Sorunlar",
+    "ariaLabel": "Yerelleştirme Sorunları Paneli",
+    "allLanguages": "Tüm Diller",
+    "allTypes": "Tüm Sorunlar",
+    "typeMissing": "Eksik",
+    "typeEmpty": "Boş",
+    "missingCount": "{count} eksik",
+    "emptyCount": "{count} boş",
+    "noProblemsTitle": "Yerelleştirme sorunu yok",
+    "noProblemsDesc": "Algılanan tüm çeviriler eksiksizdir.",
+    "noFilteredProblems": "Mevcut filtrelere uyan sorun bulunamadı.",
+    "closePanel": "Sorunlar Panelini Kapat",
+    "problemItemAria": "{language} dilinde {key} ({type})",
+    "dashboardProblemsCardTitle": "Yerelleştirme Sorunları",
+    "dashboardProblemsView": "Sorunları Görüntüle",
+    "statusBarItem": "Sorunlar {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} sorun"
+  },
   "common": {
     "save": "Kaydet",
     "done": "Tamam",

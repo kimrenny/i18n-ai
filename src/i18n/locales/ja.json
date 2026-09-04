@@ -334,7 +334,27 @@
     "allComplete": "すべての翻訳が100%完了しています！",
     "noLocalizationFiles": "ローカリゼーションファイルが検出されませんでした。",
     "singleLanguageHint": "言語間のカバレッジを比較するには、さらにローカリゼーションファイルを追加してください。",
-    "openInEditor": "エディタで開く"
+    "openInEditor": "エディターで開く"
+  },
+  "problems": {
+    "title": "問題",
+    "ariaLabel": "ローカリゼーション問題パネル",
+    "allLanguages": "すべての言語",
+    "allTypes": "すべての問題",
+    "typeMissing": "不足",
+    "typeEmpty": "空",
+    "missingCount": "{count} 件の不足",
+    "emptyCount": "{count} 件の空",
+    "noProblemsTitle": "ローカリゼーションの問題はありません",
+    "noProblemsDesc": "検出されたすべての翻訳は完全です。",
+    "noFilteredProblems": "現在のフィルターに一致する問題はありません。",
+    "closePanel": "問題パネルを閉じる",
+    "problemItemAria": "{language} の {key} ({type})",
+    "dashboardProblemsCardTitle": "ローカリゼーション問題",
+    "dashboardProblemsView": "問題を表示",
+    "statusBarItem": "問題 {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} 件の問題"
   },
   "common": {
     "save": "保存",

@@ -7,6 +7,8 @@ export interface TranslationCoverageDashboardProps {
   summary: WorkspaceCoverageSummary
   onSelectLanguage: (filename: string) => void
   onOpenFolder?: () => void
+  onOpenProblems?: () => void
+  totalProblems?: number
 }
 
 function getProgressColorClass(percentage: number): string {
@@ -20,6 +22,8 @@ export const TranslationCoverageDashboard: React.FC<TranslationCoverageDashboard
   summary,
   onSelectLanguage,
   onOpenFolder,
+  onOpenProblems,
+  totalProblems,
 }) => {
   const { t } = useTranslation()
 
@@ -201,6 +205,16 @@ export const TranslationCoverageDashboard: React.FC<TranslationCoverageDashboard
                 </span>
               </div>
             </div>
+            {onOpenProblems && (
+              <button
+                type="button"
+                className="app-btn app-btn-sm coverage-problems-btn"
+                data-testid="dashboard-open-problems-btn"
+                onClick={onOpenProblems}
+              >
+                {t('problems.title')} ({totalProblems ?? (summary.totalMissingKeys + summary.totalEmptyKeys)})
+              </button>
+            )}
           </div>
 
           {/* Least Complete Languages Card */}

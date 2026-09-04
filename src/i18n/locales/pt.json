@@ -336,6 +336,26 @@
     "singleLanguageHint": "Adicione mais ficheiros de localização para comparar a cobertura.",
     "openInEditor": "Abrir no editor"
   },
+  "problems": {
+    "title": "Problemas",
+    "ariaLabel": "Painel de problemas de localização",
+    "allLanguages": "Todos os idiomas",
+    "allTypes": "Todos os problemas",
+    "typeMissing": "Em falta",
+    "typeEmpty": "Vazio",
+    "missingCount": "{count} em falta",
+    "emptyCount": "{count} vazios",
+    "noProblemsTitle": "Sem problemas de localização",
+    "noProblemsDesc": "Todas as traduções detetadas estão completas.",
+    "noFilteredProblems": "Nenhum problema corresponde aos filtros atuais.",
+    "closePanel": "Fechar painel de problemas",
+    "problemItemAria": "{key} ({type}) em {language}",
+    "dashboardProblemsCardTitle": "Problemas de localização",
+    "dashboardProblemsView": "Ver problemas",
+    "statusBarItem": "Problemas {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} problemas"
+  },
   "common": {
     "save": "Guardar",
     "done": "Concluído",

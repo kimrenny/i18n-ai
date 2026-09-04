@@ -336,6 +336,26 @@
     "singleLanguageHint": "Añada más archivos de localización para comparar la cobertura.",
     "openInEditor": "Abrir en el editor"
   },
+  "problems": {
+    "title": "Problemas",
+    "ariaLabel": "Panel de problemas de localización",
+    "allLanguages": "Todos los idiomas",
+    "allTypes": "Todos los problemas",
+    "typeMissing": "Faltante",
+    "typeEmpty": "Vacío",
+    "missingCount": "{count} faltantes",
+    "emptyCount": "{count} vacíos",
+    "noProblemsTitle": "Sin problemas de localización",
+    "noProblemsDesc": "Todas las traducciones detectadas están completas.",
+    "noFilteredProblems": "Ningún problema coincide con los filtros actuales.",
+    "closePanel": "Cerrar panel de problemas",
+    "problemItemAria": "{key} ({type}) en {language}",
+    "dashboardProblemsCardTitle": "Problemas de localización",
+    "dashboardProblemsView": "Ver problemas",
+    "statusBarItem": "Problemas {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} problemas"
+  },
   "common": {
     "save": "Guardar",
     "done": "Listo",

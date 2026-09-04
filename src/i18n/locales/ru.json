@@ -336,6 +336,26 @@
     "singleLanguageHint": "Добавьте больше файлов локализации для сравнения покрытия.",
     "openInEditor": "Открыть в редакторе"
   },
+  "problems": {
+    "title": "Проблемы",
+    "ariaLabel": "Панель проблем локализации",
+    "allLanguages": "Все языки",
+    "allTypes": "Все проблемы",
+    "typeMissing": "Отсутствуют",
+    "typeEmpty": "Пустые",
+    "missingCount": "{count} отсутствующих",
+    "emptyCount": "{count} пустых",
+    "noProblemsTitle": "Нет проблем локализации",
+    "noProblemsDesc": "Все обнаруженные переводы полностью заполнены.",
+    "noFilteredProblems": "Нет проблем, соответствующих выбранным фильтрам.",
+    "closePanel": "Закрыть панель проблем",
+    "problemItemAria": "{key} ({type}) в {language}",
+    "dashboardProblemsCardTitle": "Проблемы локализации",
+    "dashboardProblemsView": "Просмотреть проблемы",
+    "statusBarItem": "Проблемы {count}",
+    "languageGroupHeader": "{language} ({count})",
+    "problemsCount": "{count} проблем"
+  },
   "common": {
     "save": "Сохранить",
     "done": "Готово",
