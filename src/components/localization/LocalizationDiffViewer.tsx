@@ -47,6 +47,7 @@ import {
 import { BatchTranslationModal } from './BatchTranslationModal'
 import { LocalizationContextMenu, type ContextMenuState } from './LocalizationContextMenu'
 import { DeleteSectionModal } from './DeleteSectionModal'
+import type { ProblemNavigationTarget } from '../../types/localizationCoverage'
 import { useTranslation } from '../../i18n/useTranslation'
 
 interface LocalizationDiffViewerProps {
@@ -54,6 +55,8 @@ interface LocalizationDiffViewerProps {
   parsedFiles: ParsedLocalizationFile[]
   settings?: AppSettings
   onRefreshFiles: () => Promise<void>
+  initialActiveFilename?: string
+  initialProblem?: ProblemNavigationTarget | null
 }
 
 function collectFolderIds(nodes: TreeNodeType[]): string[] {
@@ -72,12 +75,14 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   parsedFiles,
   settings,
   onRefreshFiles,
+  initialActiveFilename,
+  initialProblem,
 }) => {
   const { t } = useTranslation()
-  const initialFilename = comparisonResult.comparedFiles[0]?.filename || ''
+  const initialFilename = initialActiveFilename || comparisonResult.comparedFiles[0]?.filename || ''
   const [activeFilename, setActiveFilename] = useState<string>(initialFilename)
-  const [activeMissingKey, setActiveMissingKey] = useState<string | null>(null)
-  const [navMode, setNavMode] = useState<ProblemNavMode>('missing')
+  const [activeMissingKey, setActiveMissingKey] = useState<string | null>(initialProblem?.key || null)
+  const [navMode, setNavMode] = useState<ProblemNavMode>(initialProblem?.mode || 'missing')
   const [collapsedSet, setCollapsedSet] = useState<Set<string>>(new Set())
   const [additionPlan, setAdditionPlan] = useState<MissingKeysAdditionPlan | null>(null)
   const [isWriting, setIsWriting] = useState(false)
@@ -146,6 +151,25 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       setActiveMissingKey(null)
     }
   }, [missingKeys, emptyKeys, activeMissingKey, navMode])
+
+  useEffect(() => {
+    if (initialProblem?.key) {
+      const parentPaths = getParentPaths(initialProblem.key)
+      if (parentPaths.length > 0) {
+        setCollapsedSet((prev) => {
+          let changed = false
+          const next = new Set(prev)
+          for (const p of parentPaths) {
+            if (next.has(p)) {
+              next.delete(p)
+              changed = true
+            }
+          }
+          return changed ? next : prev
+        })
+      }
+    }
+  }, [initialProblem])
 
   const handleSelectFile = useCallback((filename: string) => {
     setActiveFilename(filename)
@@ -887,7 +911,11 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   }, [activeMissingKey, collapsedSet])
 
   return (
-    <section className="diff-viewer-section" aria-label={t('diff.viewerAria')}>
+    <section
+      className="diff-viewer-section"
+      data-testid="diff-viewer-section"
+      aria-label={t('diff.viewerAria')}
+    >
       <LocalizationSummary
         comparisonResult={comparisonResult}
         onOpenAddMissingModal={handleOpenAddMissingModal}
@@ -925,7 +953,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         </div>
       )}
 
-      <div className="diff-editor-card">
+      <div className="diff-editor-card" data-testid="localization-tree-panel">
         <LocalizationFileTabs
           files={comparisonResult.comparedFiles}
           activeFilename={activeFilename}

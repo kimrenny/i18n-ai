@@ -30,6 +30,7 @@ export const LocalizationFileTabs: React.FC<LocalizationFileTabsProps> = ({
               key={file.filename}
               type="button"
               className={`file-tab ${isActive ? 'active-tab' : ''}`}
+              data-testid={`file-tab-${file.filename}`}
               onClick={() => onSelectFile(file.filename)}
               aria-selected={isActive}
               role="tab"
