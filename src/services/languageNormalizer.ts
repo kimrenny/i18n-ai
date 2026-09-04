@@ -5,12 +5,14 @@
 
 // Common dialect mapping to standard language codes
 const DIALECT_MAP: Record<string, string> = {
+  ua: 'uk',
+  'ua-ua': 'uk',
+  'uk-ua': 'uk',
   'en-us': 'en',
   'en-gb': 'en',
   'en-ca': 'en',
   'en-au': 'en',
   'ru-ru': 'ru',
-  'uk-ua': 'uk',
   'pl-pl': 'pl',
   'de-de': 'de',
   'de-at': 'de',

@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Не вдалося застосувати переклад.",
     "failedToApplyBatch": "Не вдалося застосувати пакет перекладів."
   },
+  "explorer": {
+    "title": "Провідник",
+    "openFolder": "Відкрити папку",
+    "searchPlaceholder": "Пошук файлів...",
+    "searchFiles": "Пошук файлів",
+    "clearSearch": "Очистити пошук",
+    "refresh": "Оновити провідник",
+    "collapseAll": "Згорнути всі папки",
+    "expandAll": "Розгорнути всі папки",
+    "collapseSidebar": "Згорнути провідник",
+    "expandSidebar": "Розгорнути провідник",
+    "selectAll": "Всі",
+    "unselectAll": "Зняти всі",
+    "selectFile": "Вибрати файл для порівняння",
+    "unselectFile": "Виключити файл з порівняння",
+    "selectedCount": "Вибрано: {count} з {total}",
+    "noFolderOpened": "Папку не відкрито",
+    "noFolderHint": "Відкрийте папку з файлами локалізації для початку порівняння та перекладу.",
+    "noFilesFound": "Файлів за фільтром не знайдено"
+  },
+  "statusbar": {
+    "noFolder": "Папку не відкрито",
+    "totalFiles": "Файлів: {count}",
+    "localizationCandidates": "JSON-локалізацій: {count}",
+    "selectedCount": "Порівнюється: {count}",
+    "encoding": "UTF-8",
+    "engineAi": "AI-рушій ({provider})",
+    "engineFree": "Безкоштовний рушій ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Тільки читання",
+    "localizationBadge": "Файл перекладу",
+    "includeInCompare": "+ Додати до порівняння",
+    "includedInCompare": "✓ У порівнянні",
+    "lines": "рядків",
+    "loadingFile": "Завантаження попереднього перегляду...",
+    "binaryFileTitle": "Попередній перегляд недоступний для бінарного файлу",
+    "binaryFileDesc": "Цей формат файлу не може бути відображений у текстовому вигляді."
+  },
   "common": {
     "save": "Зберегти",
     "done": "Готово",

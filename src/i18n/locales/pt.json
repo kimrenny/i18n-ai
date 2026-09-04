@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Falha ao aplicar a tradução.",
     "failedToApplyBatch": "Falha ao aplicar as traduções em lote."
   },
+  "explorer": {
+    "title": "Explorador",
+    "openFolder": "Abrir pasta",
+    "searchPlaceholder": "Pesquisar arquivos...",
+    "searchFiles": "Pesquisar arquivos",
+    "clearSearch": "Limpar pesquisa",
+    "refresh": "Atualizar explorador",
+    "collapseAll": "Recolher todas as pastas",
+    "expandAll": "Expandir todas as pastas",
+    "collapseSidebar": "Recolher explorador",
+    "expandSidebar": "Expandir explorador",
+    "selectAll": "Todos",
+    "unselectAll": "Nenhum",
+    "selectFile": "Selecionar arquivo para comparação",
+    "unselectFile": "Desmarcar arquivo",
+    "selectedCount": "{count}/{total} selecionados",
+    "noFolderOpened": "Nenhuma pasta aberta",
+    "noFolderHint": "Abra uma pasta com arquivos de localização para começar.",
+    "noFilesFound": "Nenhum arquivo encontrado"
+  },
+  "statusbar": {
+    "noFolder": "Nenhuma pasta aberta",
+    "totalFiles": "{count} arquivos",
+    "localizationCandidates": "{count} JSONs i18n",
+    "selectedCount": "{count} comparados",
+    "encoding": "UTF-8",
+    "engineAi": "Motor IA ({provider})",
+    "engineFree": "Motor gratuito ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Apenas Leitura",
+    "localizationBadge": "Ficheiro de Tradução",
+    "includeInCompare": "+ Incluir na Comparação",
+    "includedInCompare": "✓ Na Comparação",
+    "lines": "linhas",
+    "loadingFile": "A carregar pré-visualização...",
+    "binaryFileTitle": "Pré-visualização indisponível para ficheiro binário",
+    "binaryFileDesc": "Este formato de ficheiro não pode ser apresentado em pré-visualização de texto."
+  },
   "common": {
     "save": "Guardar",
     "done": "Concluído",

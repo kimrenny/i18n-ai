@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Übersetzung konnte nicht angewendet werden.",
     "failedToApplyBatch": "Stapelübersetzungen konnten nicht angewendet werden."
   },
+  "explorer": {
+    "title": "Explorer",
+    "openFolder": "Ordner öffnen",
+    "searchPlaceholder": "Dateien suchen...",
+    "searchFiles": "Dateien suchen",
+    "clearSearch": "Suche löschen",
+    "refresh": "Explorer aktualisieren",
+    "collapseAll": "Alle Ordner einklappen",
+    "expandAll": "Alle Ordner ausklappen",
+    "collapseSidebar": "Explorer einklappen",
+    "expandSidebar": "Explorer ausklappen",
+    "selectAll": "Alle",
+    "unselectAll": "Keine",
+    "selectFile": "Datei zum Vergleich auswählen",
+    "unselectFile": "Datei aus Vergleich abwählen",
+    "selectedCount": "{count}/{total} ausgewählt",
+    "noFolderOpened": "Kein Ordner geöffnet",
+    "noFolderHint": "Öffnen Sie einen Ordner mit Lokalisierungsdateien zum Vergleichen und Übersetzen.",
+    "noFilesFound": "Keine Dateien gefunden"
+  },
+  "statusbar": {
+    "noFolder": "Kein Ordner geöffnet",
+    "totalFiles": "{count} Dateien",
+    "localizationCandidates": "{count} i18n JSONs",
+    "selectedCount": "{count} verglichen",
+    "encoding": "UTF-8",
+    "engineAi": "KI-Engine ({provider})",
+    "engineFree": "Kostenlose Engine ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Schreibgeschützt",
+    "localizationBadge": "Übersetzungsdatei",
+    "includeInCompare": "+ Zum Vergleich hinzufügen",
+    "includedInCompare": "✓ Im Vergleich",
+    "lines": "Zeilen",
+    "loadingFile": "Vorschau wird geladen...",
+    "binaryFileTitle": "Keine Vorschau für Binärdatei verfügbar",
+    "binaryFileDesc": "Dieses Dateiformat kann nicht als Text angezeigt werden."
+  },
   "common": {
     "save": "Speichern",
     "done": "Fertig",

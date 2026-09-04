@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Failed to apply translation.",
     "failedToApplyBatch": "Failed to apply batch translations."
   },
+  "explorer": {
+    "title": "Explorer",
+    "openFolder": "Open Folder",
+    "searchPlaceholder": "Search files...",
+    "searchFiles": "Search files",
+    "clearSearch": "Clear search",
+    "refresh": "Refresh Explorer",
+    "collapseAll": "Collapse All Folders",
+    "expandAll": "Expand All Folders",
+    "collapseSidebar": "Collapse Explorer",
+    "expandSidebar": "Expand Explorer",
+    "selectAll": "All",
+    "unselectAll": "None",
+    "selectFile": "Select file for comparison",
+    "unselectFile": "Unselect file from comparison",
+    "selectedCount": "{count}/{total} selected",
+    "noFolderOpened": "No Folder Opened",
+    "noFolderHint": "Open a folder containing localization files to start comparing and translating.",
+    "noFilesFound": "No files found matching filter"
+  },
+  "statusbar": {
+    "noFolder": "No folder opened",
+    "totalFiles": "{count} files",
+    "localizationCandidates": "{count} i18n JSONs",
+    "selectedCount": "{count} compared",
+    "encoding": "UTF-8",
+    "engineAi": "AI Engine ({provider})",
+    "engineFree": "Free Engine ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Read-Only",
+    "localizationBadge": "Translation File",
+    "includeInCompare": "+ Include in Comparison",
+    "includedInCompare": "✓ In Comparison",
+    "lines": "lines",
+    "loadingFile": "Loading file preview...",
+    "binaryFileTitle": "Preview not available for binary file",
+    "binaryFileDesc": "This file format cannot be displayed in text preview."
+  },
   "common": {
     "save": "Save",
     "done": "Done",

@@ -272,6 +272,45 @@
     "failedToApplyTranslation": "Nie udało się zastosować tłumaczenia.",
     "failedToApplyBatch": "Nie udało się zastosować tłumaczeń wsadowych."
   },
+  "explorer": {
+    "title": "Eksplorator",
+    "openFolder": "Otwórz folder",
+    "searchPlaceholder": "Szukaj plików...",
+    "searchFiles": "Szukaj plików",
+    "clearSearch": "Wyczyść wyszukiwanie",
+    "refresh": "Odśwież eksplorator",
+    "collapseAll": "Zwiń wszystkie foldery",
+    "expandAll": "Rozwiń wszystkie foldery",
+    "collapseSidebar": "Zwiń eksplorator",
+    "expandSidebar": "Rozwiń eksplorator",
+    "selectAll": "Wszystkie",
+    "unselectAll": "Brak",
+    "selectFile": "Wybierz plik do porównania",
+    "unselectFile": "Odznacz plik",
+    "selectedCount": "Wybrano {count} z {total}",
+    "noFolderOpened": "Brak otwartego folderu",
+    "noFolderHint": "Otwórz folder z plikami lokalizacji, aby rozpocząć porównywanie i tłumaczenie.",
+    "noFilesFound": "Nie znaleziono pasujących plików"
+  },
+  "statusbar": {
+    "noFolder": "Brak otwartego folderu",
+    "totalFiles": "Pliki: {count}",
+    "localizationCandidates": "JSON i18n: {count}",
+    "selectedCount": "Porównywane: {count}",
+    "encoding": "UTF-8",
+    "engineAi": "Silnik AI ({provider})",
+    "engineFree": "Darmowy silnik ({provider})"
+  },
+  "preview": {
+    "readOnlyBadge": "Tylko do odczytu",
+    "localizationBadge": "Plik tłumaczenia",
+    "includeInCompare": "+ Dołącz do porównania",
+    "includedInCompare": "✓ W porównaniu",
+    "lines": "wierszy",
+    "loadingFile": "Ładowanie podglądu...",
+    "binaryFileTitle": "Podgląd niedostępny dla pliku binarnego",
+    "binaryFileDesc": "Ten format pliku nie może być wyświetlony w podglądzie tekstowym."
+  },
   "common": {
     "save": "Zapisz",
     "done": "Gotowe",
