@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "La clé ne peut pas contenir des points consécutifs",
     "errorEmptySegment": "Les segments de la clé ne peuvent pas être vides"
   },
+  "inspector": {
+    "title": "Inspecteur de clé de traduction",
+    "emptySelection": "Aucune clé de traduction sélectionnée",
+    "emptySelectionHint": "Sélectionnez une clé dans l'arborescence ou naviguez depuis la recherche ou les problèmes.",
+    "keyPath": "Chemin de la clé",
+    "reference": "Référence",
+    "translations": "Traductions",
+    "coverage": "Couverture",
+    "coverageRatio": "{translated} / {total} langues",
+    "coveragePercent": "{percent}% complet",
+    "problems": "Problèmes",
+    "noProblems": "Aucun problème détecté",
+    "emptyCount": "{count} vide(s)",
+    "missingCount": "{count} manquante(s)",
+    "statusTranslated": "Traduit",
+    "statusEmpty": "Vide",
+    "statusMissing": "Manquant",
+    "openInEditor": "Ouvrir",
+    "openInEditorAria": "Ouvrir {key} dans {filename}",
+    "toggleInspector": "Inspecteur",
+    "closeInspector": "Fermer l'inspecteur"
+  },
   "common": {
     "save": "Enregistrer",
     "done": "Terminé",

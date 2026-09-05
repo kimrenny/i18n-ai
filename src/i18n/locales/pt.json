@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "A chave não pode conter pontos consecutivos",
     "errorEmptySegment": "Os segmentos da chave não podem estar vazios"
   },
+  "inspector": {
+    "title": "Inspetor de chaves de tradução",
+    "emptySelection": "Nenhuma chave de tradução selecionada",
+    "emptySelectionHint": "Selecione uma chave na árvore ou navegue a partir da pesquisa ou problemas para inspecionar.",
+    "keyPath": "Caminho da chave",
+    "reference": "Referência",
+    "translations": "Traduções",
+    "coverage": "Cobertura",
+    "coverageRatio": "{translated} / {total} idiomas",
+    "coveragePercent": "{percent}% concluído",
+    "problems": "Problemas",
+    "noProblems": "Nenhum problema detectado",
+    "emptyCount": "{count} vazios",
+    "missingCount": "{count} ausentes",
+    "statusTranslated": "Traduzido",
+    "statusEmpty": "Vazio",
+    "statusMissing": "Ausente",
+    "openInEditor": "Abrir",
+    "openInEditorAria": "Abrir {key} em {filename}",
+    "toggleInspector": "Inspetor",
+    "closeInspector": "Fechar inspetor"
+  },
   "common": {
     "save": "Guardar",
     "done": "Concluído",

@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "Ключ не может содержать две точки подряд",
     "errorEmptySegment": "Сегменты ключа не могут быть пустыми"
   },
+  "inspector": {
+    "title": "Инспектор ключей перевода",
+    "emptySelection": "Ключ перевода не выбран",
+    "emptySelectionHint": "Выберите ключ перевода в дереве или перейдите из поиска или проблем для инспекции.",
+    "keyPath": "Путь к ключу",
+    "reference": "Эталон",
+    "translations": "Переводы",
+    "coverage": "Покрытие",
+    "coverageRatio": "{translated} / {total} языков",
+    "coveragePercent": "{percent}% завершено",
+    "problems": "Проблемы",
+    "noProblems": "Проблем не обнаружено",
+    "emptyCount": "{count} пустых",
+    "missingCount": "{count} отсутствующих",
+    "statusTranslated": "Переведено",
+    "statusEmpty": "Пусто",
+    "statusMissing": "Отсутствует",
+    "openInEditor": "Открыть",
+    "openInEditorAria": "Открыть {key} в {filename}",
+    "toggleInspector": "Инспектор",
+    "closeInspector": "Закрыть инспектор"
+  },
   "common": {
     "save": "Сохранить",
     "done": "Готово",

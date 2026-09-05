@@ -8,6 +8,8 @@ interface LocalizationTreeProps {
   rootNodes: TreeNodeType[]
   collapsedSet: Set<string>
   activeMissingKey: string | null
+  selectedKey?: string | null
+  isInspectorOpen?: boolean
   editingKey?: string | null
   editValue?: string
   isSavingKey?: boolean
@@ -19,6 +21,7 @@ interface LocalizationTreeProps {
   onToggleCollapse: (id: string) => void
   onExpandAll: () => void
   onCollapseAll: () => void
+  onToggleInspector?: () => void
   onSelectRow: (fullKey: string, isMissing: boolean, isEmpty: boolean) => void
   onStartEdit?: (fullKey: string, currentValue: string) => void
   onEditValueChange?: (value: string) => void
@@ -34,6 +37,8 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   rootNodes,
   collapsedSet,
   activeMissingKey,
+  selectedKey,
+  isInspectorOpen = false,
   editingKey,
   editValue,
   isSavingKey,
@@ -45,6 +50,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   onToggleCollapse,
   onExpandAll,
   onCollapseAll,
+  onToggleInspector,
   onSelectRow,
   onStartEdit,
   onEditValueChange,
@@ -62,6 +68,21 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
       <div className="tree-toolbar">
         <span className="toolbar-title">{t('tree.explorerView')}</span>
         <div className="toolbar-actions">
+          {onToggleInspector && (
+            <button
+              type="button"
+              className={`tree-tool-btn inspector-toggle-btn ${
+                isInspectorOpen ? 'is-active' : ''
+              }`}
+              onClick={onToggleInspector}
+              title={t('inspector.title')}
+              aria-label={t('inspector.title')}
+              aria-pressed={isInspectorOpen}
+              data-testid="toggle-inspector-btn"
+            >
+              🔍 {t('inspector.title')}
+            </button>
+          )}
           {onUndo && (
             <button
               type="button"
@@ -115,6 +136,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
               depth={0}
               collapsedSet={collapsedSet}
               activeMissingKey={activeMissingKey}
+              selectedKey={selectedKey}
               editingKey={editingKey}
               editValue={editValue}
               isSavingKey={isSavingKey}

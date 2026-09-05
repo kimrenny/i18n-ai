@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "키에 연속된 점을 포함할 수 없습니다",
     "errorEmptySegment": "키 세그먼트는 비워둘 수 없습니다"
   },
+  "inspector": {
+    "title": "번역 키 인스펙터",
+    "emptySelection": "선택된 번역 키가 없습니다",
+    "emptySelectionHint": "트리에서 키를 선택하거나 검색/문제 패널에서 이동하여 확인하세요.",
+    "keyPath": "키 경로",
+    "reference": "기준 언어",
+    "translations": "번역 목록",
+    "coverage": "완성도",
+    "coverageRatio": "{translated} / {total} 개 언어",
+    "coveragePercent": "{percent}% 완료",
+    "problems": "문제",
+    "noProblems": "감지된 문제 없음",
+    "emptyCount": "{count}개 비어있음",
+    "missingCount": "{count}개 누락됨",
+    "statusTranslated": "번역됨",
+    "statusEmpty": "비어있음",
+    "statusMissing": "누락됨",
+    "openInEditor": "열기",
+    "openInEditorAria": "{filename}에서 {key} 열기",
+    "toggleInspector": "인스펙터",
+    "closeInspector": "인스펙터 닫기"
+  },
   "common": {
     "save": "저장",
     "done": "완료",

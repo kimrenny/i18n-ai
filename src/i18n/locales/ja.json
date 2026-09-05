@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "キーに連続したドットを含めることはできません",
     "errorEmptySegment": "キーのセグメントを空にすることはできません"
   },
+  "inspector": {
+    "title": "翻訳キーインスペクター",
+    "emptySelection": "翻訳キーが選択されていません",
+    "emptySelectionHint": "ツリーでキーを選択するか、検索/問題から移動して検査します。",
+    "keyPath": "キーパス",
+    "reference": "参照言語",
+    "translations": "翻訳一覧",
+    "coverage": "カバレッジ",
+    "coverageRatio": "{translated} / {total} 言語",
+    "coveragePercent": "{percent}% 完了",
+    "problems": "問題",
+    "noProblems": "問題は検出されませんでした",
+    "emptyCount": "{count} 件の空白",
+    "missingCount": "{count} 件の未翻訳",
+    "statusTranslated": "翻訳済み",
+    "statusEmpty": "空白",
+    "statusMissing": "未翻訳",
+    "openInEditor": "開く",
+    "openInEditorAria": "{filename} で {key} を開く",
+    "toggleInspector": "インスペクター",
+    "closeInspector": "インスペクターを閉じる"
+  },
   "common": {
     "save": "保存",
     "done": "完了",

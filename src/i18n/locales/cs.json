@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "Klíč nesmí obsahovat po sobě jdoucí tečky",
     "errorEmptySegment": "Segmenty klíče nesmí být prázdné"
   },
+  "inspector": {
+    "title": "Inspektor překladových klíčů",
+    "emptySelection": "Není vybrán žádný překladový klíč",
+    "emptySelectionHint": "Vyberte klíč v stromu nebo přejděte z vyhledávání/problémů pro inspekci.",
+    "keyPath": "Cesta ke klíči",
+    "reference": "Reference",
+    "translations": "Překlady",
+    "coverage": "Pokrytí",
+    "coverageRatio": "{translated} / {total} jazyků",
+    "coveragePercent": "{percent}% dokončeno",
+    "problems": "Problémy",
+    "noProblems": "Nebyly zjištěny žádné problémy",
+    "emptyCount": "{count} prázdných",
+    "missingCount": "{count} chybějících",
+    "statusTranslated": "Přeloženo",
+    "statusEmpty": "Prázdné",
+    "statusMissing": "Chybějící",
+    "openInEditor": "Otevřít",
+    "openInEditorAria": "Otevřít {key} v {filename}",
+    "toggleInspector": "Inspektor",
+    "closeInspector": "Zavřít inspektor"
+  },
   "common": {
     "save": "Uložit",
     "done": "Hotovo",

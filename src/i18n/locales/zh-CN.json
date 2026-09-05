@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "键名不能包含连续的点",
     "errorEmptySegment": "键路径段不能为空"
   },
+  "inspector": {
+    "title": "翻译键检查器",
+    "emptySelection": "未选择翻译键",
+    "emptySelectionHint": "在树中选择翻译键或从搜索/问题中跳转以进行检查。",
+    "keyPath": "键路径",
+    "reference": "参考语言",
+    "translations": "翻译列表",
+    "coverage": "覆盖率",
+    "coverageRatio": "{translated} / {total} 种语言",
+    "coveragePercent": "{percent}% 完成",
+    "problems": "问题",
+    "noProblems": "未发现问题",
+    "emptyCount": "{count} 个空白",
+    "missingCount": "{count} 个缺失",
+    "statusTranslated": "已翻译",
+    "statusEmpty": "空白",
+    "statusMissing": "缺失",
+    "openInEditor": "打开",
+    "openInEditorAria": "在 {filename} 中打开 {key}",
+    "toggleInspector": "检查器",
+    "closeInspector": "关闭检查器"
+  },
   "common": {
     "save": "保存",
     "done": "完成",

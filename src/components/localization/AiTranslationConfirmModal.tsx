@@ -89,21 +89,27 @@ export const AiTranslationConfirmModal: React.FC<AiTranslationConfirmModalProps>
             <div className="ai-meta-grid">
               <div className="ai-meta-item">
                 <span className="ai-meta-label">{t('translation.key')}:</span>
-                <span className="ai-meta-value key-highlight">{proposal.key}</span>
+                <span className="ai-meta-value key-highlight" title={proposal.key}>
+                  {proposal.key}
+                </span>
               </div>
               <div className="ai-meta-item">
                 <span className="ai-meta-label">{t('translation.targetFile')}:</span>
-                <span className="ai-meta-value">{proposal.targetFile}</span>
+                <span className="ai-meta-value" title={proposal.targetFile}>
+                  {proposal.targetFile}
+                </span>
               </div>
-              <div className="ai-meta-item">
+              <div className="ai-meta-item ai-meta-engine-item">
                 <span className="ai-meta-label">{t('translation.engine')}:</span>
-                <span className="ai-meta-value ai-engine-badge">
+                <span className="ai-meta-value ai-engine-badge" title={engineDisplay}>
                   {engineDisplay}
                 </span>
               </div>
               <div className="ai-meta-item">
                 <span className="ai-meta-label">{t('translation.sourceFile')}:</span>
-                <span className="ai-meta-value">{proposal.sourceFile}</span>
+                <span className="ai-meta-value" title={proposal.sourceFile}>
+                  {proposal.sourceFile}
+                </span>
               </div>
             </div>
 

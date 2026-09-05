@@ -51,6 +51,9 @@ import { AddTranslationKeyModal } from './AddTranslationKeyModal'
 import { planAddTranslationKey } from '../../services/localizationKeyInsertion'
 import type { AddKeyTargetMode } from '../../types/localizationKeyInsertion'
 import type { ProblemNavigationTarget } from '../../types/localizationCoverage'
+import { TranslationKeyInspector } from '../inspector/TranslationKeyInspector'
+import { ResizeHandle } from '../common/ResizeHandle'
+import { useResizablePanel } from '../../hooks/useResizablePanel'
 import { useTranslation } from '../../i18n/useTranslation'
 
 interface LocalizationDiffViewerProps {
@@ -85,6 +88,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const initialFilename = initialActiveFilename || comparisonResult.comparedFiles[0]?.filename || ''
   const [activeFilename, setActiveFilename] = useState<string>(initialFilename)
   const [activeMissingKey, setActiveMissingKey] = useState<string | null>(initialProblem?.key || null)
+  const [selectedKey, setSelectedKey] = useState<string | null>(initialProblem?.key || null)
+  const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [navMode, setNavMode] = useState<ProblemNavMode>(initialProblem?.mode || 'missing')
   const [collapsedSet, setCollapsedSet] = useState<Set<string>>(new Set())
   const [additionPlan, setAdditionPlan] = useState<MissingKeysAdditionPlan | null>(null)
@@ -92,8 +97,18 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const [isWriting, setIsWriting] = useState(false)
   const [writeError, setWriteError] = useState<string | null>(null)
 
-  // Manual inline translation editing state
-  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const inspectorResize = useResizablePanel({
+    direction: 'horizontal',
+    initialSize: 340,
+    minSize: 240,
+    maxSize: 560,
+    reverseDelta: true,
+    isCollapsed: !isInspectorOpen,
+  })
+
+  // Manual inline translation editing state (isolated by target file & key)
+  const [editingTarget, setEditingTarget] = useState<{ filename: string; key: string } | null>(null)
+  const editingKey = editingTarget?.filename === activeFilename ? editingTarget.key : null
   const [editValue, setEditValue] = useState<string>('')
   const [isSavingKey, setIsSavingKey] = useState(false)
   const [saveKeyError, setSaveKeyError] = useState<string | null>(null)
@@ -158,12 +173,17 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
   useEffect(() => {
     if (initialActiveFilename) {
+      setEditingTarget(null)
+      setEditValue('')
       setActiveFilename(initialActiveFilename)
     }
   }, [initialActiveFilename])
 
   useEffect(() => {
     if (initialProblem?.key) {
+      setEditingTarget(null)
+      setEditValue('')
+      setSelectedKey(initialProblem.key)
       setActiveMissingKey(initialProblem.key)
       if (initialProblem.mode) {
         setNavMode(initialProblem.mode)
@@ -188,7 +208,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const handleSelectFile = useCallback((filename: string) => {
     setActiveFilename(filename)
     setActiveMissingKey(null)
-    setEditingKey(null)
+    setEditingTarget(null)
+    setEditValue('')
     setSaveKeyError(null)
     setAiError(null)
     setAiSuccessMessage(null)
@@ -196,6 +217,10 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
   const handleNavigate = useCallback(
     (key: string, mode: ProblemNavMode = navMode) => {
+      setEditingTarget(null)
+      setEditValue('')
+      setSaveKeyError(null)
+      setSelectedKey(key)
       setNavMode(mode)
       const parentPaths = getParentPaths(key)
       if (parentPaths.length > 0) {
@@ -225,6 +250,9 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
   const handleNavigateProblem = useCallback(
     (filename: string, mode: ProblemNavMode) => {
+      setEditingTarget(null)
+      setEditValue('')
+      setSaveKeyError(null)
       if (filename !== activeFilename) {
         setActiveFilename(filename)
       }
@@ -257,8 +285,51 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     [comparisonResult, handleNavigateProblem]
   )
 
+  const handleNavigateFromInspector = useCallback(
+    (filename: string, key: string) => {
+      setEditingTarget(null)
+      setEditValue('')
+      setSaveKeyError(null)
+      if (filename !== activeFilename) {
+        setActiveFilename(filename)
+      }
+      setSelectedKey(key)
+      const parentPaths = getParentPaths(key)
+      if (parentPaths.length > 0) {
+        setCollapsedSet((prev) => {
+          let changed = false
+          const next = new Set(prev)
+          for (const p of parentPaths) {
+            if (next.has(p)) {
+              next.delete(p)
+              changed = true
+            }
+          }
+          return changed ? next : prev
+        })
+      }
+      const missingList = getMissingKeysForFile(filename, comparisonResult)
+      const emptyList = getEmptyKeysForFile(filename, comparisonResult)
+      if (missingList.includes(key)) {
+        setNavMode('missing')
+        setActiveMissingKey(key)
+      } else if (emptyList.includes(key)) {
+        setNavMode('empty')
+        setActiveMissingKey(key)
+      } else {
+        setActiveMissingKey(null)
+      }
+    },
+    [activeFilename, comparisonResult]
+  )
+
   const handleSelectRow = useCallback(
     (fullKey: string, isMissing: boolean, isEmpty: boolean) => {
+      setEditingTarget((prev) =>
+        prev?.key === fullKey && prev.filename === activeFilename ? prev : null
+      )
+      setSaveKeyError(null)
+      setSelectedKey(fullKey)
       if (isMissing) {
         setNavMode('missing')
         setActiveMissingKey(fullKey)
@@ -269,27 +340,32 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         setActiveMissingKey(null)
       }
     },
-    []
+    [activeFilename]
   )
 
-  const handleStartEdit = useCallback((fullKey: string, currentValue: string) => {
-    setEditingKey(fullKey)
-    setEditValue(currentValue)
-    setSaveKeyError(null)
-  }, [])
+  const handleStartEdit = useCallback(
+    (fullKey: string, currentValue: string) => {
+      setEditingTarget({ filename: activeFilename, key: fullKey })
+      setEditValue(currentValue)
+      setSaveKeyError(null)
+    },
+    [activeFilename]
+  )
 
   const handleCancelEdit = useCallback(() => {
-    setEditingKey(null)
+    setEditingTarget(null)
     setEditValue('')
     setSaveKeyError(null)
   }, [])
 
   const handleSaveEdit = useCallback(async () => {
-    if (!editingKey || !activeFileData) return
+    if (!editingTarget || editingTarget.filename !== activeFilename || !activeFileData) return
     if (!window.electronAPI?.writeJsonFiles) {
       setSaveKeyError('Unable to write files: Electron API is unavailable.')
       return
     }
+
+    const keyToSave = editingTarget.key
 
     setIsSavingKey(true)
     setSaveKeyError(null)
@@ -297,7 +373,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     try {
       const { updatedRaw, formattedJson } = updateSingleKeyInFile(
         activeFileData.raw,
-        editingKey,
+        keyToSave,
         editValue
       )
 
@@ -312,14 +388,15 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         targetFile: activeFileData.filename,
         targetFilePath: activeFileData.path,
         type: 'edit_key',
-        description: `Edit ${editingKey}`,
-        key: editingKey,
+        description: `Edit ${keyToSave}`,
+        key: keyToSave,
         beforeRawJson: activeFileData.raw as Record<string, JsonValue>,
         afterRawJson: updatedRaw as Record<string, JsonValue>,
       })
       setHistoryVersion((v) => v + 1)
 
-      setEditingKey(null)
+      setEditingTarget(null)
+      setEditValue('')
       await onRefreshFiles()
     } catch (err) {
       setSaveKeyError(
@@ -328,7 +405,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     } finally {
       setIsSavingKey(false)
     }
-  }, [editingKey, activeFileData, editValue, onRefreshFiles, t])
+  }, [editingTarget, activeFilename, activeFileData, editValue, onRefreshFiles, t])
 
   const handleDeleteKey = useCallback(
     async (fullKey: string) => {
@@ -366,7 +443,10 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           afterRawJson: updatedRaw as Record<string, JsonValue>,
         })
         setHistoryVersion((v) => v + 1)
-        setEditingKey(null)
+        setSelectedKey((prev) => (prev === fullKey ? null : prev))
+        setActiveMissingKey((prev) => (prev === fullKey ? null : prev))
+        setEditingTarget(null)
+        setEditValue('')
         await onRefreshFiles()
       } catch (err) {
         setSaveKeyError(
@@ -429,7 +509,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         })
         setHistoryVersion((v) => v + 1)
         setDeleteSectionTarget(null)
-        setEditingKey(null)
+        setEditingTarget(null)
+        setEditValue('')
         await onRefreshFiles()
       }
     } catch (err) {
@@ -466,7 +547,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         throw new Error('Failed to write file')
       }
       setHistoryVersion((v) => v + 1)
-      setEditingKey(null)
+      setEditingTarget(null)
+      setEditValue('')
       await onRefreshFiles()
     } catch (err) {
       setSaveKeyError(
@@ -500,7 +582,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         throw new Error('Failed to write file')
       }
       setHistoryVersion((v) => v + 1)
-      setEditingKey(null)
+      setEditingTarget(null)
+      setEditValue('')
       await onRefreshFiles()
     } catch (err) {
       setSaveKeyError(
@@ -575,14 +658,15 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         },
       ])
 
-      if (editingKey === fullKey) {
-        setEditingKey(null)
+      if (editingTarget?.key === fullKey && editingTarget.filename === activeFilename) {
+        setEditingTarget(null)
+        setEditValue('')
       }
 
       setAiSuccessMessage(t('diff.appliedKeySuccess', { key: fullKey }))
       await onRefreshFiles()
     },
-    [activeFileData, editingKey, onRefreshFiles, t]
+    [activeFileData, editingTarget, activeFilename, onRefreshFiles, t]
   )
 
   const handleAiTranslate = useCallback(
@@ -1092,31 +1176,66 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           onTop={handleTop}
         />
 
-        <LocalizationTree
-          rootNodes={activeTreeData.rootNodes}
-          collapsedSet={collapsedSet}
-          activeMissingKey={activeMissingKey}
-          editingKey={editingKey}
-          editValue={editValue}
-          isSavingKey={isSavingKey}
-          translatingKey={translatingKey}
-          engine={settings?.engine || 'ai'}
-          canUndo={historyManagerRef.current.canUndo(activeFilename)}
-          canRedo={historyManagerRef.current.canRedo(activeFilename)}
-          treeBodyRef={treeBodyRef}
-          onToggleCollapse={handleToggleCollapse}
-          onExpandAll={handleExpandAll}
-          onCollapseAll={handleCollapseAll}
-          onSelectRow={handleSelectRow}
-          onStartEdit={handleStartEdit}
-          onEditValueChange={setEditValue}
-          onSaveEdit={handleSaveEdit}
-          onCancelEdit={handleCancelEdit}
-          onAiTranslate={handleAiTranslate}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          onContextMenu={handleContextMenu}
-        />
+        <div className="diff-editor-split-body">
+          <div className="diff-tree-column">
+            <LocalizationTree
+              rootNodes={activeTreeData.rootNodes}
+              collapsedSet={collapsedSet}
+              activeMissingKey={activeMissingKey}
+              selectedKey={selectedKey}
+              isInspectorOpen={isInspectorOpen}
+              onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
+              editingKey={editingKey}
+              editValue={editValue}
+              isSavingKey={isSavingKey}
+              translatingKey={translatingKey}
+              engine={settings?.engine || 'ai'}
+              canUndo={historyManagerRef.current.canUndo(activeFilename)}
+              canRedo={historyManagerRef.current.canRedo(activeFilename)}
+              treeBodyRef={treeBodyRef}
+              onToggleCollapse={handleToggleCollapse}
+              onExpandAll={handleExpandAll}
+              onCollapseAll={handleCollapseAll}
+              onSelectRow={handleSelectRow}
+              onStartEdit={handleStartEdit}
+              onEditValueChange={setEditValue}
+              onSaveEdit={handleSaveEdit}
+              onCancelEdit={handleCancelEdit}
+              onAiTranslate={handleAiTranslate}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              onContextMenu={handleContextMenu}
+            />
+          </div>
+
+          {isInspectorOpen && (
+            <>
+              <ResizeHandle
+                direction="horizontal"
+                onPointerDown={inspectorResize.handlePointerDown}
+                onPointerMove={inspectorResize.handlePointerMove}
+                onPointerUp={inspectorResize.handlePointerUp}
+                onKeyDown={inspectorResize.handleKeyDown}
+                valueNow={inspectorResize.size}
+                valueMin={240}
+                valueMax={560}
+                ariaLabel={t('inspector.title')}
+                testId="inspector-resize-handle"
+              />
+              <div
+                className="diff-inspector-column"
+                style={{ width: `${inspectorResize.size}px` }}
+              >
+                <TranslationKeyInspector
+                  selectedKey={selectedKey}
+                  parsedFiles={parsedFiles}
+                  onNavigateLanguage={handleNavigateFromInspector}
+                  onClose={() => setIsInspectorOpen(false)}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {contextMenu && (

@@ -856,6 +856,35 @@ textarea,
   user-select: none;
 }
 
+.diff-editor-split-body {
+  display: flex;
+  flex-direction: row;
+  min-height: 480px;
+  position: relative;
+  overflow: hidden;
+}
+
+.diff-tree-column {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-inspector-column {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0f172a;
+  overflow: hidden;
+}
+
+.tree-tool-btn.inspector-toggle-btn.is-active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
 .file-tabs-container {
   display: flex;
   align-items: center;
@@ -1219,6 +1248,11 @@ textarea,
   background: rgba(56, 189, 248, 0.22) !important;
   border-left: 4px solid #38bdf8 !important;
   box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.4), 0 0 8px rgba(56, 189, 248, 0.3);
+}
+
+.row-selected:not(.row-missing):not(.row-empty):not(.row-editing) {
+  background: rgba(56, 189, 248, 0.12);
+  border-left: 3px solid #38bdf8;
 }
 
 .row-conflict {
@@ -2075,7 +2109,9 @@ textarea,
 
 .ai-meta-grid {
   display: flex;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.25rem;
   padding: 0.65rem 1rem;
   background: rgba(15, 23, 42, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -2088,6 +2124,8 @@ textarea,
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ai-meta-label {
@@ -2095,15 +2133,35 @@ textarea,
   text-transform: uppercase;
   font-size: 0.72rem;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .ai-meta-value {
   color: #f1f5f9;
   font-weight: 600;
+  min-width: 0;
 }
 
 .key-highlight {
   color: #38bdf8;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-meta-value.ai-engine-badge,
+.ai-engine-badge {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  max-height: 2.5em;
+  max-width: 280px;
 }
 
 .ai-preview-card {

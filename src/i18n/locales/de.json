@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "Schlüssel darf keine aufeinanderfolgenden Punkte enthalten",
     "errorEmptySegment": "Schlüsselsegmente dürfen nicht leer sein"
   },
+  "inspector": {
+    "title": "Übersetzungsschlüssel-Inspektor",
+    "emptySelection": "Kein Übersetzungsschlüssel ausgewählt",
+    "emptySelectionHint": "Wählen Sie einen Schlüssel im Baum aus oder navigieren Sie von der Suche/Problemen zur Inspektion.",
+    "keyPath": "Schlüsselpfad",
+    "reference": "Referenz",
+    "translations": "Übersetzungen",
+    "coverage": "Abdeckung",
+    "coverageRatio": "{translated} / {total} Sprachen",
+    "coveragePercent": "{percent}% abgeschlossen",
+    "problems": "Probleme",
+    "noProblems": "Keine Probleme erkannt",
+    "emptyCount": "{count} Leer",
+    "missingCount": "{count} Fehlend",
+    "statusTranslated": "Übersetzt",
+    "statusEmpty": "Leer",
+    "statusMissing": "Fehlend",
+    "openInEditor": "Öffnen",
+    "openInEditorAria": "Öffne {key} in {filename}",
+    "toggleInspector": "Inspektor",
+    "closeInspector": "Inspektor schließen"
+  },
   "common": {
     "save": "Speichern",
     "done": "Fertig",
