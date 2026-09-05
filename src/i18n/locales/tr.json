@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} sorun"
   },
+  "search": {
+    "title": "Ara",
+    "placeholder": "Anahtarları ve çevirileri ara...",
+    "resultsCount": "{fileCount} dosyada {count} sonuç",
+    "singleResult": "1 dosyada 1 sonuç",
+    "noResults": "Eşleşen anahtar veya çeviri bulunamadı",
+    "noResultsHint": "Farklı bir anahtar veya çeviri parçacığı aramayı deneyin",
+    "emptyQueryHint": "Tüm dosyalarda aramak için bir anahtar veya çeviri yazın",
+    "noWorkspace": "Yerelleştirme dosyalarında arama yapmak için bir çalışma alanı açın",
+    "noFiles": "Çalışma alanında yerelleştirme dosyası bulunamadı",
+    "matchTypeKey": "Anahtar eşleşmesi",
+    "matchTypeValue": "Değer eşleşmesi",
+    "matchTypeBoth": "Anahtar ve Değer eşleşmesi",
+    "openSearchTooltip": "Yerelleştirme dosyalarında ara (Ctrl+F)",
+    "clearSearch": "Aramayı temizle",
+    "closeSearch": "Aramayı kapat",
+    "navigateHint": "Gezinmek için ↑↓, anahtara gitmek için Enter, kapatmak için Esc tuşunu kullanın"
+  },
   "common": {
     "save": "Kaydet",
     "done": "Tamam",

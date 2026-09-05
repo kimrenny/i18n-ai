@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} problèmes"
   },
+  "search": {
+    "title": "Recherche",
+    "placeholder": "Rechercher des clés et des traductions...",
+    "resultsCount": "{count} résultats dans {fileCount} fichiers",
+    "singleResult": "1 résultat dans 1 fichier",
+    "noResults": "Aucune clé ou traduction correspondante trouvée",
+    "noResultsHint": "Essayez de rechercher une autre clé ou un extrait de traduction",
+    "emptyQueryHint": "Saisissez une clé ou une traduction pour rechercher dans tous les fichiers",
+    "noWorkspace": "Ouvrez un espace de travail pour rechercher des fichiers de localisation",
+    "noFiles": "Aucun fichier de localisation détecté dans l'espace de travail",
+    "matchTypeKey": "Correspondance de clé",
+    "matchTypeValue": "Correspondance de valeur",
+    "matchTypeBoth": "Correspondance de clé et valeur",
+    "openSearchTooltip": "Rechercher dans les fichiers de localisation (Ctrl+F)",
+    "clearSearch": "Effacer la recherche",
+    "closeSearch": "Fermer la recherche",
+    "navigateHint": "Utilisez ↑↓ pour naviguer, Entrée pour ouvrir, Échap pour fermer"
+  },
   "common": {
     "save": "Enregistrer",
     "done": "Terminé",

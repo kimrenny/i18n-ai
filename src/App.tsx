@@ -20,11 +20,13 @@ import { calculateWorkspaceProblems } from './services/localizationProblems'
 import type { ProblemNavigationTarget } from './types/localizationCoverage'
 import type { LocalizationProblem } from './types/localizationProblems'
 import { ProblemsPanel } from './components/problems/ProblemsPanel'
+import { GlobalSearch } from './components/search/GlobalSearch'
 import { useResizablePanel } from './hooks/useResizablePanel'
 import type {
   ParsedLocalizationFile,
   LocalizationComparisonResult,
 } from './types/localization'
+import type { LocalizationSearchResult } from './types/localizationSearch'
 import type { DirectoryTreeResult, ProjectFileEntry } from './types/explorer'
 import { I18nProvider } from './i18n/I18nContext'
 import { useTranslation } from './i18n/useTranslation'
@@ -108,10 +110,23 @@ const AppContent: React.FC<AppContentProps> = ({
   })
 
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'dashboard' | 'diff' | 'preview'>('dashboard')
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [selectedLanguageTarget, setSelectedLanguageTarget] = useState<{
     filename: string
     problem: ProblemNavigationTarget | null
   } | null>(null)
+
+  // Global keyboard shortcut: Ctrl+F / Cmd+F opens/focuses Global Search
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setIsSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [])
 
   // Parsing & Comparison State
   const [parseResults, setParseResults] = useState<FileParseResult[] | null>(null)
@@ -455,6 +470,26 @@ const AppContent: React.FC<AppContentProps> = ({
     [comparisonResult, successfulParsedFiles]
   )
 
+  const handleNavigateFromSearch = useCallback(
+    (result: LocalizationSearchResult) => {
+      let currentComparison = comparisonResult
+      if (!currentComparison && successfulParsedFiles.length >= 2) {
+        currentComparison = compareLocalizationFiles(successfulParsedFiles)
+        setComparisonResult(currentComparison)
+      }
+      setSelectedLanguageTarget({
+        filename: result.filename,
+        problem: {
+          key: result.key,
+          mode: result.isEmpty ? 'empty' : 'missing',
+        },
+      })
+      setActiveWorkspaceTab('diff')
+      setIsSearchOpen(false)
+    },
+    [comparisonResult, successfulParsedFiles]
+  )
+
   const folderName = useMemo(() => {
     if (!selectedDirectory) return null
     return treeData?.rootName || selectedDirectory.split(/[/|\\]/).filter(Boolean).pop() || selectedDirectory
@@ -519,6 +554,17 @@ const AppContent: React.FC<AppContentProps> = ({
               📄 {selectedPreviewFile.name}
             </button>
           )}
+
+          <button
+            type="button"
+            className="app-btn app-btn-md ide-search-btn"
+            data-testid="ide-search-btn"
+            onClick={() => setIsSearchOpen(true)}
+            title={t('search.openSearchTooltip')}
+            aria-label={t('search.title')}
+          >
+            🔍 {t('search.title')}
+          </button>
 
           <button
             type="button"
@@ -750,6 +796,15 @@ const AppContent: React.FC<AppContentProps> = ({
           </span>
         </div>
       </footer>
+
+      {/* Global Search Dialog */}
+      <GlobalSearch
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelectResult={handleNavigateFromSearch}
+        files={successfulParsedFiles}
+        isWorkspaceOpen={!!selectedDirectory}
+      />
 
       {/* Settings Modal */}
       {isSettingsOpen && (

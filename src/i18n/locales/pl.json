@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} problemów"
   },
+  "search": {
+    "title": "Szukaj",
+    "placeholder": "Szukaj kluczy i tłumaczeń...",
+    "resultsCount": "{count} wyników w {fileCount} plikach",
+    "singleResult": "1 wynik w 1 pliku",
+    "noResults": "Nie znaleziono pasujących kluczy ani tłumaczeń",
+    "noResultsHint": "Spróbuj wyszukać inny klucz lub fragment tłumaczenia",
+    "emptyQueryHint": "Wpisz klucz lub tłumaczenie, aby przeszukać wszystkie pliki",
+    "noWorkspace": "Otwórz obszar roboczy, aby przeszukiwać pliki lokalizacji",
+    "noFiles": "Nie wykryto plików lokalizacji w obszarze roboczym",
+    "matchTypeKey": "Dopasowanie klucza",
+    "matchTypeValue": "Dopasowanie wartości",
+    "matchTypeBoth": "Dopasowanie klucza i wartości",
+    "openSearchTooltip": "Szukaj w plikach lokalizacji (Ctrl+F)",
+    "clearSearch": "Wyczyść wyszukiwanie",
+    "closeSearch": "Zamknij wyszukiwanie",
+    "navigateHint": "Użyj ↑↓ do nawigacji, Enter aby przejść do klucza, Esc aby zamknąć"
+  },
   "common": {
     "save": "Zapisz",
     "done": "Gotowe",

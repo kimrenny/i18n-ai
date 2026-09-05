@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} проблем"
   },
+  "search": {
+    "title": "Поиск",
+    "placeholder": "Поиск ключей и переводов...",
+    "resultsCount": "Результатов: {count} в {fileCount} файлах",
+    "singleResult": "1 результат в 1 файле",
+    "noResults": "Совпадающих ключей или переводов не найдено",
+    "noResultsHint": "Попробуйте ввести другой ключ или фрагмент перевода",
+    "emptyQueryHint": "Введите ключ или текст для поиска по всем файлам",
+    "noWorkspace": "Откройте рабочую область для поиска файлов локализации",
+    "noFiles": "В рабочей области не обнаружены файлы локализации",
+    "matchTypeKey": "Совпадение по ключу",
+    "matchTypeValue": "Совпадение по значению",
+    "matchTypeBoth": "Совпадение по ключу и значению",
+    "openSearchTooltip": "Поиск по файлам локализации (Ctrl+F)",
+    "clearSearch": "Очистить поиск",
+    "closeSearch": "Закрыть поиск",
+    "navigateHint": "Используйте ↑↓ для навигации, Enter для перехода, Esc для закрытия"
+  },
   "common": {
     "save": "Сохранить",
     "done": "Готово",

@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} 件の問題"
   },
+  "search": {
+    "title": "検索",
+    "placeholder": "キーと翻訳を検索...",
+    "resultsCount": "{fileCount} ファイルで {count} 件の結果",
+    "singleResult": "1 ファイルで 1 件の結果",
+    "noResults": "一致するキーまたは翻訳が見つかりません",
+    "noResultsHint": "別のキーまたは翻訳テキストを検索してください",
+    "emptyQueryHint": "すべてのファイルを検索するキーまたは翻訳を入力してください",
+    "noWorkspace": "ローカライズファイルを検索するにはワークスペースを開いてください",
+    "noFiles": "ワークスペースにローカライズファイルが見つかりません",
+    "matchTypeKey": "キーの一致",
+    "matchTypeValue": "値の一致",
+    "matchTypeBoth": "キーと値の一致",
+    "openSearchTooltip": "ローカライズファイルを検索 (Ctrl+F)",
+    "clearSearch": "検索をクリア",
+    "closeSearch": "検索を閉じる",
+    "navigateHint": "↑↓ で移動、Enter でキーに移動、Esc で閉じる"
+  },
   "common": {
     "save": "保存",
     "done": "完了",
