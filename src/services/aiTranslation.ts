@@ -64,6 +64,31 @@ export class AiTranslationError extends Error {
   }
 }
 
+export function is429RateLimitError(error: unknown): boolean {
+  if (error instanceof AiTranslationError) {
+    return error.status === 429 || error.code === 'RATE_LIMIT'
+  }
+  if (typeof error === 'object' && error !== null) {
+    const e = error as Record<string, unknown>
+    if (e.status === 429 || e.code === 'RATE_LIMIT') {
+      return true
+    }
+    if (typeof e.message === 'string') {
+      const msg = e.message.toLowerCase()
+      // Only match 429 or explicit rate limit keywords
+      if (
+        msg.includes('429') ||
+        msg.includes('rate limit') ||
+        msg.includes('too many requests') ||
+        msg.includes('resource_exhausted')
+      ) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
 export function isRetryableError(error: unknown): boolean {
   if (error instanceof AiTranslationError) {
     return error.retryable
@@ -101,14 +126,71 @@ export function isRetryableError(error: unknown): boolean {
   return false
 }
 
+export function parseRetryAfterHeader(header?: string | null): number | undefined {
+  if (!header) return undefined
+  const trimmed = header.trim()
+  if (!trimmed) return undefined
+  const seconds = Number(trimmed)
+  if (!isNaN(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000)
+  }
+  const dateParsed = Date.parse(trimmed)
+  if (!isNaN(dateParsed)) {
+    const diff = dateParsed - Date.now()
+    return diff > 0 ? diff : 0
+  }
+  return undefined
+}
+
 export function getRetryAfterMs(error: unknown): number | undefined {
   if (typeof error === 'object' && error !== null) {
     const e = error as Record<string, unknown>
-    if (typeof e.retryAfterMs === 'number' && e.retryAfterMs > 0) {
+    if (typeof e.retryAfterMs === 'number' && !isNaN(e.retryAfterMs) && e.retryAfterMs >= 0) {
       return e.retryAfterMs
+    }
+    if (typeof e.retryAfter === 'string') {
+      const parsed = parseRetryAfterHeader(e.retryAfter)
+      if (parsed !== undefined) return parsed
     }
   }
   return undefined
+}
+
+export function calculate429BackoffDelay(
+  attempt: number,
+  retryAfterMs?: number,
+  baseDelayMs: number = 1000,
+  maxDelayMs: number = 15000,
+  enableJitter: boolean = false
+): number {
+  if (typeof retryAfterMs === 'number' && !isNaN(retryAfterMs) && retryAfterMs >= 0) {
+    return Math.min(retryAfterMs, maxDelayMs)
+  }
+  const exponent = Math.max(0, attempt - 1)
+  const delay = baseDelayMs * Math.pow(2, exponent)
+  const jitter = enableJitter ? Math.floor(Math.random() * 200) : 0
+  return Math.min(delay + jitter, maxDelayMs)
+}
+
+export interface SingleTranslationProgressInfo {
+  status: 'idle' | 'translating' | 'retrying' | 'success' | 'error'
+  attempt: number // 0 for initial translation, 1..3 for retrying
+  maxRetries: number // 3
+  delayRemainingMs?: number
+  message?: string
+  error?: unknown
+  key: string
+  targetFile: string
+}
+
+export interface ExecuteAiTranslationOptions {
+  maxRetries?: number // defaults to 3
+  baseDelayMs?: number // defaults to 1000
+  maxDelayMs?: number // defaults to 15000
+  enableJitter?: boolean
+  countdownIntervalMs?: number // defaults to 1000ms
+  onProgress?: (progress: SingleTranslationProgressInfo) => void
+  signal?: AbortSignal
 }
 
 export interface AiTranslationProvider {
@@ -422,3 +504,164 @@ export async function executeBatchAiTranslation(
     model: providerConfig.model || 'default',
   }
 }
+
+/**
+ * Dispatches a single AI translation request with automatic bounded retries ONLY for HTTP 429 Too Many Requests.
+ *
+ * Retries up to maxRetries (default 3) attempts with exponential backoff / Retry-After prioritization
+ * and non-busy countdown notifications.
+ */
+export async function executeAiTranslationWithRetry(
+  request: AiTranslationRequest,
+  settings: AiTranslationSettings | import('../types/settings').AppSettings,
+  options?: ExecuteAiTranslationOptions
+): Promise<AiTranslationResult> {
+  const maxRetries = options?.maxRetries ?? 3
+  const baseDelayMs = options?.baseDelayMs ?? 1000
+  const maxDelayMs = options?.maxDelayMs ?? 15000
+  const enableJitter = options?.enableJitter ?? false
+  const countdownIntervalMs = options?.countdownIntervalMs ?? 1000
+  const signal = options?.signal
+
+  if (signal?.aborted) {
+    const abortErr = new Error('Translation cancelled by user.')
+    options?.onProgress?.({
+      status: 'error',
+      attempt: 0,
+      maxRetries,
+      key: request.key,
+      targetFile: request.targetFile,
+      error: abortErr,
+    })
+    throw abortErr
+  }
+
+  let attempt = 0 // 0 = initial attempt, 1 = retry 1, 2 = retry 2, 3 = retry 3
+  while (true) {
+    if (signal?.aborted) {
+      const abortErr = new Error('Translation cancelled by user.')
+      options?.onProgress?.({
+        status: 'error',
+        attempt,
+        maxRetries,
+        key: request.key,
+        targetFile: request.targetFile,
+        error: abortErr,
+      })
+      throw abortErr
+    }
+
+    options?.onProgress?.({
+      status: 'translating',
+      attempt,
+      maxRetries,
+      key: request.key,
+      targetFile: request.targetFile,
+    })
+
+    try {
+      const result = await executeAiTranslation(request, settings)
+      if (signal?.aborted) {
+        throw new Error('Translation cancelled by user.')
+      }
+      options?.onProgress?.({
+        status: 'success',
+        attempt,
+        maxRetries,
+        key: request.key,
+        targetFile: request.targetFile,
+      })
+      return result
+    } catch (err) {
+      if (signal?.aborted) {
+        const abortErr = new Error('Translation cancelled by user.')
+        options?.onProgress?.({
+          status: 'error',
+          attempt,
+          maxRetries,
+          key: request.key,
+          targetFile: request.targetFile,
+          error: abortErr,
+        })
+        throw abortErr
+      }
+
+      const is429 = is429RateLimitError(err)
+      if (!is429 || attempt >= maxRetries) {
+        options?.onProgress?.({
+          status: 'error',
+          attempt,
+          maxRetries,
+          key: request.key,
+          targetFile: request.targetFile,
+          error: err,
+        })
+        throw err
+      }
+
+      attempt++
+      const retryAfterMs = getRetryAfterMs(err)
+      const delayMs = calculate429BackoffDelay(attempt, retryAfterMs, baseDelayMs, maxDelayMs, enableJitter)
+
+      if (delayMs > 0) {
+        let remainingMs = delayMs
+        options?.onProgress?.({
+          status: 'retrying',
+          attempt,
+          maxRetries,
+          delayRemainingMs: remainingMs,
+          key: request.key,
+          targetFile: request.targetFile,
+        })
+
+        const startTime = Date.now()
+        while (remainingMs > 0) {
+          if (signal?.aborted) {
+            const abortErr = new Error('Translation cancelled by user.')
+            options?.onProgress?.({
+              status: 'error',
+              attempt,
+              maxRetries,
+              key: request.key,
+              targetFile: request.targetFile,
+              error: abortErr,
+            })
+            throw abortErr
+          }
+
+          const sleepChunk = Math.min(countdownIntervalMs, remainingMs)
+          await new Promise<void>((resolve, reject) => {
+            const onAbort = () => {
+              clearTimeout(timer)
+              signal?.removeEventListener('abort', onAbort)
+              reject(new Error('Translation cancelled by user.'))
+            }
+            if (signal?.aborted) {
+              return reject(new Error('Translation cancelled by user.'))
+            }
+            signal?.addEventListener('abort', onAbort)
+            const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
+              signal?.removeEventListener('abort', onAbort)
+              resolve()
+            }, sleepChunk)
+          })
+
+          const elapsed = Date.now() - startTime
+          remainingMs = Math.max(0, delayMs - elapsed)
+
+          if (remainingMs > 0) {
+            options?.onProgress?.({
+              status: 'retrying',
+              attempt,
+              maxRetries,
+              delayRemainingMs: remainingMs,
+              key: request.key,
+              targetFile: request.targetFile,
+            })
+          }
+        }
+      }
+    }
+  }
+}
+

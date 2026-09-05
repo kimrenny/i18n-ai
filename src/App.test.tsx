@@ -4,6 +4,7 @@ import App from './App'
 import {
   setAiTranslationProvider,
   MockAiTranslationProvider,
+  AiTranslationError,
 } from './services/aiTranslation'
 import type { ElectronAPI } from './types/electron'
 import { DEFAULT_APP_SETTINGS, type AppSettings } from './types/settings'
@@ -533,7 +534,7 @@ describe('App', () => {
     fireEvent.click(aiTranslateBtn)
 
     await waitFor(() => {
-      expect(screen.getByText(/api key is missing for openai/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/api key is missing for openai/i)[0]).toBeInTheDocument()
     })
 
     expect(mockWriteJsonFiles).not.toHaveBeenCalled()
@@ -2785,6 +2786,597 @@ describe('App', () => {
       expect(screen.getByTestId('rename-translation-key-modal')).toBeInTheDocument()
     })
   })
+
+  describe('Translation History feature', () => {
+    let mockGetJsonFiles: Mock
+    let mockReadJsonFile: Mock
+    let mockWriteJsonFiles: Mock
+    let enState: Record<string, unknown>
+    let ruState: Record<string, unknown>
+
+    beforeEach(() => {
+      enState = {
+        'COMMON.SAVE': 'Save',
+        'COMMON.CANCEL': 'Cancel',
+        'ADMIN.DASHBOARD.TITLE': 'Number of registrations',
+        'ADMIN.DASHBOARD.EXISTING': 'Already Here',
+      }
+      ruState = {
+        'COMMON.SAVE': 'Сохранить',
+        'ADMIN.DASHBOARD.TITLE': 'Количество регистраций',
+      }
+
+      mockGetJsonFiles = vi.fn().mockResolvedValue([
+        { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+        { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+      ])
+
+      mockReadJsonFile = vi.fn().mockImplementation(async (p: string) => {
+        if (p.includes('en.json')) {
+          return enState
+        }
+        if (p.includes('ru.json')) {
+          return ruState
+        }
+        throw new Error('File not found')
+      })
+
+      mockWriteJsonFiles = vi.fn().mockImplementation(async (files: Array<{ path: string; content: string }>) => {
+        for (const file of files) {
+          if (file.path.includes('en.json')) {
+            enState = JSON.parse(file.content)
+          }
+          if (file.path.includes('ru.json')) {
+            ruState = JSON.parse(file.content)
+          }
+        }
+        return { success: true }
+      })
+
+      const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: mockSelectDirectory,
+        getJsonFiles: mockGetJsonFiles,
+        readJsonFile: mockReadJsonFile,
+        writeJsonFiles: mockWriteJsonFiles,
+      })
+    })
+
+    it('opens Translation History panel via toolbar button and shows empty state', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('toggle-history-btn')).toBeInTheDocument())
+
+      const historyToggleBtn = screen.getByTestId('toggle-history-btn')
+      fireEvent.click(historyToggleBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('translation-history-panel')).toBeInTheDocument()
+        expect(screen.getByTestId('history-empty-state')).toBeInTheDocument()
+      })
+    })
+
+    it('tracks inline translation edits, displays details, navigates and supports revert', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).toBeInTheDocument())
+
+      const titleNode = screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')
+
+      // Double-click to edit
+      fireEvent.doubleClick(titleNode)
+      const input = screen.getByRole('textbox', { name: /edit admin\.dashboard\.title/i })
+      fireEvent.change(input, { target: { value: 'New Dashboard Title' } })
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/en.json',
+            content: expect.stringContaining('"ADMIN.DASHBOARD.TITLE": "New Dashboard Title"'),
+          },
+        ])
+      })
+
+      // Open Translation History
+      fireEvent.click(screen.getByTestId('toggle-history-btn'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('translation-history-panel')).toBeInTheDocument()
+        expect(screen.getByTestId('history-list')).toBeInTheDocument()
+        expect(screen.getByTestId('history-total-count')).toHaveTextContent('1')
+      })
+
+      // Inspect detail pane
+      expect(screen.getByTestId('history-detail-pane')).toBeInTheDocument()
+      expect(screen.getByTestId('detail-prev-value')).toHaveTextContent('Number of registrations')
+      expect(screen.getByTestId('detail-new-value')).toHaveTextContent('New Dashboard Title')
+
+      // Revert history item
+      const revertBtn = screen.getByTestId('history-revert-btn')
+      fireEvent.click(revertBtn)
+
+      expect(screen.getByTestId('revert-history-modal')).toBeInTheDocument()
+      const confirmRevertBtn = screen.getByTestId('revert-history-confirm')
+      fireEvent.click(confirmRevertBtn)
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/en.json',
+            content: expect.stringContaining('"ADMIN.DASHBOARD.TITLE": "Number of registrations"'),
+          },
+        ])
+      })
+    })
+
+    it('clears history without modifying translation files', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).toBeInTheDocument())
+
+      const titleNode = screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')
+      fireEvent.doubleClick(titleNode)
+      const input = screen.getByRole('textbox', { name: /edit admin\.dashboard\.title/i })
+      fireEvent.change(input, { target: { value: 'Updated Title' } })
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() => expect(mockWriteJsonFiles).toHaveBeenCalled())
+      mockWriteJsonFiles.mockClear()
+
+      // Open history
+      fireEvent.click(screen.getByTestId('toggle-history-btn'))
+      await waitFor(() => expect(screen.getByTestId('clear-history-btn')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByTestId('clear-history-btn'))
+      expect(screen.getByTestId('clear-history-modal')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByTestId('clear-history-confirm'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('history-empty-state')).toBeInTheDocument()
+        expect(screen.getByTestId('history-total-count')).toHaveTextContent('0')
+      })
+
+      // No files modified by clearing history
+      expect(mockWriteJsonFiles).not.toHaveBeenCalled()
+    })
+
+    it('safely deactivates active inline editor when navigating from History item', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).toBeInTheDocument())
+
+      // Edit a key to populate history
+      const titleNode = screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')
+      fireEvent.doubleClick(titleNode)
+      const input = screen.getByRole('textbox', { name: /edit admin\.dashboard\.title/i })
+      fireEvent.change(input, { target: { value: 'First Edit' } })
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() => expect(mockWriteJsonFiles).toHaveBeenCalled())
+
+      // Switch to ru.json and start editing another key
+      fireEvent.click(screen.getByRole('tab', { name: /ru\.json/i }))
+      await waitFor(() => expect(screen.getByTestId('tree-node-COMMON.SAVE')).toBeInTheDocument())
+
+      const saveNode = screen.getByTestId('tree-node-COMMON.SAVE')
+      fireEvent.doubleClick(saveNode)
+      expect(screen.getByRole('textbox', { name: /edit common\.save/i })).toBeInTheDocument()
+
+      // Open history and click the en.json history item
+      fireEvent.click(screen.getByTestId('toggle-history-btn'))
+      await waitFor(() => expect(screen.getByTestId('history-list')).toBeInTheDocument())
+
+      const navBtn = screen.getByTestId('history-navigate-btn')
+      fireEvent.click(navBtn)
+
+      // Active editor on ru.json must be closed safely
+      expect(screen.queryByRole('textbox', { name: /edit common\.save/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /en\.json/i, selected: true })).toBeInTheDocument()
+    })
+
+    it('displays history toolbar button without any numeric count badge', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('toggle-history-btn')).toBeInTheDocument())
+
+      const historyBtn = screen.getByTestId('toggle-history-btn')
+      expect(historyBtn).toHaveTextContent(/History/)
+      expect(screen.queryByTestId('toolbar-history-count')).not.toBeInTheDocument()
+
+      // Edit a key to add history
+      const titleNode = screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')
+      fireEvent.doubleClick(titleNode)
+      const input = screen.getByRole('textbox', { name: /edit admin\.dashboard\.title/i })
+      fireEvent.change(input, { target: { value: 'Modified' } })
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+      await waitFor(() => expect(mockWriteJsonFiles).toHaveBeenCalled())
+
+      // History button still does NOT render numeric badge
+      expect(historyBtn).toHaveTextContent(/History/)
+      expect(screen.queryByTestId('toolbar-history-count')).not.toBeInTheDocument()
+    })
+
+    it('Scenario A, B & E: AI translate -> Undo -> preserves all existing translations, distinguishes missing/empty, and allows second translation', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
+
+      // ru.json has COMMON.SAVE and ADMIN.DASHBOARD.TITLE translated, but COMMON.CANCEL missing
+      await waitFor(() => expect(screen.getByTestId('tree-node-COMMON.SAVE')).toBeInTheDocument())
+
+      // 1. AI translate COMMON.CANCEL
+      await waitFor(() => expect(screen.getByRole('button', { name: /translate common\.cancel with ai/i })).toBeInTheDocument())
+      const translateCancelBtn = screen.getByRole('button', { name: /translate common\.cancel with ai/i })
+      fireEvent.click(translateCancelBtn)
+
+      // Confirm translation modal
+      await waitFor(() => expect(screen.getByRole('button', { name: /apply translation/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /apply translation/i }))
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.stringContaining('[AI: RU] Cancel'),
+          },
+        ])
+      })
+
+      // 2. Click Undo
+      await waitFor(() => expect(screen.getByTestId('tree-undo-btn')).not.toBeDisabled())
+      const undoBtn = screen.getByTestId('tree-undo-btn')
+
+      mockWriteJsonFiles.mockClear()
+      fireEvent.click(undoBtn)
+
+      // 3. File is restored via targeted mutation (COMMON.CANCEL deleted from ru.json)
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledTimes(1)
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.not.stringContaining('Cancel'),
+          },
+        ])
+      })
+
+      // 4. Verify existing translations (COMMON.SAVE, ADMIN.DASHBOARD.TITLE) remain fully visible and present
+      await waitFor(() => {
+        expect(screen.getByTestId('tree-node-COMMON.SAVE')).toBeInTheDocument()
+        expect(screen.getByTestId('tree-node-COMMON.SAVE')).toHaveTextContent('Сохранить')
+        expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).toBeInTheDocument()
+        expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).toHaveTextContent('Количество регистраций')
+      })
+
+      // 5. Verify missing key detection is still accurate
+      expect(screen.getByRole('button', { name: /translate common\.cancel with ai/i })).toBeInTheDocument()
+
+      // 6. Translate the missing key again -> works because source reference in en.json is intact
+      mockWriteJsonFiles.mockClear()
+      const translateAgainBtn = screen.getByRole('button', { name: /translate common\.cancel with ai/i })
+      fireEvent.click(translateAgainBtn)
+
+      await waitFor(() => expect(screen.getByRole('button', { name: /apply translation/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /apply translation/i }))
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.stringContaining('[AI: RU] Cancel'),
+          },
+        ])
+      })
+    })
+
+    it('Scenario F: Reverting an older history entry does NOT overwrite or wipe newer changes to other keys', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).toBeInTheDocument())
+
+      // 1. Edit key A (ADMIN.DASHBOARD.TITLE)
+      const titleNode = screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')
+      fireEvent.doubleClick(titleNode)
+      let input = screen.getByRole('textbox', { name: /edit admin\.dashboard\.title/i })
+      fireEvent.change(input, { target: { value: 'First Edited Title' } })
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+      await waitFor(() => expect(mockWriteJsonFiles).toHaveBeenCalled())
+
+      // 2. Edit key B (ADMIN.DASHBOARD.EXISTING) - a newer change
+      mockWriteJsonFiles.mockClear()
+      const existingNode = screen.getByTestId('tree-node-ADMIN.DASHBOARD.EXISTING')
+      fireEvent.doubleClick(existingNode)
+      input = screen.getByRole('textbox', { name: /edit admin\.dashboard\.existing/i })
+      fireEvent.change(input, { target: { value: 'Newer Existing Value' } })
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+      await waitFor(() => expect(mockWriteJsonFiles).toHaveBeenCalled())
+
+      // 3. Open History and revert the older operation (key A)
+      fireEvent.click(screen.getByTestId('toggle-history-btn'))
+      await waitFor(() => expect(screen.getByTestId('history-list')).toBeInTheDocument())
+
+      // Find the older history item for ADMIN.DASHBOARD.TITLE
+      const items = screen.getAllByRole('listitem')
+      const olderItem = items.find((i) => i.textContent?.includes('ADMIN.DASHBOARD.TITLE'))
+      expect(olderItem).toBeDefined()
+      fireEvent.click(olderItem!)
+
+      // Revert the older item
+      mockWriteJsonFiles.mockClear()
+      fireEvent.click(screen.getByTestId('history-revert-btn'))
+      await waitFor(() => expect(screen.getByTestId('revert-history-modal')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('revert-history-confirm'))
+
+      // Verify written content: key A is reverted to original "Number of registrations", but key B "Newer Existing Value" is PRESERVED!
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/en.json',
+            content: expect.stringContaining('"ADMIN.DASHBOARD.TITLE": "Number of registrations"'),
+          },
+        ])
+        const writtenContent = mockWriteJsonFiles.mock.calls[0][0][0].content
+        expect(writtenContent).toContain('"ADMIN.DASHBOARD.EXISTING": "Newer Existing Value"')
+      })
+    })
+  })
+
+  describe('HTTP 429 Rate Limit Recovery & Progress UX', () => {
+    let mockWriteJsonFiles: Mock
+
+    beforeEach(() => {
+      mockWriteJsonFiles = vi.fn().mockResolvedValue(undefined)
+      const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+      const mockGetJsonFiles = vi.fn().mockResolvedValue([
+        { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+        { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+      ])
+      const mockReadJsonFile = vi.fn().mockImplementation(async (filePath: string) => {
+        if (filePath.endsWith('en.json')) {
+          return {
+            COMMON: {
+              SAVE: 'Save',
+              CANCEL: 'Cancel',
+            },
+          }
+        }
+        if (filePath.endsWith('ru.json')) {
+          return {
+            COMMON: {
+              SAVE: 'Сохранить',
+              CANCEL: '',
+            },
+          }
+        }
+        throw new Error('File not found')
+      })
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: mockSelectDirectory,
+        getJsonFiles: mockGetJsonFiles,
+        readJsonFile: mockReadJsonFile,
+        writeJsonFiles: mockWriteJsonFiles,
+      })
+    })
+
+    it('Scenario 1: 429 -> retry 1 -> retry 2 -> retry 3 -> success', async () => {
+      let attemptsCount = 0
+      const mockProvider = new MockAiTranslationProvider(async (req) => {
+        attemptsCount++
+        if (attemptsCount <= 3) {
+          throw new AiTranslationError('429 Too Many Requests', {
+            status: 429,
+            retryAfterMs: 5,
+            retryable: true,
+          })
+        }
+        return {
+          translatedText: `[AI: RU] ${req.sourceValue}`,
+          provider: 'mock',
+          model: 'mock-v1',
+        }
+      })
+      setAiTranslationProvider(mockProvider)
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: /translate common\.cancel with ai/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /translate common\.cancel with ai/i }))
+
+      // Wait for 3 retries to finish and proposal modal to show up
+      await waitFor(() => expect(screen.getByRole('button', { name: /apply translation/i })).toBeInTheDocument(), { timeout: 4000 })
+      expect(attemptsCount).toBe(4) // 1 initial + 3 retries
+
+      fireEvent.click(screen.getByRole('button', { name: /apply translation/i }))
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.stringContaining('[AI: RU] Cancel'),
+          },
+        ])
+      })
+    })
+
+    it('Scenario 2: 429 -> all 3 retries exhausted -> clean failure and state reset', async () => {
+      let attemptsCount = 0
+      const mockProvider = new MockAiTranslationProvider(async () => {
+        attemptsCount++
+        throw new AiTranslationError('429 Too Many Requests', {
+          status: 429,
+          retryAfterMs: 5,
+          retryable: true,
+        })
+      })
+      setAiTranslationProvider(mockProvider)
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: /translate common\.cancel with ai/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /translate common\.cancel with ai/i }))
+
+      // Wait for error toast / banner after retries exhausted
+      await waitFor(() => {
+        expect(screen.getByTestId('translation-progress-toast')).toHaveClass('status-error')
+      }, { timeout: 4000 })
+
+      expect(attemptsCount).toBe(4) // 1 initial + 3 retries = 4 attempts total
+      // Verify button is re-enabled and state is cleanly idle
+      expect(screen.getByRole('button', { name: /translate common\.cancel with ai/i })).toBeEnabled()
+    })
+
+    it('Scenario 3: 429 -> failure -> immediately start another AI translation -> works normally', async () => {
+      let shouldFail = true
+      const mockProvider = new MockAiTranslationProvider(async (req) => {
+        if (shouldFail) {
+          throw new AiTranslationError('429 Too Many Requests', {
+            status: 429,
+            retryAfterMs: 5,
+            retryable: true,
+          })
+        }
+        return {
+          translatedText: `[AI: RU] ${req.sourceValue}`,
+          provider: 'mock',
+          model: 'mock-v1',
+        }
+      })
+      setAiTranslationProvider(mockProvider)
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
+
+      // 1. First translation fails with 429
+      await waitFor(() => expect(screen.getByRole('button', { name: /translate common\.cancel with ai/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /translate common\.cancel with ai/i }))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('translation-progress-toast')).toHaveClass('status-error')
+      }, { timeout: 4000 })
+
+      // 2. Recover backend, trigger translation again immediately
+      shouldFail = false
+      const translateBtn = screen.getByRole('button', { name: /translate common\.cancel with ai/i })
+      expect(translateBtn).toBeEnabled()
+      fireEvent.click(translateBtn)
+
+      // 3. Proposal modal appears normally and applies successfully
+      await waitFor(() => expect(screen.getByRole('button', { name: /apply translation/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /apply translation/i }))
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.stringContaining('[AI: RU] Cancel'),
+          },
+        ])
+      })
+    })
+
+    it('Scenario 4: Free Translation remains fully usable after AI 429 failure', async () => {
+      let mockProviderMode: 'ai_429' | 'free_ok' = 'ai_429'
+      const mockProvider = new MockAiTranslationProvider(async (req) => {
+        if (mockProviderMode === 'ai_429') {
+          throw new AiTranslationError('429 Too Many Requests', {
+            status: 429,
+            retryAfterMs: 5,
+            retryable: true,
+          })
+        }
+        return {
+          translatedText: `[Free: RU] ${req.sourceValue}`,
+          provider: 'mock',
+          model: 'libretranslate',
+        }
+      })
+      setAiTranslationProvider(mockProvider)
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
+
+      // 1. AI translation fails with 429
+      await waitFor(() => expect(screen.getByRole('button', { name: /translate common\.cancel with ai/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /translate common\.cancel with ai/i }))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('translation-progress-toast')).toHaveClass('status-error')
+      }, { timeout: 4000 })
+
+      // 2. Switch engine to Free Translation in Settings
+      mockProviderMode = 'free_ok'
+      fireEvent.click(screen.getByRole('button', { name: /open settings/i }))
+      await waitFor(() => expect(screen.getByRole('combobox', { name: /select translation engine/i })).toBeInTheDocument())
+      fireEvent.change(screen.getByRole('combobox', { name: /select translation engine/i }), {
+        target: { value: 'free' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+      // 3. Trigger Free Translation
+      await waitFor(() => expect(screen.getByRole('button', { name: /translate common\.cancel with free/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /translate common\.cancel with free/i }))
+
+      // 4. Modal appears and translation completes successfully
+      await waitFor(() => expect(screen.getByRole('button', { name: /apply translation/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /apply translation/i }))
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.stringContaining('[Free: RU] Cancel'),
+          },
+        ])
+      })
+    })
+  })
 })
+
+
 
 

@@ -871,7 +871,8 @@ textarea,
   flex-direction: column;
 }
 
-.diff-inspector-column {
+.diff-inspector-column,
+.diff-history-column {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -879,7 +880,8 @@ textarea,
   overflow: hidden;
 }
 
-.tree-tool-btn.inspector-toggle-btn.is-active {
+.tree-tool-btn.inspector-toggle-btn.is-active,
+.tree-tool-btn.history-toggle-btn.is-active {
   background: rgba(56, 189, 248, 0.15);
   border-color: rgba(56, 189, 248, 0.4);
   color: #38bdf8;

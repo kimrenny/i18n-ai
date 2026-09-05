@@ -24,6 +24,7 @@ import { countLeafDescendants } from '../../services/localizationTree'
 import { shouldConfirmAiEdit } from '../../services/aiEditPolicy'
 import {
   executeAiTranslation,
+  executeAiTranslationWithRetry,
   findSourceReference,
   resolveLanguageFromFilename,
 } from '../../services/aiTranslation'
@@ -54,7 +55,18 @@ import { planAddTranslationKey } from '../../services/localizationKeyInsertion'
 import type { AddKeyTargetMode } from '../../types/localizationKeyInsertion'
 import type { ProblemNavigationTarget } from '../../types/localizationCoverage'
 import { TranslationKeyInspector } from '../inspector/TranslationKeyInspector'
+import { TranslationHistory } from '../history/TranslationHistory'
+import type { TranslationHistoryItem } from '../../types/localizationHistoryView'
+import {
+  mapHistoryActionToViewItem,
+  computeRevertFileChanges,
+  computeRedoFileChanges,
+} from '../../services/localizationHistoryView'
 import { ResizeHandle } from '../common/ResizeHandle'
+import {
+  TranslationProgressToast,
+  type TranslationProgressToastState,
+} from '../common/TranslationProgressToast'
 import { useResizablePanel } from '../../hooks/useResizablePanel'
 import { useTranslation } from '../../i18n/useTranslation'
 
@@ -92,6 +104,9 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const [activeMissingKey, setActiveMissingKey] = useState<string | null>(initialProblem?.key || null)
   const [selectedKey, setSelectedKey] = useState<string | null>(initialProblem?.key || null)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [selectedHistoryItemId, setSelectedHistoryItemId] = useState<string | null>(null)
+  const [isRevertingHistory, setIsRevertingHistory] = useState(false)
   const [navMode, setNavMode] = useState<ProblemNavMode>(initialProblem?.mode || 'missing')
   const [collapsedSet, setCollapsedSet] = useState<Set<string>>(new Set())
   const [additionPlan, setAdditionPlan] = useState<MissingKeysAdditionPlan | null>(null)
@@ -108,6 +123,15 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     isCollapsed: !isInspectorOpen,
   })
 
+  const historyResize = useResizablePanel({
+    direction: 'horizontal',
+    initialSize: 360,
+    minSize: 260,
+    maxSize: 600,
+    reverseDelta: true,
+    isCollapsed: !isHistoryOpen,
+  })
+
   // Manual inline translation editing state (isolated by target file & key)
   const [editingTarget, setEditingTarget] = useState<{ filename: string; key: string } | null>(null)
   const editingKey = editingTarget?.filename === activeFilename ? editingTarget.key : null
@@ -117,7 +141,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
   // History & Context Menu state
   const historyManagerRef = useRef<LocalizationHistoryManager>(new LocalizationHistoryManager())
-  const [, setHistoryVersion] = useState(0)
+  const [historyVersion, setHistoryVersion] = useState(0)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [deleteSectionTarget, setDeleteSectionTarget] = useState<{
     sectionPath: string
@@ -130,12 +154,21 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const [renameKeyTarget, setRenameKeyTarget] = useState<string | null>(null)
   const [isWritingRename, setIsWritingRename] = useState(false)
 
+  const historyItems = useMemo(() => {
+    if (historyVersion < 0) return []
+    const actions = historyManagerRef.current.getActions()
+    return actions.map((a) => mapHistoryActionToViewItem(a, t))
+  }, [historyVersion, t])
+
   // Single AI Translation state
   const [translatingKey, setTranslatingKey] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null)
   const [aiProposal, setAiProposal] = useState<AiTranslationProposal | null>(null)
   const [isApplyingAi, setIsApplyingAi] = useState(false)
+  const translationRequestIdRef = useRef<number>(0)
+  const singleTranslationAbortRef = useRef<AbortController | null>(null)
+  const [progressToastState, setProgressToastState] = useState<TranslationProgressToastState | null>(null)
 
   // Batch Translation state
   const [batchPlan, setBatchPlan] = useState<BatchTranslationPlan | null>(null)
@@ -370,6 +403,10 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     }
 
     const keyToSave = editingTarget.key
+    const previousValue =
+      typeof activeFileData.keys[keyToSave] === 'string'
+        ? (activeFileData.keys[keyToSave] as string)
+        : undefined
 
     setIsSavingKey(true)
     setSaveKeyError(null)
@@ -394,6 +431,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         type: 'edit_key',
         description: `Edit ${keyToSave}`,
         key: keyToSave,
+        previousValue,
+        newValue: editValue,
         beforeRawJson: activeFileData.raw as Record<string, JsonValue>,
         afterRawJson: updatedRaw as Record<string, JsonValue>,
       })
@@ -419,6 +458,11 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         return
       }
 
+      const previousValue =
+        typeof activeFileData.keys[fullKey] === 'string'
+          ? (activeFileData.keys[fullKey] as string)
+          : ''
+
       setSaveKeyError(null)
       try {
         const { updatedRaw, formattedJson, deleted } = deleteKeyFromFile(
@@ -443,6 +487,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           type: 'delete_key',
           description: `Delete ${fullKey}`,
           key: fullKey,
+          previousValue,
           beforeRawJson: activeFileData.raw as Record<string, JsonValue>,
           afterRawJson: updatedRaw as Record<string, JsonValue>,
         })
@@ -564,6 +609,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           type: 'rename_key',
           description: `Rename ${plan.oldKey} to ${plan.newKey}`,
           key: plan.newKey,
+          oldKey: plan.oldKey,
+          newKey: plan.newKey,
           beforeRawJson:
             (activeFileData?.raw as Record<string, JsonValue>) ||
             activeFilePlan.beforeRawJson,
@@ -620,22 +667,12 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
     setSaveKeyError(null)
     try {
-      const filesToWrite =
-        action.batchChanges && action.batchChanges.length > 0
-          ? action.batchChanges.map((c) => ({
-              path: c.targetFilePath,
-              content: JSON.stringify(c.beforeRawJson, null, 2) + '\n',
-            }))
-          : [
-              {
-                path: action.targetFilePath,
-                content: JSON.stringify(action.beforeRawJson, null, 2) + '\n',
-              },
-            ]
-
-      const res = await window.electronAPI.writeJsonFiles(filesToWrite)
-      if (!res || res.success === false) {
-        throw new Error('Failed to write file')
+      const filesToWrite = computeRevertFileChanges(action, parsedFiles)
+      if (filesToWrite.length > 0) {
+        const res = await window.electronAPI.writeJsonFiles(filesToWrite)
+        if (!res || res.success === false) {
+          throw new Error('Failed to write file')
+        }
       }
       setHistoryVersion((v) => v + 1)
       setEditingTarget(null)
@@ -646,7 +683,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         err instanceof Error ? err.message : t('errors.failedToSaveKey')
       )
     }
-  }, [activeFilename, onRefreshFiles, t])
+  }, [activeFilename, parsedFiles, onRefreshFiles, t])
 
   const handleRedo = useCallback(async () => {
     if (!window.electronAPI?.writeJsonFiles) return
@@ -655,22 +692,12 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
     setSaveKeyError(null)
     try {
-      const filesToWrite =
-        action.batchChanges && action.batchChanges.length > 0
-          ? action.batchChanges.map((c) => ({
-              path: c.targetFilePath,
-              content: JSON.stringify(c.afterRawJson, null, 2) + '\n',
-            }))
-          : [
-              {
-                path: action.targetFilePath,
-                content: JSON.stringify(action.afterRawJson, null, 2) + '\n',
-              },
-            ]
-
-      const res = await window.electronAPI.writeJsonFiles(filesToWrite)
-      if (!res || res.success === false) {
-        throw new Error('Failed to write file')
+      const filesToWrite = computeRedoFileChanges(action, parsedFiles)
+      if (filesToWrite.length > 0) {
+        const res = await window.electronAPI.writeJsonFiles(filesToWrite)
+        if (!res || res.success === false) {
+          throw new Error('Failed to write file')
+        }
       }
       setHistoryVersion((v) => v + 1)
       setEditingTarget(null)
@@ -681,7 +708,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         err instanceof Error ? err.message : t('errors.failedToSaveKey')
       )
     }
-  }, [activeFilename, onRefreshFiles, t])
+  }, [activeFilename, parsedFiles, onRefreshFiles, t])
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, node: TreeNodeType) => {
@@ -736,7 +763,12 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         throw new Error(t('errors.electronUnavailableWrite'))
       }
 
-      const { formattedJson } = updateSingleKeyInFile(
+      const previousValue =
+        typeof activeFileData.keys[fullKey] === 'string'
+          ? (activeFileData.keys[fullKey] as string)
+          : undefined
+
+      const { updatedRaw, formattedJson } = updateSingleKeyInFile(
         activeFileData.raw,
         fullKey,
         textToApply
@@ -749,6 +781,21 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         },
       ])
 
+      const isFree = settings?.engine === 'free'
+      historyManagerRef.current.push({
+        targetFile: activeFileData.filename,
+        targetFilePath: activeFileData.path,
+        type: isFree ? 'free_translate' : 'ai_translate',
+        description: `${isFree ? 'Free' : 'AI'} translate ${fullKey}`,
+        key: fullKey,
+        previousValue,
+        newValue: textToApply,
+        engine: settings?.engine || 'ai',
+        beforeRawJson: activeFileData.raw as Record<string, JsonValue>,
+        afterRawJson: updatedRaw as Record<string, JsonValue>,
+      })
+      setHistoryVersion((v) => v + 1)
+
       if (editingTarget?.key === fullKey && editingTarget.filename === activeFilename) {
         setEditingTarget(null)
         setEditValue('')
@@ -757,7 +804,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       setAiSuccessMessage(t('diff.appliedKeySuccess', { key: fullKey }))
       await onRefreshFiles()
     },
-    [activeFileData, editingTarget, activeFilename, onRefreshFiles, t]
+    [activeFileData, editingTarget, activeFilename, settings, onRefreshFiles, t]
   )
 
   const handleAiTranslate = useCallback(
@@ -773,37 +820,98 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         return
       }
 
+      const currentRequestId = ++translationRequestIdRef.current
+      if (singleTranslationAbortRef.current) {
+        singleTranslationAbortRef.current.abort()
+      }
+      const controller = new AbortController()
+      singleTranslationAbortRef.current = controller
+
+      const targetLanguage = resolveLanguageFromFilename(activeFilename)
+      const isFreeEngine = settings?.engine === 'free'
+
       setTranslatingKey(fullKey)
+      setProgressToastState({
+        status: 'translating',
+        attempt: 0,
+        maxRetries: 3,
+        key: fullKey,
+        targetFile: activeFilename,
+      })
 
       try {
-        const targetLanguage = resolveLanguageFromFilename(activeFilename)
-        const response = await executeAiTranslation(
-          {
-            key: fullKey,
-            sourceFile: ref.sourceFile,
-            sourceLanguage: ref.sourceLanguage,
-            targetFile: activeFilename,
-            targetLanguage,
-            sourceValue: ref.sourceValue,
-          },
-          settings || {
-            engine: 'ai',
-            aiTranslation: {
-              provider: 'mock',
-              requireEditConfirmation: true,
-              providers: {
-                mock: { model: 'mock-v1' },
-                openai: { model: 'gpt-4o-mini' },
-                gemini: { model: 'gemini-3.6-flash' },
-                anthropic: { model: 'claude-3-5-sonnet-20241022' },
-                mistral: { model: 'mistral-large-latest' },
-                xai: { model: 'grok-2-latest' },
-                deepseek: { model: 'deepseek-chat' },
-                ollama: { model: 'llama3.1' },
-              },
+        const requestPayload = {
+          key: fullKey,
+          sourceFile: ref.sourceFile,
+          sourceLanguage: ref.sourceLanguage,
+          targetFile: activeFilename,
+          targetLanguage,
+          sourceValue: ref.sourceValue,
+        }
+
+        const effectiveSettings = settings || {
+          engine: 'ai',
+          aiTranslation: {
+            provider: 'mock',
+            requireEditConfirmation: true,
+            providers: {
+              mock: { model: 'mock-v1' },
+              openai: { model: 'gpt-4o-mini' },
+              gemini: { model: 'gemini-3.6-flash' },
+              anthropic: { model: 'claude-3-5-sonnet-20241022' },
+              mistral: { model: 'mistral-large-latest' },
+              xai: { model: 'grok-2-latest' },
+              deepseek: { model: 'deepseek-chat' },
+              ollama: { model: 'llama3.1' },
             },
-          }
-        )
+          },
+        }
+
+        let response: { translatedText: string; provider: import('../../types/settings').AiProviderId; model: string; detectedLanguage?: string }
+        if (isFreeEngine) {
+          // Free Translation does NOT go through the 429 AI retry engine
+          response = await executeAiTranslation(requestPayload, effectiveSettings)
+        } else {
+          // AI Translation with bounded 429 retry
+          response = await executeAiTranslationWithRetry(
+            requestPayload,
+            effectiveSettings,
+            {
+              maxRetries: 3,
+              signal: controller.signal,
+              onProgress: (prog) => {
+                if (currentRequestId !== translationRequestIdRef.current) return
+                setProgressToastState({
+                  status: prog.status,
+                  attempt: prog.attempt,
+                  maxRetries: prog.maxRetries,
+                  delayRemainingMs: prog.delayRemainingMs,
+                  key: fullKey,
+                  targetFile: activeFilename,
+                  error:
+                    prog.error instanceof Error
+                      ? prog.error.message
+                      : typeof prog.error === 'string'
+                      ? prog.error
+                      : null,
+                })
+              },
+            }
+          )
+        }
+
+        if (currentRequestId !== translationRequestIdRef.current) {
+          return
+        }
+
+        setProgressToastState({
+          status: 'success',
+          attempt: 0,
+          maxRetries: 3,
+          key: fullKey,
+          targetFile: activeFilename,
+          message: t('progress.completedKey', { key: fullKey }),
+        })
 
         const needsConfirmation = shouldConfirmAiEdit(settings)
 
@@ -824,11 +932,25 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           await executeApplyAiTranslation(fullKey, response.translatedText)
         }
       } catch (err) {
-        setAiError(
+        if (currentRequestId !== translationRequestIdRef.current) {
+          return
+        }
+        const errorMsg =
           err instanceof Error ? err.message : t('errors.translationRequestFailed')
-        )
+        setAiError(errorMsg)
+        setProgressToastState({
+          status: 'error',
+          attempt: 3,
+          maxRetries: 3,
+          key: fullKey,
+          targetFile: activeFilename,
+          error: errorMsg,
+        })
       } finally {
-        setTranslatingKey(null)
+        if (currentRequestId === translationRequestIdRef.current) {
+          setTranslatingKey(null)
+          singleTranslationAbortRef.current = null
+        }
       }
     },
     [translatingKey, activeFilename, parsedFiles, settings, executeApplyAiTranslation, t]
@@ -878,6 +1000,52 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           await window.electronAPI.writeJsonFiles(
             filesToModify.map((f) => ({ path: f.path, content: f.content }))
           )
+
+          const isFree = settings?.engine === 'free'
+          const primaryMod =
+            filesToModify.find((f) => f.filename === activeFilename) ||
+            filesToModify[0]
+          const primaryParsed = parsedFiles.find(
+            (f) => f.filename === primaryMod.filename
+          )
+
+          const batchItems = activePlan.items.map((item) => {
+            const pf = parsedFiles.find((p) => p.filename === item.targetFile)
+            const prevVal =
+              pf && typeof pf.keys[item.key] === 'string'
+                ? (pf.keys[item.key] as string)
+                : undefined
+            return {
+              key: item.key,
+              targetFile: item.targetFile,
+              targetFilePath: pf?.path || item.targetFile,
+              previousValue: prevVal,
+              newValue: item.proposedTranslation,
+            }
+          })
+
+          historyManagerRef.current.push({
+            targetFile: primaryMod.filename,
+            targetFilePath: primaryMod.path,
+            type: isFree ? 'free_translate' : 'ai_translate',
+            description: `${isFree ? 'Free' : 'AI'} batch translate (${appliedCount} keys)`,
+            count: appliedCount,
+            engine: settings?.engine || 'ai',
+            beforeRawJson:
+              (primaryParsed?.raw as Record<string, JsonValue>) || {},
+            afterRawJson: JSON.parse(primaryMod.content),
+            batchChanges: filesToModify.map((f) => {
+              const p = parsedFiles.find((pf) => pf.filename === f.filename)
+              return {
+                targetFile: f.filename,
+                targetFilePath: f.path,
+                beforeRawJson: (p?.raw as Record<string, JsonValue>) || {},
+                afterRawJson: JSON.parse(f.content),
+              }
+            }),
+            batchItems,
+          })
+          setHistoryVersion((v) => v + 1)
         }
 
         setBatchPlan(null)
@@ -894,7 +1062,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         setIsWritingBatch(false)
       }
     },
-    [batchPlan, parsedFiles, onRefreshFiles, t]
+    [batchPlan, parsedFiles, activeFilename, settings, onRefreshFiles, t]
   )
 
   const handleStartBatchTranslate = useCallback(async () => {
@@ -925,6 +1093,13 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     })
 
     try {
+      setProgressToastState({
+        status: 'translating',
+        isBatch: true,
+        batchCurrent: 0,
+        batchTotal: initialPlan.totalCount,
+      })
+
       const executedPlan = await executeBatchTranslation(
         initialPlan,
         settings || {
@@ -944,11 +1119,42 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
             },
           },
         },
-        (progress) => setBatchProgress(progress),
+        (progress) => {
+          setBatchProgress(progress)
+          if (progress.isRetrying) {
+            setProgressToastState({
+              status: 'retrying',
+              isBatch: true,
+              batchCurrent: progress.current,
+              batchTotal: progress.total,
+              attempt: progress.retryAttempt,
+              maxRetries: progress.maxRetries || 3,
+              delayRemainingMs: progress.retryDelayRemainingMs,
+              key: progress.currentKey,
+              targetFile: progress.targetFile,
+            })
+          } else {
+            setProgressToastState({
+              status: 'translating',
+              isBatch: true,
+              batchCurrent: progress.current,
+              batchTotal: progress.total,
+              key: progress.currentKey,
+              targetFile: progress.targetFile,
+            })
+          }
+        },
         controller.signal
       )
 
       setBatchPlan(executedPlan)
+      setProgressToastState({
+        status: 'success',
+        isBatch: true,
+        batchCurrent: executedPlan.totalCount,
+        batchTotal: executedPlan.totalCount,
+        message: t('progress.batchCompleted', { count: executedPlan.totalCount }),
+      })
 
       const needsConfirmation = shouldConfirmAiEdit(settings)
       if (!needsConfirmation) {
@@ -956,9 +1162,14 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         await handleConfirmApplyBatch(executedPlan)
       }
     } catch (err) {
-      setBatchError(
+      const errorMsg =
         err instanceof Error ? err.message : 'Batch translation failed.'
-      )
+      setBatchError(errorMsg)
+      setProgressToastState({
+        status: 'error',
+        isBatch: true,
+        error: errorMsg,
+      })
     } finally {
       setIsBatchTranslating(false)
       abortControllerRef.current = null
@@ -969,6 +1180,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     comparisonResult,
     settings,
     handleConfirmApplyBatch,
+    t,
   ])
 
   const handleRetryFailedBatch = useCallback(async () => {
@@ -1104,6 +1316,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
         type: 'add_key',
         description: `Add key ${plan.key}`,
         key: plan.key,
+        newValue: primaryModified.value || '',
         count: plan.filesToModify.length,
         beforeRawJson: primaryModified.beforeRawJson,
         afterRawJson: primaryModified.afterRawJson,
@@ -1116,6 +1329,13 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
                 afterRawJson: f.afterRawJson,
               }))
             : undefined,
+        batchItems: plan.filesToModify.map((f) => ({
+          key: plan.key,
+          targetFile: f.filename,
+          targetFilePath: f.path,
+          previousValue: undefined,
+          newValue: f.value || '',
+        })),
       })
       setHistoryVersion((v) => v + 1)
 
@@ -1177,6 +1397,43 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       }))
 
       await window.electronAPI.writeJsonFiles(filesPayload)
+
+      const primaryMod =
+        additionPlan.filesToModify.find((f) => f.filename === activeFilename) ||
+        additionPlan.filesToModify[0]
+      const primaryParsed = parsedFiles.find((p) => p.filename === primaryMod.filename)
+
+      const batchItems = additionPlan.filesToModify.flatMap((f) =>
+        f.keysToAdd.map((k) => ({
+          key: k.key,
+          targetFile: f.filename,
+          targetFilePath: f.path,
+          previousValue: undefined,
+          newValue: k.value,
+        }))
+      )
+
+      historyManagerRef.current.push({
+        targetFile: primaryMod.filename,
+        targetFilePath: primaryMod.path,
+        type: 'add_keys',
+        description: `Add missing keys (${additionPlan.filesToModify.length} files)`,
+        count: additionPlan.filesToModify.length,
+        beforeRawJson: (primaryParsed?.raw as Record<string, JsonValue>) || {},
+        afterRawJson: primaryMod.newRawJson as Record<string, JsonValue>,
+        batchChanges: additionPlan.filesToModify.map((f) => {
+          const parsed = parsedFiles.find((p) => p.filename === f.filename)
+          return {
+            targetFile: f.filename,
+            targetFilePath: f.path,
+            beforeRawJson: (parsed?.raw as Record<string, JsonValue>) || {},
+            afterRawJson: f.newRawJson as Record<string, JsonValue>,
+          }
+        }),
+        batchItems,
+      })
+      setHistoryVersion((v) => v + 1)
+
       setAdditionPlan(null)
       await onRefreshFiles()
     } catch (err) {
@@ -1187,6 +1444,132 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       setIsWriting(false)
     }
   }
+
+  const handleNavigateFromHistory = useCallback(
+    (item: TranslationHistoryItem) => {
+      setEditingTarget(null)
+      setEditValue('')
+      setSaveKeyError(null)
+
+      if (item.targetFile && item.targetFile !== activeFilename) {
+        setActiveFilename(item.targetFile)
+      }
+
+      const targetKey = item.newKey || item.key
+      if (targetKey) {
+        setSelectedKey(targetKey)
+        setActiveMissingKey(targetKey)
+        const parentPaths = getParentPaths(targetKey)
+        if (parentPaths.length > 0) {
+          setCollapsedSet((prev) => {
+            let changed = false
+            const next = new Set(prev)
+            for (const p of parentPaths) {
+              if (next.has(p)) {
+                next.delete(p)
+                changed = true
+              }
+            }
+            return changed ? next : prev
+          })
+        }
+      }
+    },
+    [activeFilename]
+  )
+
+  const handleRevertFromHistory = useCallback(
+    async (item: TranslationHistoryItem) => {
+      if (!window.electronAPI?.writeJsonFiles) {
+        setSaveKeyError('Unable to write files: Electron API is unavailable.')
+        return
+      }
+
+      setIsRevertingHistory(true)
+      setSaveKeyError(null)
+
+      try {
+        const filesToWrite = computeRevertFileChanges(item.action, parsedFiles)
+        if (filesToWrite.length > 0) {
+          const res = await window.electronAPI.writeJsonFiles(filesToWrite)
+          if (!res || res.success === false) {
+            throw new Error('Failed to restore files during history revert')
+          }
+        }
+
+        historyManagerRef.current.push({
+          targetFile: item.targetFile,
+          targetFilePath: item.targetFilePath,
+          type: item.action.type,
+          description: `Revert ${item.summary}`,
+          key: item.action.key,
+          oldKey: item.action.newKey,
+          newKey: item.action.oldKey,
+          previousValue: item.action.newValue,
+          newValue: item.action.previousValue,
+          sectionPath: item.action.sectionPath,
+          count: item.action.count,
+          beforeRawJson: item.action.afterRawJson,
+          afterRawJson: item.action.beforeRawJson,
+          batchChanges: item.action.batchChanges?.map((c) => ({
+            targetFile: c.targetFile,
+            targetFilePath: c.targetFilePath,
+            beforeRawJson: c.afterRawJson,
+            afterRawJson: c.beforeRawJson,
+          })),
+          batchItems: item.action.batchItems?.map((b) => ({
+            key: b.key,
+            targetFile: b.targetFile,
+            targetFilePath: b.targetFilePath,
+            previousValue: b.newValue,
+            newValue: b.previousValue,
+          })),
+        })
+        setHistoryVersion((v) => v + 1)
+
+        setEditingTarget(null)
+        setEditValue('')
+
+        await onRefreshFiles()
+
+        if (item.targetFile) {
+          setActiveFilename(item.targetFile)
+        }
+        const restoredKey = item.oldKey || item.key
+        if (restoredKey) {
+          setSelectedKey(restoredKey)
+          setActiveMissingKey(restoredKey)
+          const parentPaths = getParentPaths(restoredKey)
+          if (parentPaths.length > 0) {
+            setCollapsedSet((prev) => {
+              let changed = false
+              const next = new Set(prev)
+              for (const p of parentPaths) {
+                if (next.has(p)) {
+                  next.delete(p)
+                  changed = true
+                }
+              }
+              return changed ? next : prev
+            })
+          }
+        }
+      } catch (err) {
+        setSaveKeyError(
+          err instanceof Error ? err.message : t('errors.failedToSaveKey')
+        )
+      } finally {
+        setIsRevertingHistory(false)
+      }
+    },
+    [parsedFiles, onRefreshFiles, t]
+  )
+
+  const handleClearHistory = useCallback(() => {
+    historyManagerRef.current.clear()
+    setHistoryVersion((v) => v + 1)
+    setSelectedHistoryItemId(null)
+  }, [])
 
   // Scroll active problem key into view smoothly when changed
   useEffect(() => {
@@ -1275,7 +1658,9 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
               activeMissingKey={activeMissingKey}
               selectedKey={selectedKey}
               isInspectorOpen={isInspectorOpen}
+              isHistoryOpen={isHistoryOpen}
               onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
+              onToggleHistory={() => setIsHistoryOpen((prev) => !prev)}
               editingKey={editingKey}
               editValue={editValue}
               isSavingKey={isSavingKey}
@@ -1322,6 +1707,38 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
                   parsedFiles={parsedFiles}
                   onNavigateLanguage={handleNavigateFromInspector}
                   onClose={() => setIsInspectorOpen(false)}
+                />
+              </div>
+            </>
+          )}
+
+          {isHistoryOpen && (
+            <>
+              <ResizeHandle
+                direction="horizontal"
+                onPointerDown={historyResize.handlePointerDown}
+                onPointerMove={historyResize.handlePointerMove}
+                onPointerUp={historyResize.handlePointerUp}
+                onKeyDown={historyResize.handleKeyDown}
+                valueNow={historyResize.size}
+                valueMin={260}
+                valueMax={600}
+                ariaLabel={t('history.title')}
+                testId="history-resize-handle"
+              />
+              <div
+                className="diff-history-column"
+                style={{ width: `${historyResize.size}px` }}
+              >
+                <TranslationHistory
+                  items={historyItems}
+                  selectedItemId={selectedHistoryItemId}
+                  onSelectItem={(item) => setSelectedHistoryItemId(item?.id || null)}
+                  onNavigateKey={handleNavigateFromHistory}
+                  onRevertItem={handleRevertFromHistory}
+                  onClearHistory={handleClearHistory}
+                  onClose={() => setIsHistoryOpen(false)}
+                  isReverting={isRevertingHistory}
                 />
               </div>
             </>
@@ -1414,6 +1831,11 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           }}
         />
       )}
+
+      <TranslationProgressToast
+        state={progressToastState}
+        onDismiss={() => setProgressToastState(null)}
+      />
     </section>
   )
 }

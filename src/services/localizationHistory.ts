@@ -7,12 +7,23 @@ export type LocalizationMutationType =
   | 'add_keys'
   | 'add_key'
   | 'rename_key'
+  | 'ai_translate'
+  | 'free_translate'
+
+export interface HistoryBatchItem {
+  key: string
+  targetFile: string
+  targetFilePath: string
+  previousValue?: string
+  newValue?: string
+}
 
 export interface HistoryFileChange {
   targetFile: string
   targetFilePath: string
   beforeRawJson: Record<string, JsonValue>
   afterRawJson: Record<string, JsonValue>
+  items?: HistoryBatchItem[]
 }
 
 export interface HistoryAction {
@@ -23,11 +34,17 @@ export interface HistoryAction {
   type: LocalizationMutationType
   description: string
   key?: string
+  oldKey?: string
+  newKey?: string
+  previousValue?: string
+  newValue?: string
+  engine?: string
   sectionPath?: string
   count?: number
   beforeRawJson: Record<string, JsonValue>
   afterRawJson: Record<string, JsonValue>
   batchChanges?: HistoryFileChange[]
+  batchItems?: HistoryBatchItem[]
 }
 
 function isActionMatchingFile(action: HistoryAction, targetFile: string): boolean {
@@ -45,6 +62,13 @@ export class LocalizationHistoryManager {
 
   constructor(maxHistorySize = 50) {
     this.maxHistorySize = maxHistorySize
+  }
+
+  /**
+   * Returns a copy of the undo history actions in reverse chronological order (newest first).
+   */
+  getActions(): HistoryAction[] {
+    return [...this.undoStack].reverse()
   }
 
   /**

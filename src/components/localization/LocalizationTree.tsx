@@ -10,6 +10,7 @@ interface LocalizationTreeProps {
   activeMissingKey: string | null
   selectedKey?: string | null
   isInspectorOpen?: boolean
+  isHistoryOpen?: boolean
   editingKey?: string | null
   editValue?: string
   isSavingKey?: boolean
@@ -22,6 +23,7 @@ interface LocalizationTreeProps {
   onExpandAll: () => void
   onCollapseAll: () => void
   onToggleInspector?: () => void
+  onToggleHistory?: () => void
   onSelectRow: (fullKey: string, isMissing: boolean, isEmpty: boolean) => void
   onStartEdit?: (fullKey: string, currentValue: string) => void
   onEditValueChange?: (value: string) => void
@@ -39,6 +41,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   activeMissingKey,
   selectedKey,
   isInspectorOpen = false,
+  isHistoryOpen = false,
   editingKey,
   editValue,
   isSavingKey,
@@ -51,6 +54,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
   onExpandAll,
   onCollapseAll,
   onToggleInspector,
+  onToggleHistory,
   onSelectRow,
   onStartEdit,
   onEditValueChange,
@@ -68,6 +72,21 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
       <div className="tree-toolbar">
         <span className="toolbar-title">{t('tree.explorerView')}</span>
         <div className="toolbar-actions">
+          {onToggleHistory && (
+            <button
+              type="button"
+              className={`tree-tool-btn history-toggle-btn ${
+                isHistoryOpen ? 'is-active' : ''
+              }`}
+              onClick={onToggleHistory}
+              title={t('history.title')}
+              aria-label={t('history.title')}
+              aria-pressed={isHistoryOpen}
+              data-testid="toggle-history-btn"
+            >
+              📜 {t('history.title')}
+            </button>
+          )}
           {onToggleInspector && (
             <button
               type="button"
@@ -91,6 +110,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
               disabled={!canUndo}
               title={t('tree.undoTooltip', { shortcut: 'Ctrl+Z' })}
               aria-label={t('tree.undo')}
+              data-testid="tree-undo-btn"
             >
               ↶ {t('tree.undo')}
             </button>
@@ -103,6 +123,7 @@ export const LocalizationTree: React.FC<LocalizationTreeProps> = ({
               disabled={!canRedo}
               title={t('tree.redoTooltip', { shortcut: 'Ctrl+Y' })}
               aria-label={t('tree.redo')}
+              data-testid="tree-redo-btn"
             >
               ↷ {t('tree.redo')}
             </button>
