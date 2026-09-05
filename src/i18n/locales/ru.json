@@ -102,7 +102,8 @@
     "deleteUndoNote": "Вы всегда можете безопасно отменить это действие с помощью Отмены (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Удалить раздел",
     "alreadyMissing": "Ключ отсутствует в этом файле",
-    "sectionEmpty": "В этом файле нет ключей для удаления"
+    "sectionEmpty": "В этом файле нет ключей для удаления",
+    "renameKey": "Переименовать ключ"
   },
   "translation": {
     "translateWithAi": "✨ Перевести с помощью AI",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Открыть {key} в {filename}",
     "toggleInspector": "Инспектор",
     "closeInspector": "Закрыть инспектор"
+  },
+  "rename": {
+    "title": "Переименовать ключ перевода",
+    "subtitle": "Переименование ключа во всех файлах локализации с сохранением существующих значений",
+    "oldKeyLabel": "Текущий ключ",
+    "newKeyLabel": "Новое имя ключа",
+    "newKeyPlaceholder": "напр. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Файлов к изменению: {count} / {total}",
+    "skippedFilesCount": "Пропущено: {count}",
+    "previewTitle": "Предпросмотр изменений",
+    "preservedValue": "Сохраняемое значение",
+    "sameKeyNotice": "Введите другое имя ключа для переименования",
+    "noFilesMatch": "Ни один файл не содержит этот ключ",
+    "confirmButton": "Переименовать ключ",
+    "renaming": "Переименование...",
+    "errorEmpty": "Имя ключа не может быть пустым",
+    "errorDotBoundary": "Ключ не может начинаться или заканчиваться точкой",
+    "errorConsecutiveDots": "Ключ не может содержать подряд идущие точки (..)",
+    "errorEmptySegment": "Сегменты ключа не могут быть пустыми",
+    "errorInvalidKey": "Недопустимый формат имени ключа"
   },
   "common": {
     "save": "Сохранить",

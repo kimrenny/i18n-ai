@@ -102,7 +102,8 @@
     "deleteUndoNote": "Sie können diese Aktion jederzeit mit Rückgängig (Ctrl+Z) rückgängig machen.",
     "confirmDeleteSectionBtn": "Abschnitt löschen",
     "alreadyMissing": "Schlüssel ist in dieser Datei nicht vorhanden",
-    "sectionEmpty": "Keine Schlüssel zum Löschen in dieser Datei vorhanden"
+    "sectionEmpty": "Keine Schlüssel zum Löschen in dieser Datei vorhanden",
+    "renameKey": "Schlüssel umbenennen"
   },
   "translation": {
     "translateWithAi": "✨ Mit KI übersetzen",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Öffne {key} in {filename}",
     "toggleInspector": "Inspektor",
     "closeInspector": "Inspektor schließen"
+  },
+  "rename": {
+    "title": "Übersetzungsschlüssel umbenennen",
+    "subtitle": "Schlüssel in allen Lokalisierungsdateien umbenennen und bestehende Werte beibehalten",
+    "oldKeyLabel": "Aktueller Schlüssel",
+    "newKeyLabel": "Neuer Schlüsselname",
+    "newKeyPlaceholder": "z. B. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Betroffene Dateien: {count} / {total}",
+    "skippedFilesCount": "Übersprungen: {count}",
+    "previewTitle": "Vorschau der Änderungen",
+    "preservedValue": "Beibehaltener Wert",
+    "sameKeyNotice": "Geben Sie einen anderen Schlüsselnamen zum Umbenennen ein",
+    "noFilesMatch": "Keine Dateien enthalten diesen Schlüssel",
+    "confirmButton": "Schlüssel umbenennen",
+    "renaming": "Wird umbenannt...",
+    "errorEmpty": "Schlüsselname darf nicht leer sein",
+    "errorDotBoundary": "Schlüssel darf nicht mit einem Punkt beginnen oder enden",
+    "errorConsecutiveDots": "Schlüssel darf keine aufeinanderfolgenden Punkte enthalten (..)",
+    "errorEmptySegment": "Schlüsselsegmente dürfen nicht leer sein",
+    "errorInvalidKey": "Ungültiges Format für Schlüsselnamen"
   },
   "common": {
     "save": "Speichern",

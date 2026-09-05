@@ -2595,6 +2595,196 @@ describe('App', () => {
       expect(screen.getByTestId('tree-node-SUBTITLE')).toHaveClass('row-selected')
     })
   })
+
+  describe('Rename Translation Key Feature', () => {
+    let mockGetJsonFiles: Mock
+    let mockReadJsonFile: Mock
+    let mockWriteJsonFiles: Mock
+    let enState: Record<string, unknown>
+    let ruState: Record<string, unknown>
+
+    beforeEach(() => {
+      enState = {
+        ADMIN: {
+          DASHBOARD: {
+            TITLE: 'Number of registrations',
+            EXISTING: 'Already Here',
+          },
+        },
+      }
+      ruState = {
+        ADMIN: {
+          DASHBOARD: {
+            TITLE: 'Количество регистраций',
+          },
+        },
+      }
+
+      mockGetJsonFiles = vi.fn().mockResolvedValue([
+        { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+        { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+      ])
+
+      mockReadJsonFile = vi.fn().mockImplementation(async (p: string) => {
+        if (p.includes('en.json')) {
+          return enState
+        }
+        if (p.includes('ru.json')) {
+          return ruState
+        }
+        throw new Error('File not found')
+      })
+
+      mockWriteJsonFiles = vi.fn().mockImplementation(async (files: Array<{ path: string; content: string }>) => {
+        for (const file of files) {
+          if (file.path.includes('en.json')) {
+            enState = JSON.parse(file.content)
+          }
+          if (file.path.includes('ru.json')) {
+            ruState = JSON.parse(file.content)
+          }
+        }
+        return { success: true }
+      })
+
+      const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: mockSelectDirectory,
+        getJsonFiles: mockGetJsonFiles,
+        readJsonFile: mockReadJsonFile,
+        writeJsonFiles: mockWriteJsonFiles,
+      })
+    })
+
+    it('opens Rename Key modal from context menu, validates, and renames across files with Inspector update', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).toBeInTheDocument())
+
+      const titleNode = screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')
+
+      // 1. Right click on leaf node to open context menu
+      fireEvent.contextMenu(titleNode)
+      expect(screen.getByRole('menu', { name: /localization context menu/i })).toBeInTheDocument()
+
+      const renameMenuBtn = screen.getByTestId('context-menu-rename-key-btn')
+      expect(renameMenuBtn).toBeInTheDocument()
+      fireEvent.click(renameMenuBtn)
+
+      // 2. Rename modal is displayed
+      await waitFor(() => {
+        expect(screen.getByTestId('rename-translation-key-modal')).toBeInTheDocument()
+      })
+      expect(screen.getByTestId('rename-old-key-display')).toHaveTextContent('ADMIN.DASHBOARD.TITLE')
+
+      const newKeyInput = screen.getByTestId('rename-new-key-input')
+      expect(newKeyInput).toHaveValue('ADMIN.DASHBOARD.TITLE')
+
+      // 3. Test validation error when typing an existing key in en.json
+      fireEvent.change(newKeyInput, { target: { value: 'ADMIN.DASHBOARD.EXISTING' } })
+      expect(screen.getByTestId('rename-error-banner')).toHaveTextContent(/already exists/i)
+      expect(screen.getByTestId('rename-submit-btn')).toBeDisabled()
+
+      // 4. Type a valid new key name
+      fireEvent.change(newKeyInput, { target: { value: 'ADMIN.DASHBOARD.HEADER' } })
+      expect(screen.queryByTestId('rename-error-banner')).not.toBeInTheDocument()
+      expect(screen.getByTestId('rename-submit-btn')).toBeEnabled()
+
+      // 5. Submit rename
+      fireEvent.click(screen.getByTestId('rename-submit-btn'))
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/en.json',
+            content: expect.stringContaining('"HEADER": "Number of registrations"'),
+          },
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.stringContaining('"HEADER": "Количество регистраций"'),
+          },
+        ])
+      })
+
+      // 6. Tree reflects new key and old key is gone
+      await waitFor(() => {
+        expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.HEADER')).toBeInTheDocument()
+        expect(screen.queryByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).not.toBeInTheDocument()
+      })
+
+      // 7. Test Undo reverts both files atomically
+      const undoBtn = screen.getByRole('button', { name: /undo/i })
+      expect(undoBtn).not.toBeDisabled()
+
+      mockWriteJsonFiles.mockClear()
+      fireEvent.click(undoBtn)
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledTimes(1)
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/en.json',
+            content: expect.stringContaining('"TITLE": "Number of registrations"'),
+          },
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.stringContaining('"TITLE": "Количество регистраций"'),
+          },
+        ])
+      })
+
+      // 8. Test Redo restores rename across both files atomically
+      const redoBtn = screen.getByRole('button', { name: /redo/i })
+      expect(redoBtn).not.toBeDisabled()
+
+      mockWriteJsonFiles.mockClear()
+      fireEvent.click(redoBtn)
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledTimes(1)
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/en.json',
+            content: expect.stringContaining('"HEADER": "Number of registrations"'),
+          },
+          {
+            path: 'C:/Projects/locales/ru.json',
+            content: expect.stringContaining('"HEADER": "Количество регистраций"'),
+          },
+        ])
+      })
+    })
+
+    it('safely deactivates active inline editor when Rename is triggered', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')).toBeInTheDocument())
+
+      const titleNode = screen.getByTestId('tree-node-ADMIN.DASHBOARD.TITLE')
+
+      // Double-click to start inline editing
+      fireEvent.doubleClick(titleNode)
+      expect(screen.getByRole('textbox', { name: /edit admin\.dashboard\.title/i })).toBeInTheDocument()
+
+      // Right-click and trigger Rename
+      fireEvent.contextMenu(titleNode)
+      const renameMenuBtn = screen.getByTestId('context-menu-rename-key-btn')
+      fireEvent.click(renameMenuBtn)
+
+      // Inline editor must be closed
+      expect(screen.queryByRole('textbox', { name: /edit admin\.dashboard\.title/i })).not.toBeInTheDocument()
+      expect(screen.getByTestId('rename-translation-key-modal')).toBeInTheDocument()
+    })
+  })
 })
 
 

@@ -15,6 +15,7 @@ interface LocalizationContextMenuProps {
   state: ContextMenuState | null
   canUndo: boolean
   canRedo: boolean
+  onRenameKey?: (fullKey: string) => void
   onDeleteKey: (fullKey: string) => void
   onDeleteSection: (sectionPath: string, node: LocalizationTreeNode) => void
   onUndo: () => void
@@ -26,6 +27,7 @@ export const LocalizationContextMenu: React.FC<LocalizationContextMenuProps> = (
   state,
   canUndo,
   canRedo,
+  onRenameKey,
   onDeleteKey,
   onDeleteSection,
   onUndo,
@@ -121,22 +123,43 @@ export const LocalizationContextMenu: React.FC<LocalizationContextMenuProps> = (
             </span>
           </button>
         ) : (
-          <button
-            type="button"
-            className="context-menu-item danger-item"
-            role="menuitem"
-            disabled={!canDelete}
-            onClick={(e) => {
-              if (!canDelete) return
-              e.stopPropagation()
-              onDeleteKey(state.node.fullKey)
-              onClose()
-            }}
-            title={!canDelete ? t('contextMenu.alreadyMissing') : t('contextMenu.deleteEntry')}
-          >
-            <span className="menu-icon">🗑</span>
-            <span className="menu-label">{t('contextMenu.deleteEntry')}</span>
-          </button>
+          <>
+            {onRenameKey && (
+              <button
+                type="button"
+                className="context-menu-item"
+                role="menuitem"
+                disabled={!canDelete}
+                onClick={(e) => {
+                  if (!canDelete) return
+                  e.stopPropagation()
+                  onRenameKey(state.node.fullKey)
+                  onClose()
+                }}
+                title={!canDelete ? t('contextMenu.alreadyMissing') : t('contextMenu.renameKey')}
+                data-testid="context-menu-rename-key-btn"
+              >
+                <span className="menu-icon">✏</span>
+                <span className="menu-label">{t('contextMenu.renameKey')}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="context-menu-item danger-item"
+              role="menuitem"
+              disabled={!canDelete}
+              onClick={(e) => {
+                if (!canDelete) return
+                e.stopPropagation()
+                onDeleteKey(state.node.fullKey)
+                onClose()
+              }}
+              title={!canDelete ? t('contextMenu.alreadyMissing') : t('contextMenu.deleteEntry')}
+            >
+              <span className="menu-icon">🗑</span>
+              <span className="menu-label">{t('contextMenu.deleteEntry')}</span>
+            </button>
+          </>
         )}
 
         <div className="context-menu-divider" />

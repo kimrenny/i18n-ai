@@ -102,7 +102,8 @@
     "deleteUndoNote": "Możesz bezpiecznie cofnąć tę akcję w dowolnym momencie, używając opcji Cofnij (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Usuń sekcję",
     "alreadyMissing": "Klucz nie istnieje w tym pliku",
-    "sectionEmpty": "Brak kluczy do usunięcia w tym pliku"
+    "sectionEmpty": "Brak kluczy do usunięcia w tym pliku",
+    "renameKey": "Zmień nazwę klucza"
   },
   "translation": {
     "translateWithAi": "✨ Przetłumacz za pomocą AI",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Otwórz {key} w {filename}",
     "toggleInspector": "Inspektor",
     "closeInspector": "Zamknij inspektor"
+  },
+  "rename": {
+    "title": "Zmień nazwę klucza tłumaczenia",
+    "subtitle": "Zmień nazwę klucza we wszystkich plikach lokalizacyjnych z zachowaniem istniejących wartości",
+    "oldKeyLabel": "Bieżący klucz",
+    "newKeyLabel": "Nowa nazwa klucza",
+    "newKeyPlaceholder": "np. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Zmieniane pliki: {count} / {total}",
+    "skippedFilesCount": "Pominięte: {count}",
+    "previewTitle": "Podgląd zmian",
+    "preservedValue": "Zachowana wartość",
+    "sameKeyNotice": "Wprowadź inną nazwę klucza, aby zmienić",
+    "noFilesMatch": "Żaden plik nie zawiera tego klucza",
+    "confirmButton": "Zmień nazwę klucza",
+    "renaming": "Zmienianie nazwy...",
+    "errorEmpty": "Nazwa klucza nie może być pusta",
+    "errorDotBoundary": "Klucz nie może zaczynać się ani kończyć kropką",
+    "errorConsecutiveDots": "Klucz nie może zawierać kolejnych kropek (..)",
+    "errorEmptySegment": "Segmenty klucza nie mogą być puste",
+    "errorInvalidKey": "Nieprawidłowy format nazwy klucza"
   },
   "common": {
     "save": "Zapisz",

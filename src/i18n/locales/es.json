@@ -102,7 +102,8 @@
     "deleteUndoNote": "Puede revertir esta acción en cualquier momento usando Deshacer (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Eliminar sección",
     "alreadyMissing": "La clave no está presente en este archivo",
-    "sectionEmpty": "No hay claves para eliminar en este archivo"
+    "sectionEmpty": "No hay claves para eliminar en este archivo",
+    "renameKey": "Renombrar clave"
   },
   "translation": {
     "translateWithAi": "✨ Traducir con IA",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Abrir {key} en {filename}",
     "toggleInspector": "Inspector",
     "closeInspector": "Cerrar inspector"
+  },
+  "rename": {
+    "title": "Renombrar clave de traducción",
+    "subtitle": "Renombrar clave en todos los archivos de localización conservando los valores existentes",
+    "oldKeyLabel": "Clave actual",
+    "newKeyLabel": "Nuevo nombre de clave",
+    "newKeyPlaceholder": "p. ej. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Archivos afectados: {count} / {total}",
+    "skippedFilesCount": "Omitidos: {count}",
+    "previewTitle": "Vista previa de cambios",
+    "preservedValue": "Valor conservado",
+    "sameKeyNotice": "Introduzca un nombre de clave diferente para renombrar",
+    "noFilesMatch": "Ningún archivo contiene esta clave",
+    "confirmButton": "Renombrar clave",
+    "renaming": "Renombrando...",
+    "errorEmpty": "El nombre de la clave no puede estar vacío",
+    "errorDotBoundary": "La clave no puede empezar ni terminar con un punto",
+    "errorConsecutiveDots": "La clave no puede contener puntos consecutivos (..)",
+    "errorEmptySegment": "Los segmentos de la clave no pueden estar vacíos",
+    "errorInvalidKey": "Formato de nombre de clave no válido"
   },
   "common": {
     "save": "Guardar",

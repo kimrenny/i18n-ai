@@ -102,7 +102,8 @@
     "deleteUndoNote": "元に戻す (Ctrl+Z) を使用して、いつでもこの操作を取り消すことができます。",
     "confirmDeleteSectionBtn": "セクションを削除",
     "alreadyMissing": "このファイルにはキーが存在しません",
-    "sectionEmpty": "このファイルに削除対象のキーはありません"
+    "sectionEmpty": "このファイルに削除対象のキーはありません",
+    "renameKey": "キー名を変更"
   },
   "translation": {
     "translateWithAi": "✨ AI で翻訳",
@@ -419,6 +420,26 @@
     "openInEditorAria": "{filename} で {key} を開く",
     "toggleInspector": "インスペクター",
     "closeInspector": "インスペクターを閉じる"
+  },
+  "rename": {
+    "title": "翻訳キー名の変更",
+    "subtitle": "既存の値を保持したまま、すべてのローカリゼーションファイルでキー名を変更します",
+    "oldKeyLabel": "現在のキー",
+    "newKeyLabel": "新しいキー名",
+    "newKeyPlaceholder": "例: ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "対象ファイル: {count} / {total}",
+    "skippedFilesCount": "スキップ: {count}",
+    "previewTitle": "変更プレビュー",
+    "preservedValue": "保持される値",
+    "sameKeyNotice": "変更するには別のキー名を入力してください",
+    "noFilesMatch": "このキーを含むファイルはありません",
+    "confirmButton": "キー名を変更",
+    "renaming": "変更中...",
+    "errorEmpty": "キー名を空にすることはできません",
+    "errorDotBoundary": "キーの先頭または末尾にドットを使用することはできません",
+    "errorConsecutiveDots": "キーに連続したドット(..)を含めることはできません",
+    "errorEmptySegment": "キーのセグメントを空にすることはできません",
+    "errorInvalidKey": "無効なキー名形式です"
   },
   "common": {
     "save": "保存",

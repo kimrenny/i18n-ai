@@ -102,7 +102,8 @@
     "deleteUndoNote": "Você pode reverter esta ação a qualquer momento usando Desfazer (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Eliminar secção",
     "alreadyMissing": "A chave não está presente neste ficheiro",
-    "sectionEmpty": "Nenhuma chave presente para eliminar neste ficheiro"
+    "sectionEmpty": "Nenhuma chave presente para eliminar neste ficheiro",
+    "renameKey": "Renomear chave"
   },
   "translation": {
     "translateWithAi": "✨ Traduzir com IA",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Abrir {key} em {filename}",
     "toggleInspector": "Inspetor",
     "closeInspector": "Fechar inspetor"
+  },
+  "rename": {
+    "title": "Renomear chave de tradução",
+    "subtitle": "Renomear a chave em todos os arquivos de localização preservando os valores existentes",
+    "oldKeyLabel": "Chave atual",
+    "newKeyLabel": "Novo nome da chave",
+    "newKeyPlaceholder": "ex.: ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Arquivos afetados: {count} / {total}",
+    "skippedFilesCount": "Ignorados: {count}",
+    "previewTitle": "Pré-visualização das alterações",
+    "preservedValue": "Valor preservado",
+    "sameKeyNotice": "Insira um nome de chave diferente para renomear",
+    "noFilesMatch": "Nenhum arquivo contém esta chave",
+    "confirmButton": "Renomear chave",
+    "renaming": "Renomeando...",
+    "errorEmpty": "O nome da chave não pode estar vazio",
+    "errorDotBoundary": "A chave não pode começar ou terminar com ponto",
+    "errorConsecutiveDots": "A chave não pode conter pontos consecutivos (..)",
+    "errorEmptySegment": "Os segmentos da chave não podem estar vazios",
+    "errorInvalidKey": "Formato de nome de chave inválido"
   },
   "common": {
     "save": "Guardar",

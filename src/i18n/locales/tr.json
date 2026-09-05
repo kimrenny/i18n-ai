@@ -102,7 +102,8 @@
     "deleteUndoNote": "Geri Al (Ctrl+Z) kullanarak bu işlemi istediğiniz zaman geri alabilirsiniz.",
     "confirmDeleteSectionBtn": "Bölümü Sil",
     "alreadyMissing": "Anahtar bu dosyada mevcut değil",
-    "sectionEmpty": "Bu dosyada silinecek anahtar yok"
+    "sectionEmpty": "Bu dosyada silinecek anahtar yok",
+    "renameKey": "Anahtarı Yeniden Adlandır"
   },
   "translation": {
     "translateWithAi": "✨ Yapay Zeka ile Çevir",
@@ -419,6 +420,26 @@
     "openInEditorAria": "{filename} dosyasında {key} aç",
     "toggleInspector": "Denetçi",
     "closeInspector": "Denetçiyi Kapat"
+  },
+  "rename": {
+    "title": "Çeviri Anahtarını Yeniden Adlandır",
+    "subtitle": "Mevcut değerleri koruyarak tüm yerelleştirme dosyalarında anahtarı yeniden adlandırın",
+    "oldKeyLabel": "Mevcut Anahtar",
+    "newKeyLabel": "Yeni Anahtar Adı",
+    "newKeyPlaceholder": "örn. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Etkilenen dosyalar: {count} / {total}",
+    "skippedFilesCount": "Atlanan: {count}",
+    "previewTitle": "Değişiklik Önizlemesi",
+    "preservedValue": "Korunan değer",
+    "sameKeyNotice": "Yeniden adlandırmak için farklı bir anahtar adı girin",
+    "noFilesMatch": "Hiçbir dosya bu anahtarı içermiyor",
+    "confirmButton": "Anahtarı Yeniden Adlandır",
+    "renaming": "Yeniden adlandırılıyor...",
+    "errorEmpty": "Anahtar adı boş olamaz",
+    "errorDotBoundary": "Anahtar nokta ile başlayamaz veya bitemez",
+    "errorConsecutiveDots": "Anahtar ardışık noktalar (..) içeremez",
+    "errorEmptySegment": "Anahtar parçaları boş olamaz",
+    "errorInvalidKey": "Geçersiz anahtar adı biçimi"
   },
   "common": {
     "save": "Kaydet",
