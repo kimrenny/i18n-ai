@@ -2228,6 +2228,200 @@ describe('App', () => {
       expect(screen.getByTestId('tree-node-dashboard.title')).toBeInTheDocument()
     })
   })
+
+  describe('Add Translation Key Feature & Undo/Redo Integration', () => {
+    const mockFiles = [
+      { name: 'en.json', path: 'C:/Projects/MyProject/locales/en.json' },
+      { name: 'de.json', path: 'C:/Projects/MyProject/locales/de.json' },
+    ]
+
+    let mockJsonData: Record<string, Record<string, unknown>>
+
+    beforeEach(() => {
+      mockJsonData = {
+        'C:/Projects/MyProject/locales/en.json': {
+          COMMON: {
+            HELLO: 'Hello',
+          },
+        },
+        'C:/Projects/MyProject/locales/de.json': {
+          COMMON: {
+            HELLO: 'Hallo',
+          },
+        },
+      }
+    })
+
+    it('adds a translation key to a single language file and focuses it in Diff Viewer', async () => {
+      const mockWriteJsonFiles = vi.fn().mockImplementation(async (files: { path: string; content: string }[]) => {
+        for (const file of files) {
+          mockJsonData[file.path] = JSON.parse(file.content)
+        }
+        return { success: true }
+      })
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+        writeJsonFiles: mockWriteJsonFiles,
+      })
+
+      render(<App />)
+
+      // Load folder
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument())
+
+      // Navigate to Diff Viewer via Dashboard language row
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+      await waitFor(() => expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument())
+
+      // Click + Add Key button
+      const openAddKeyBtn = screen.getByTestId('open-add-key-modal-btn')
+      expect(openAddKeyBtn).toBeInTheDocument()
+      fireEvent.click(openAddKeyBtn)
+
+      // Modal is displayed
+      expect(screen.getByTestId('add-key-modal')).toBeInTheDocument()
+
+      // Switch to single language mode
+      fireEvent.click(screen.getByTestId('mode-single-btn'))
+
+      // Select de.json
+      const singleSelect = screen.getByTestId('single-lang-select')
+      fireEvent.change(singleSelect, { target: { value: 'de.json' } })
+
+      // Enter key name
+      const keyInput = screen.getByTestId('add-key-input')
+      fireEvent.change(keyInput, { target: { value: 'COMMON.BYE' } })
+
+      // Enter translation
+      const transInput = screen.getByTestId('single-translation-input')
+      fireEvent.change(transInput, { target: { value: 'Tschüss' } })
+
+      // Confirm Add Key
+      const confirmBtn = screen.getByTestId('add-key-confirm-btn')
+      expect(confirmBtn).not.toBeDisabled()
+      fireEvent.click(confirmBtn)
+
+      // Modal closes and writeJsonFiles is called
+      await waitFor(() => {
+        expect(screen.queryByTestId('add-key-modal')).not.toBeInTheDocument()
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/MyProject/locales/de.json',
+            content: expect.stringContaining('"BYE": "Tschüss"'),
+          },
+        ])
+      })
+
+      // German tab is active and key is present in tree
+      expect(screen.getByTestId('file-tab-de.json')).toHaveClass('active-tab')
+      expect(screen.getByTestId('tree-node-COMMON.BYE')).toBeInTheDocument()
+    })
+
+    it('adds a translation key to all languages, then reverts with ONE Undo and restores with ONE Redo', async () => {
+      const mockWriteJsonFiles = vi.fn().mockImplementation(async (files: { path: string; content: string }[]) => {
+        for (const file of files) {
+          mockJsonData[file.path] = JSON.parse(file.content)
+        }
+        return { success: true }
+      })
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+        writeJsonFiles: mockWriteJsonFiles,
+      })
+
+      render(<App />)
+
+      // Open workspace
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument())
+
+      // Switch to Diff Viewer via Dashboard language row
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+      await waitFor(() => expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument())
+
+      // Open Add Key Modal
+      fireEvent.click(screen.getByTestId('open-add-key-modal-btn'))
+      expect(screen.getByTestId('add-key-modal')).toBeInTheDocument()
+
+      // Enter key name
+      const keyInput = screen.getByTestId('add-key-input')
+      fireEvent.change(keyInput, { target: { value: 'SETTINGS.THEME' } })
+
+      // Enter translations for en and de
+      const enInput = screen.getByTestId('translation-input-en.json')
+      const deInput = screen.getByTestId('translation-input-de.json')
+      fireEvent.change(enInput, { target: { value: 'Dark' } })
+      fireEvent.change(deInput, { target: { value: 'Dunkel' } })
+
+      // Submit
+      fireEvent.click(screen.getByTestId('add-key-confirm-btn'))
+
+      // Both files were modified in a single write call
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/MyProject/locales/en.json',
+            content: expect.stringContaining('"THEME": "Dark"'),
+          },
+          {
+            path: 'C:/Projects/MyProject/locales/de.json',
+            content: expect.stringContaining('"THEME": "Dunkel"'),
+          },
+        ])
+      })
+
+      // Undo button is enabled
+      const undoBtn = screen.getByRole('button', { name: /undo/i })
+      expect(undoBtn).not.toBeDisabled()
+
+      // Press Undo ONCE -> reverts both files atomically
+      mockWriteJsonFiles.mockClear()
+      fireEvent.click(undoBtn)
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledTimes(1)
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/MyProject/locales/en.json',
+            content: expect.not.stringContaining('"THEME"'),
+          },
+          {
+            path: 'C:/Projects/MyProject/locales/de.json',
+            content: expect.not.stringContaining('"THEME"'),
+          },
+        ])
+      })
+
+      // Redo button is enabled
+      const redoBtn = screen.getByRole('button', { name: /redo/i })
+      expect(redoBtn).not.toBeDisabled()
+
+      // Press Redo ONCE -> restores both files atomically
+      mockWriteJsonFiles.mockClear()
+      fireEvent.click(redoBtn)
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledTimes(1)
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/MyProject/locales/en.json',
+            content: expect.stringContaining('"THEME": "Dark"'),
+          },
+          {
+            path: 'C:/Projects/MyProject/locales/de.json',
+            content: expect.stringContaining('"THEME": "Dunkel"'),
+          },
+        ])
+      })
+    })
+  })
 })
 
 

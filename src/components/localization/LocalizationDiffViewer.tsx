@@ -47,6 +47,9 @@ import {
 import { BatchTranslationModal } from './BatchTranslationModal'
 import { LocalizationContextMenu, type ContextMenuState } from './LocalizationContextMenu'
 import { DeleteSectionModal } from './DeleteSectionModal'
+import { AddTranslationKeyModal } from './AddTranslationKeyModal'
+import { planAddTranslationKey } from '../../services/localizationKeyInsertion'
+import type { AddKeyTargetMode } from '../../types/localizationKeyInsertion'
 import type { ProblemNavigationTarget } from '../../types/localizationCoverage'
 import { useTranslation } from '../../i18n/useTranslation'
 
@@ -85,6 +88,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const [navMode, setNavMode] = useState<ProblemNavMode>(initialProblem?.mode || 'missing')
   const [collapsedSet, setCollapsedSet] = useState<Set<string>>(new Set())
   const [additionPlan, setAdditionPlan] = useState<MissingKeysAdditionPlan | null>(null)
+  const [isAddKeyOpen, setIsAddKeyOpen] = useState(false)
   const [isWriting, setIsWriting] = useState(false)
   const [writeError, setWriteError] = useState<string | null>(null)
 
@@ -444,12 +448,20 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
     setSaveKeyError(null)
     try {
-      const res = await window.electronAPI.writeJsonFiles([
-        {
-          path: action.targetFilePath,
-          content: JSON.stringify(action.beforeRawJson, null, 2) + '\n',
-        },
-      ])
+      const filesToWrite =
+        action.batchChanges && action.batchChanges.length > 0
+          ? action.batchChanges.map((c) => ({
+              path: c.targetFilePath,
+              content: JSON.stringify(c.beforeRawJson, null, 2) + '\n',
+            }))
+          : [
+              {
+                path: action.targetFilePath,
+                content: JSON.stringify(action.beforeRawJson, null, 2) + '\n',
+              },
+            ]
+
+      const res = await window.electronAPI.writeJsonFiles(filesToWrite)
       if (!res || res.success === false) {
         throw new Error('Failed to write file')
       }
@@ -470,12 +482,20 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
 
     setSaveKeyError(null)
     try {
-      const res = await window.electronAPI.writeJsonFiles([
-        {
-          path: action.targetFilePath,
-          content: JSON.stringify(action.afterRawJson, null, 2) + '\n',
-        },
-      ])
+      const filesToWrite =
+        action.batchChanges && action.batchChanges.length > 0
+          ? action.batchChanges.map((c) => ({
+              path: c.targetFilePath,
+              content: JSON.stringify(c.afterRawJson, null, 2) + '\n',
+            }))
+          : [
+              {
+                path: action.targetFilePath,
+                content: JSON.stringify(action.afterRawJson, null, 2) + '\n',
+              },
+            ]
+
+      const res = await window.electronAPI.writeJsonFiles(filesToWrite)
       if (!res || res.success === false) {
         throw new Error('Failed to write file')
       }
@@ -866,6 +886,95 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     setCollapsedSet(new Set(allFolderIds))
   }, [activeTreeData.rootNodes])
 
+  const handleOpenAddKeyModal = useCallback(() => {
+    setIsAddKeyOpen(true)
+  }, [])
+
+  const handleConfirmAddKey = useCallback(
+    async (params: {
+      key: string
+      mode: AddKeyTargetMode
+      singleTargetFile?: string
+      translationsByFile: Record<string, string>
+    }) => {
+      if (!window.electronAPI?.writeJsonFiles) {
+        throw new Error(t('errors.electronUnavailableWrite'))
+      }
+
+      const plan = planAddTranslationKey(parsedFiles, params)
+      if (!plan.canApply || plan.filesToModify.length === 0) {
+        if (plan.conflictMessages.length > 0) {
+          throw new Error(plan.conflictMessages.join('; '))
+        }
+        return
+      }
+
+      const filesPayload = plan.filesToModify.map((f) => ({
+        path: f.path,
+        content: f.formattedJson,
+      }))
+
+      const res = await window.electronAPI.writeJsonFiles(filesPayload)
+      if (!res || res.success === false) {
+        throw new Error('Failed to write files')
+      }
+
+      const primaryModified =
+        plan.filesToModify.find((f) => f.filename === activeFilename) ||
+        plan.filesToModify[0]
+
+      historyManagerRef.current.push({
+        targetFile: primaryModified.filename,
+        targetFilePath: primaryModified.path,
+        type: 'add_key',
+        description: `Add key ${plan.key}`,
+        key: plan.key,
+        count: plan.filesToModify.length,
+        beforeRawJson: primaryModified.beforeRawJson,
+        afterRawJson: primaryModified.afterRawJson,
+        batchChanges:
+          plan.filesToModify.length > 1
+            ? plan.filesToModify.map((f) => ({
+                targetFile: f.filename,
+                targetFilePath: f.path,
+                beforeRawJson: f.beforeRawJson,
+                afterRawJson: f.afterRawJson,
+              }))
+            : undefined,
+      })
+      setHistoryVersion((v) => v + 1)
+
+      // Refresh files across workspace
+      await onRefreshFiles()
+
+      // Activate target tab
+      setActiveFilename(primaryModified.filename)
+
+      // Expand parent folders for the new key
+      const parentPaths = getParentPaths(plan.key)
+      if (parentPaths.length > 0) {
+        setCollapsedSet((prev) => {
+          let changed = false
+          const next = new Set(prev)
+          for (const p of parentPaths) {
+            if (next.has(p)) {
+              next.delete(p)
+              changed = true
+            }
+          }
+          return changed ? next : prev
+        })
+      }
+
+      // Focus / highlight newly created key
+      if (!primaryModified.value || primaryModified.value === '') {
+        setNavMode('empty')
+      }
+      setActiveMissingKey(plan.key)
+    },
+    [parsedFiles, activeFilename, onRefreshFiles, t]
+  )
+
   const handleOpenAddMissingModal = () => {
     setWriteError(null)
     const plan = planMissingKeysAddition(parsedFiles, comparisonResult)
@@ -928,6 +1037,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     >
       <LocalizationSummary
         comparisonResult={comparisonResult}
+        onOpenAddKeyModal={handleOpenAddKeyModal}
         onOpenAddMissingModal={handleOpenAddMissingModal}
         onNavigateMissing={() =>
           handleNavigateFirstProblemAcrossAllFiles('missing')
@@ -1039,6 +1149,16 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           isWriting={isWriting}
           onConfirm={handleConfirmWrite}
           onClose={() => setAdditionPlan(null)}
+        />
+      )}
+
+      {isAddKeyOpen && (
+        <AddTranslationKeyModal
+          isOpen={isAddKeyOpen}
+          parsedFiles={parsedFiles}
+          initialActiveFilename={activeFilename}
+          onClose={() => setIsAddKeyOpen(false)}
+          onConfirmAddKey={handleConfirmAddKey}
         />
       )}
 

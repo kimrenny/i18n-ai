@@ -5,6 +5,14 @@ export type LocalizationMutationType =
   | 'delete_section'
   | 'edit_key'
   | 'add_keys'
+  | 'add_key'
+
+export interface HistoryFileChange {
+  targetFile: string
+  targetFilePath: string
+  beforeRawJson: Record<string, JsonValue>
+  afterRawJson: Record<string, JsonValue>
+}
 
 export interface HistoryAction {
   id: string
@@ -18,6 +26,15 @@ export interface HistoryAction {
   count?: number
   beforeRawJson: Record<string, JsonValue>
   afterRawJson: Record<string, JsonValue>
+  batchChanges?: HistoryFileChange[]
+}
+
+function isActionMatchingFile(action: HistoryAction, targetFile: string): boolean {
+  if (action.targetFile === targetFile) return true
+  if (action.batchChanges && action.batchChanges.some((c) => c.targetFile === targetFile)) {
+    return true
+  }
+  return false
 }
 
 export class LocalizationHistoryManager {
@@ -57,7 +74,7 @@ export class LocalizationHistoryManager {
     if (!targetFile) {
       return this.undoStack.length > 0
     }
-    return this.undoStack.some((a) => a.targetFile === targetFile)
+    return this.undoStack.some((a) => isActionMatchingFile(a, targetFile))
   }
 
   /**
@@ -67,7 +84,7 @@ export class LocalizationHistoryManager {
     if (!targetFile) {
       return this.redoStack.length > 0
     }
-    return this.redoStack.some((a) => a.targetFile === targetFile)
+    return this.redoStack.some((a) => isActionMatchingFile(a, targetFile))
   }
 
   /**
@@ -83,8 +100,8 @@ export class LocalizationHistoryManager {
       return action
     }
 
-    // Find last action for targetFile
-    const idx = findLastIndex(this.undoStack, (a) => a.targetFile === targetFile)
+    // Find last action matching targetFile
+    const idx = findLastIndex(this.undoStack, (a) => isActionMatchingFile(a, targetFile))
     if (idx === -1) return null
 
     const [action] = this.undoStack.splice(idx, 1)
@@ -104,7 +121,7 @@ export class LocalizationHistoryManager {
       return action
     }
 
-    const idx = findLastIndex(this.redoStack, (a) => a.targetFile === targetFile)
+    const idx = findLastIndex(this.redoStack, (a) => isActionMatchingFile(a, targetFile))
     if (idx === -1) return null
 
     const [action] = this.redoStack.splice(idx, 1)
@@ -120,7 +137,7 @@ export class LocalizationHistoryManager {
     if (!targetFile) {
       return this.undoStack[this.undoStack.length - 1]
     }
-    const idx = findLastIndex(this.undoStack, (a) => a.targetFile === targetFile)
+    const idx = findLastIndex(this.undoStack, (a) => isActionMatchingFile(a, targetFile))
     return idx !== -1 ? this.undoStack[idx] : null
   }
 
@@ -132,7 +149,7 @@ export class LocalizationHistoryManager {
     if (!targetFile) {
       return this.redoStack[this.redoStack.length - 1]
     }
-    const idx = findLastIndex(this.redoStack, (a) => a.targetFile === targetFile)
+    const idx = findLastIndex(this.redoStack, (a) => isActionMatchingFile(a, targetFile))
     return idx !== -1 ? this.redoStack[idx] : null
   }
 
@@ -147,8 +164,8 @@ export class LocalizationHistoryManager {
       }
     }
     return {
-      undoCount: this.undoStack.filter((a) => a.targetFile === targetFile).length,
-      redoCount: this.redoStack.filter((a) => a.targetFile === targetFile).length,
+      undoCount: this.undoStack.filter((a) => isActionMatchingFile(a, targetFile)).length,
+      redoCount: this.redoStack.filter((a) => isActionMatchingFile(a, targetFile)).length,
     }
   }
 
