@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "Ключ не може містити кілька крапок поспіль",
     "errorEmptySegment": "Сегменти ключа не можуть бути порожніми"
   },
+  "inspector": {
+    "title": "Інспектор ключів перекладу",
+    "emptySelection": "Ключ перекладу не вибрано",
+    "emptySelectionHint": "Виберіть ключ перекладу в дереві або перейдіть із пошуку чи проблем для інспекції.",
+    "keyPath": "Шлях до ключа",
+    "reference": "Еталон",
+    "translations": "Переклади",
+    "coverage": "Покриття",
+    "coverageRatio": "{translated} / {total} мов",
+    "coveragePercent": "{percent}% завершено",
+    "problems": "Проблеми",
+    "noProblems": "Проблем не виявлено",
+    "emptyCount": "{count} порожніх",
+    "missingCount": "{count} відсутніх",
+    "statusTranslated": "Перекладено",
+    "statusEmpty": "Порожньо",
+    "statusMissing": "Відсутній",
+    "openInEditor": "Відкрити",
+    "openInEditorAria": "Відкрити {key} у {filename}",
+    "toggleInspector": "Інспектор",
+    "closeInspector": "Закрити інспектор"
+  },
   "common": {
     "save": "Зберегти",
     "done": "Готово",

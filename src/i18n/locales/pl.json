@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "Klucz nie może zawierać kolejnych kropek",
     "errorEmptySegment": "Segmenty klucza nie mogą być puste"
   },
+  "inspector": {
+    "title": "Inspektor kluczy tłumaczeń",
+    "emptySelection": "Nie wybrano klucza tłumaczenia",
+    "emptySelectionHint": "Wybierz klucz tłumaczenia w drzewie lub przejdź z wyszukiwania/problemów.",
+    "keyPath": "Ścieżka klucza",
+    "reference": "Wzorzec",
+    "translations": "Tłumaczenia",
+    "coverage": "Pokrycie",
+    "coverageRatio": "{translated} / {total} języków",
+    "coveragePercent": "{percent}% ukończono",
+    "problems": "Problemy",
+    "noProblems": "Nie wykryto problemów",
+    "emptyCount": "{count} pustych",
+    "missingCount": "{count} brakujących",
+    "statusTranslated": "Przetłumaczono",
+    "statusEmpty": "Puste",
+    "statusMissing": "Brakujące",
+    "openInEditor": "Otwórz",
+    "openInEditorAria": "Otwórz {key} w {filename}",
+    "toggleInspector": "Inspektor",
+    "closeInspector": "Zamknij inspektor"
+  },
   "common": {
     "save": "Zapisz",
     "done": "Gotowe",

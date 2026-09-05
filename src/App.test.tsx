@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from './App'
 import {
   setAiTranslationProvider,
@@ -218,13 +218,14 @@ describe('App', () => {
       expect(screen.getByRole('dialog', { name: /review ai translation/i })).toBeInTheDocument()
     })
 
-    expect(screen.getByText(/Source Reference \(en\.json · en\)/i)).toBeInTheDocument()
-    expect(screen.getByText('Play')).toBeInTheDocument()
-    expect(screen.getByText(/Mock \/ Offline · mock-v1/i)).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: /ai proposed translation/i })).toHaveValue('[AI: RU] Play')
+    const reviewModal = screen.getByRole('dialog', { name: /review ai translation/i })
+    expect(within(reviewModal).getByText(/Source Reference \(en\.json · en\)/i)).toBeInTheDocument()
+    expect(within(reviewModal).getByText('Play')).toBeInTheDocument()
+    expect(within(reviewModal).getByText(/Mock \/ Offline · mock-v1/i)).toBeInTheDocument()
+    expect(within(reviewModal).getByRole('textbox', { name: /ai proposed translation/i })).toHaveValue('[AI: RU] Play')
 
     // Test Cancel
-    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
+    fireEvent.click(within(reviewModal).getByRole('button', { name: /^cancel$/i }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(mockWriteJsonFiles).not.toHaveBeenCalled()
 
@@ -722,11 +723,12 @@ describe('App', () => {
     // Open Preview Modal
     fireEvent.click(addMissingBtn)
 
-    expect(screen.getByRole('dialog', { name: /add missing keys preview/i })).toBeInTheDocument()
-    expect(screen.getByText('ADMIN.PANEL.BUTTON.SAVE')).toBeInTheDocument()
+    const previewModal = screen.getByRole('dialog', { name: /add missing keys preview/i })
+    expect(previewModal).toBeInTheDocument()
+    expect(within(previewModal).getByText('ADMIN.PANEL.BUTTON.SAVE')).toBeInTheDocument()
 
     // Test Cancel
-    const cancelBtn = screen.getByRole('button', { name: /cancel/i })
+    const cancelBtn = within(previewModal).getByRole('button', { name: /cancel/i })
     fireEvent.click(cancelBtn)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(mockWriteJsonFiles).not.toHaveBeenCalled()
@@ -831,8 +833,12 @@ describe('App', () => {
 
     expect(screen.getByTestId('navigator-position')).toHaveTextContent('Empty translation 1 of 1')
 
-    // Click the row to start editing
+    // Single-click the row: selects row, does NOT enter edit mode
     fireEvent.click(playNode)
+    expect(screen.queryByRole('textbox', { name: /edit menu\.play/i })).not.toBeInTheDocument()
+
+    // Double-click the row: enters edit mode
+    fireEvent.doubleClick(playNode)
 
     const input = screen.getByRole('textbox', { name: /edit menu\.play/i })
     expect(input).toBeInTheDocument()
@@ -844,8 +850,8 @@ describe('App', () => {
     expect(mockWriteJsonFiles).not.toHaveBeenCalled()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 
-    // Click row again, enter translation and Save
-    fireEvent.click(screen.getByTestId('tree-node-MENU.PLAY'))
+    // Double-click row again, enter translation and Save
+    fireEvent.doubleClick(screen.getByTestId('tree-node-MENU.PLAY'))
     const editInput = screen.getByRole('textbox', { name: /edit menu\.play/i })
     fireEvent.change(editInput, { target: { value: 'Играть' } })
     fireEvent.click(screen.getByRole('button', { name: /save/i }))
@@ -2420,6 +2426,173 @@ describe('App', () => {
           },
         ])
       })
+    })
+  })
+
+  describe('Translation Editing UX & Safety (Single-click selection vs Double-click edit)', () => {
+    let mockGetJsonFiles: Mock
+    let mockReadJsonFile: Mock
+    let mockWriteJsonFiles: Mock
+    let enState: Record<string, unknown>
+    let ruState: Record<string, unknown>
+
+    beforeEach(() => {
+      enState = {
+        TITLE: 'Number of registrations',
+        SUBTITLE: 'Active user list',
+      }
+      ruState = {
+        TITLE: 'Количество регистраций',
+        SUBTITLE: 'Список активных пользователей',
+      }
+
+      mockGetJsonFiles = vi.fn().mockResolvedValue([
+        { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+        { name: 'ru.json', path: 'C:/Projects/locales/ru.json' },
+      ])
+
+      mockReadJsonFile = vi.fn().mockImplementation(async (p: string) => {
+        if (p.includes('en.json')) {
+          return enState
+        }
+        if (p.includes('ru.json')) {
+          return ruState
+        }
+        throw new Error('File not found')
+      })
+
+      mockWriteJsonFiles = vi.fn().mockResolvedValue({ success: true })
+
+      const mockSelectDirectory = vi.fn().mockResolvedValue('C:/Projects/locales')
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: mockSelectDirectory,
+        getJsonFiles: mockGetJsonFiles,
+        readJsonFile: mockReadJsonFile,
+        writeJsonFiles: mockWriteJsonFiles,
+      })
+    })
+
+    it('single-click selects/focuses the row and does NOT enter edit mode', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-TITLE')).toBeInTheDocument())
+
+      const titleNode = screen.getByTestId('tree-node-TITLE')
+
+      // Single click on row
+      fireEvent.click(titleNode)
+
+      // Row is selected (has row-selected class)
+      expect(titleNode).toHaveClass('row-selected')
+
+      // No text input is present
+      expect(screen.queryByRole('textbox', { name: /edit title/i })).not.toBeInTheDocument()
+    })
+
+    it('double-click explicitly enters edit mode and allows saving translation', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-TITLE')).toBeInTheDocument())
+
+      const titleNode = screen.getByTestId('tree-node-TITLE')
+
+      // Double-click to start edit
+      fireEvent.doubleClick(titleNode)
+
+      const input = screen.getByRole('textbox', { name: /edit title/i })
+      expect(input).toBeInTheDocument()
+      expect(input).toHaveValue('Number of registrations')
+
+      // Edit value and save
+      fireEvent.change(input, { target: { value: 'Total Registrations' } })
+      fireEvent.click(screen.getByRole('button', { name: /save/i }))
+
+      await waitFor(() => {
+        expect(mockWriteJsonFiles).toHaveBeenCalledWith([
+          {
+            path: 'C:/Projects/locales/en.json',
+            content: expect.stringContaining('"TITLE": "Total Registrations"'),
+          },
+        ])
+      })
+    })
+
+    it('switching to another language in Inspector immediately exits edit mode and prevents cross-language state bleeding', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-ru.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-ru.json'))
+
+      // Switch to ru.json tab
+      await waitFor(() => expect(screen.getByRole('tab', { name: /ru\.json/i })).toBeInTheDocument())
+
+      // 1. Select TITLE in Russian
+      const ruTitleNode = screen.getByTestId('tree-node-TITLE')
+      fireEvent.click(ruTitleNode)
+
+      // Open inspector if not already visible
+      const inspectorPanel = screen.getByTestId('translation-key-inspector')
+      expect(inspectorPanel).toBeInTheDocument()
+
+      // 2. Double-click Russian TITLE to start editing
+      fireEvent.doubleClick(ruTitleNode)
+      const ruInput = screen.getByRole('textbox', { name: /edit title/i })
+      expect(ruInput).toBeInTheDocument()
+
+      // Type a Russian draft
+      fireEvent.change(ruInput, { target: { value: 'Черновик на русском' } })
+
+      // 3. In Inspector, click "Open in Editor" for English (en.json)
+      const enLangItem = screen.getByTestId('inspector-lang-en.json')
+      const openEnBtn = within(enLangItem).getByRole('button', { name: /open/i })
+      fireEvent.click(openEnBtn)
+
+      // 4. Verify tab switched to en.json
+      await waitFor(() => {
+        expect(screen.getByTestId('file-tab-en.json')).toHaveClass('active-tab')
+      })
+
+      // 5. Verify Russian editor is immediately deactivated and English is read-only
+      expect(screen.queryByRole('textbox', { name: /edit title/i })).not.toBeInTheDocument()
+
+      // 6. English node is visible with its own English value
+      const enTitleNode = screen.getByTestId('tree-node-TITLE')
+      expect(enTitleNode).toHaveTextContent('"Number of registrations"')
+      expect(enTitleNode).not.toHaveTextContent('Черновик на русском')
+
+      // 7. Verify no unintended files were written
+      expect(mockWriteJsonFiles).not.toHaveBeenCalled()
+    })
+
+    it('selecting another key exits edit mode', async () => {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-row-en.json')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('coverage-row-en.json'))
+
+      await waitFor(() => expect(screen.getByTestId('tree-node-TITLE')).toBeInTheDocument())
+
+      // Double-click TITLE to edit
+      fireEvent.doubleClick(screen.getByTestId('tree-node-TITLE'))
+      expect(screen.getByRole('textbox', { name: /edit title/i })).toBeInTheDocument()
+
+      // Click SUBTITLE
+      fireEvent.click(screen.getByTestId('tree-node-SUBTITLE'))
+
+      // Editor for TITLE must be closed
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+      expect(screen.getByTestId('tree-node-SUBTITLE')).toHaveClass('row-selected')
     })
   })
 })

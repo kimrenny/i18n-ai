@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "Key cannot contain consecutive dots",
     "errorEmptySegment": "Key segments cannot be empty"
   },
+  "inspector": {
+    "title": "Translation Key Inspector",
+    "emptySelection": "No translation key selected",
+    "emptySelectionHint": "Select a translation key in the tree or navigate from search/problems to inspect.",
+    "keyPath": "Key Path",
+    "reference": "Reference",
+    "translations": "Translations",
+    "coverage": "Coverage",
+    "coverageRatio": "{translated} / {total} languages",
+    "coveragePercent": "{percent}% complete",
+    "problems": "Problems",
+    "noProblems": "No problems detected",
+    "emptyCount": "{count} Empty",
+    "missingCount": "{count} Missing",
+    "statusTranslated": "Translated",
+    "statusEmpty": "Empty",
+    "statusMissing": "Missing",
+    "openInEditor": "Open",
+    "openInEditorAria": "Open {key} in {filename}",
+    "toggleInspector": "Inspector",
+    "closeInspector": "Close Inspector"
+  },
   "common": {
     "save": "Save",
     "done": "Done",

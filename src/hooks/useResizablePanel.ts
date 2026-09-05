@@ -9,6 +9,7 @@ export interface UseResizableOptions {
   maxSize: number
   collapseThreshold?: number
   isCollapsed?: boolean
+  reverseDelta?: boolean
   onCollapse?: () => void
   onExpand?: () => void
 }
@@ -32,6 +33,7 @@ export function useResizablePanel({
   maxSize,
   collapseThreshold,
   isCollapsed = false,
+  reverseDelta = false,
   onCollapse,
   onExpand,
 }: UseResizableOptions): UseResizableReturn {
@@ -72,7 +74,9 @@ export function useResizablePanel({
       const currentPos = direction === 'horizontal' ? e.clientX : e.clientY
       const delta =
         direction === 'horizontal'
-          ? currentPos - startPosRef.current
+          ? reverseDelta
+            ? startPosRef.current - currentPos
+            : currentPos - startPosRef.current
           : startPosRef.current - currentPos // Upward drag increases vertical panel height
 
       const rawSize = startSizeRef.current + delta
@@ -96,6 +100,7 @@ export function useResizablePanel({
       direction,
       collapseThreshold,
       isCollapsed,
+      reverseDelta,
       onCollapse,
       onExpand,
       minSize,
@@ -120,12 +125,15 @@ export function useResizablePanel({
     (e: React.KeyboardEvent<HTMLElement>) => {
       const step = 10
       if (direction === 'horizontal') {
-        if (e.key === 'ArrowLeft') {
+        const isDec = reverseDelta ? e.key === 'ArrowRight' : e.key === 'ArrowLeft'
+        const isInc = reverseDelta ? e.key === 'ArrowLeft' : e.key === 'ArrowRight'
+
+        if (isDec) {
           e.preventDefault()
           const newSize = Math.max(minSize, size - step)
           setSize(newSize)
           setLastSize(newSize)
-        } else if (e.key === 'ArrowRight') {
+        } else if (isInc) {
           e.preventDefault()
           const newSize = Math.min(maxSize, size + step)
           setSize(newSize)
@@ -161,7 +169,7 @@ export function useResizablePanel({
         }
       }
     },
-    [direction, size, minSize, maxSize]
+    [direction, reverseDelta, size, minSize, maxSize]
   )
 
   const resetToLastSize = useCallback(() => {

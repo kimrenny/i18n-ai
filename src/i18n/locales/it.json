@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "La chiave non può contenere punti consecutivi",
     "errorEmptySegment": "I segmenti della chiave non possono essere vuoti"
   },
+  "inspector": {
+    "title": "Ispettore delle chiavi di traduzione",
+    "emptySelection": "Nessuna chiave di traduzione selezionata",
+    "emptySelectionHint": "Seleziona una chiave nell'albero o naviga da ricerca/problemi per ispezionare.",
+    "keyPath": "Percorso della chiave",
+    "reference": "Riferimento",
+    "translations": "Traduzioni",
+    "coverage": "Copertura",
+    "coverageRatio": "{translated} / {total} lingue",
+    "coveragePercent": "{percent}% completato",
+    "problems": "Problemi",
+    "noProblems": "Nessun problema rilevato",
+    "emptyCount": "{count} vuoti",
+    "missingCount": "{count} mancanti",
+    "statusTranslated": "Tradotto",
+    "statusEmpty": "Vuoto",
+    "statusMissing": "Mancante",
+    "openInEditor": "Apri",
+    "openInEditorAria": "Apri {key} in {filename}",
+    "toggleInspector": "Ispettore",
+    "closeInspector": "Chiudi ispettore"
+  },
   "common": {
     "save": "Salva",
     "done": "Fine",

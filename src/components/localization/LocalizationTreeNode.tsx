@@ -13,6 +13,7 @@ interface LocalizationTreeNodeProps {
   depth?: number
   collapsedSet: Set<string>
   activeMissingKey: string | null
+  selectedKey?: string | null
   editingKey?: string | null
   editValue?: string
   isSavingKey?: boolean
@@ -52,6 +53,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
   depth = 0,
   collapsedSet,
   activeMissingKey,
+  selectedKey,
   editingKey,
   editValue = '',
   isSavingKey = false,
@@ -69,6 +71,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
   const { t } = useTranslation()
   const isFolder = node.type === 'folder' || node.children.length > 0
   const isCollapsed = collapsedSet.has(node.id)
+  const isSelected = selectedKey === node.fullKey
   const isProblemActive =
     (node.isMissing || node.isEmpty) && node.fullKey === activeMissingKey
   const isTargetActive =
@@ -97,9 +100,13 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
   const handleRowClick = () => {
     if (!isFolder) {
       onSelectRow(node.fullKey, node.isMissing, node.isEmpty)
-      if (isStringValue && onStartEdit && !isCurrentlyEditing) {
-        onStartEdit(node.fullKey, typeof node.value === 'string' ? node.value : '')
-      }
+    }
+  }
+
+  const handleRowDoubleClick = (e: React.MouseEvent) => {
+    if (!isFolder && isStringValue && onStartEdit && !isCurrentlyEditing) {
+      e.stopPropagation()
+      onStartEdit(node.fullKey, typeof node.value === 'string' ? node.value : '')
     }
   }
 
@@ -136,7 +143,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
       <div
         className={`tree-row ${node.isMissing ? 'row-missing' : ''} ${
           node.isEmpty ? 'row-empty' : ''
-        } ${isProblemActive ? 'row-active-missing' : ''} ${
+        } ${isSelected ? 'row-selected' : ''} ${isProblemActive ? 'row-active-missing' : ''} ${
           isTargetActive ? 'row-active-target' : ''
         } ${node.isConflict ? 'row-conflict' : ''} ${
           isCurrentlyEditing ? 'row-editing' : ''
@@ -145,6 +152,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
         data-key={node.fullKey}
         data-testid={`tree-node-${node.fullKey}`}
         onClick={handleRowClick}
+        onDoubleClick={handleRowDoubleClick}
         onContextMenu={handleContextMenu}
       >
         {isFolder ? (
@@ -196,6 +204,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
               <div
                 className="inline-editor"
                 onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
               >
                 <input
                   type="text"
@@ -277,6 +286,7 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
               depth={depth + 1}
               collapsedSet={collapsedSet}
               activeMissingKey={activeMissingKey}
+              selectedKey={selectedKey}
               editingKey={editingKey}
               editValue={editValue}
               isSavingKey={isSavingKey}

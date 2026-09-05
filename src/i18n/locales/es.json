@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "La clave no puede contener puntos consecutivos",
     "errorEmptySegment": "Los segmentos de la clave no pueden estar vacíos"
   },
+  "inspector": {
+    "title": "Inspector de claves de traducción",
+    "emptySelection": "Ninguna clave de traducción seleccionada",
+    "emptySelectionHint": "Seleccione una clave en el árbol o navegue desde búsqueda o problemas para inspeccionar.",
+    "keyPath": "Ruta de la clave",
+    "reference": "Referencia",
+    "translations": "Traducciones",
+    "coverage": "Cobertura",
+    "coverageRatio": "{translated} / {total} idiomas",
+    "coveragePercent": "{percent}% completo",
+    "problems": "Problemas",
+    "noProblems": "No se detectaron problemas",
+    "emptyCount": "{count} vacíos",
+    "missingCount": "{count} faltantes",
+    "statusTranslated": "Traducido",
+    "statusEmpty": "Vacío",
+    "statusMissing": "Faltante",
+    "openInEditor": "Abrir",
+    "openInEditorAria": "Abrir {key} en {filename}",
+    "toggleInspector": "Inspector",
+    "closeInspector": "Cerrar inspector"
+  },
   "common": {
     "save": "Guardar",
     "done": "Listo",

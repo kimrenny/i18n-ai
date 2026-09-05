@@ -398,6 +398,28 @@
     "errorConsecutiveDots": "Anahtar art arda noktalar içeremez",
     "errorEmptySegment": "Anahtar segmentleri boş olamaz"
   },
+  "inspector": {
+    "title": "Çeviri Anahtarı Denetçisi",
+    "emptySelection": "Seçili çeviri anahtarı yok",
+    "emptySelectionHint": "Ağaçtan bir anahtar seçin veya incelemek için arama/sorunlardan gidin.",
+    "keyPath": "Anahtar Yolu",
+    "reference": "Referans",
+    "translations": "Çeviriler",
+    "coverage": "Kapsam",
+    "coverageRatio": "{translated} / {total} dil",
+    "coveragePercent": "%{percent} tamamlandı",
+    "problems": "Sorunlar",
+    "noProblems": "Sorun tespit edilmedi",
+    "emptyCount": "{count} Boş",
+    "missingCount": "{count} Eksik",
+    "statusTranslated": "Çevrildi",
+    "statusEmpty": "Boş",
+    "statusMissing": "Eksik",
+    "openInEditor": "Aç",
+    "openInEditorAria": "{filename} dosyasında {key} aç",
+    "toggleInspector": "Denetçi",
+    "closeInspector": "Denetçiyi Kapat"
+  },
   "common": {
     "save": "Kaydet",
     "done": "Tamam",
