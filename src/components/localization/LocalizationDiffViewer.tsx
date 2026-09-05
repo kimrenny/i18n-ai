@@ -48,6 +48,8 @@ import { BatchTranslationModal } from './BatchTranslationModal'
 import { LocalizationContextMenu, type ContextMenuState } from './LocalizationContextMenu'
 import { DeleteSectionModal } from './DeleteSectionModal'
 import { AddTranslationKeyModal } from './AddTranslationKeyModal'
+import { RenameTranslationKeyModal } from './RenameTranslationKeyModal'
+import type { RenameTranslationKeyPlan } from '../../types/localizationKeyRename'
 import { planAddTranslationKey } from '../../services/localizationKeyInsertion'
 import type { AddKeyTargetMode } from '../../types/localizationKeyInsertion'
 import type { ProblemNavigationTarget } from '../../types/localizationCoverage'
@@ -125,6 +127,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
     node: TreeNodeType
   } | null>(null)
   const [isDeletingSection, setIsDeletingSection] = useState(false)
+  const [renameKeyTarget, setRenameKeyTarget] = useState<string | null>(null)
+  const [isWritingRename, setIsWritingRename] = useState(false)
 
   // Single AI Translation state
   const [translatingKey, setTranslatingKey] = useState<string | null>(null)
@@ -521,6 +525,93 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
       setIsDeletingSection(false)
     }
   }, [deleteSectionTarget, activeFileData, onRefreshFiles, t])
+
+  const handleOpenRenameKey = useCallback((fullKey: string) => {
+    setEditingTarget(null)
+    setEditValue('')
+    setRenameKeyTarget(fullKey)
+  }, [])
+
+  const handleConfirmRenameKey = useCallback(
+    async (plan: RenameTranslationKeyPlan) => {
+      if (!plan.canApply || plan.filesToModify.length === 0) return
+      if (!window.electronAPI?.writeJsonFiles) {
+        setSaveKeyError('Unable to write files: Electron API is unavailable.')
+        return
+      }
+
+      setIsWritingRename(true)
+      setSaveKeyError(null)
+
+      try {
+        const filesToWrite = plan.filesToModify.map((f) => ({
+          path: f.path,
+          content: f.formattedJson,
+        }))
+
+        const res = await window.electronAPI.writeJsonFiles(filesToWrite)
+        if (!res || res.success === false) {
+          throw new Error('Failed to write files during rename')
+        }
+
+        const activeFilePlan =
+          plan.filesToModify.find((f) => f.filename === activeFilename) ||
+          plan.filesToModify[0]
+
+        historyManagerRef.current.push({
+          targetFile: activeFilename,
+          targetFilePath: activeFileData?.path || activeFilePlan.path,
+          type: 'rename_key',
+          description: `Rename ${plan.oldKey} to ${plan.newKey}`,
+          key: plan.newKey,
+          beforeRawJson:
+            (activeFileData?.raw as Record<string, JsonValue>) ||
+            activeFilePlan.beforeRawJson,
+          afterRawJson: activeFilePlan.afterRawJson,
+          batchChanges: plan.filesToModify.map((f) => ({
+            targetFile: f.filename,
+            targetFilePath: f.path,
+            beforeRawJson: f.beforeRawJson,
+            afterRawJson: f.afterRawJson,
+          })),
+        })
+        setHistoryVersion((v) => v + 1)
+
+        setRenameKeyTarget(null)
+        setEditingTarget(null)
+        setEditValue('')
+
+        await onRefreshFiles()
+
+        setSelectedKey(plan.newKey)
+        if (activeMissingKey === plan.oldKey) {
+          setActiveMissingKey(plan.newKey)
+        }
+
+        const parentPaths = getParentPaths(plan.newKey)
+        if (parentPaths.length > 0) {
+          setCollapsedSet((prev) => {
+            let changed = false
+            const next = new Set(prev)
+            for (const p of parentPaths) {
+              if (next.has(p)) {
+                next.delete(p)
+                changed = true
+              }
+            }
+            return changed ? next : prev
+          })
+        }
+      } catch (err) {
+        setSaveKeyError(
+          err instanceof Error ? err.message : t('errors.failedToSaveKey')
+        )
+      } finally {
+        setIsWritingRename(false)
+      }
+    },
+    [activeFilename, activeFileData, activeMissingKey, onRefreshFiles, t]
+  )
 
   const handleUndo = useCallback(async () => {
     if (!window.electronAPI?.writeJsonFiles) return
@@ -1243,11 +1334,22 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
           state={contextMenu}
           canUndo={historyManagerRef.current.canUndo(activeFilename)}
           canRedo={historyManagerRef.current.canRedo(activeFilename)}
+          onRenameKey={handleOpenRenameKey}
           onDeleteKey={handleDeleteKey}
           onDeleteSection={handleRequestDeleteSection}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {renameKeyTarget && (
+        <RenameTranslationKeyModal
+          oldKey={renameKeyTarget}
+          parsedFiles={parsedFiles}
+          isWriting={isWritingRename}
+          onConfirm={handleConfirmRenameKey}
+          onCancel={() => setRenameKeyTarget(null)}
         />
       )}
 

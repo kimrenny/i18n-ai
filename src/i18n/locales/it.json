@@ -102,7 +102,8 @@
     "deleteUndoNote": "Puoi annullare questa azione in qualsiasi momento usando Annulla (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Elimina sezione",
     "alreadyMissing": "La chiave non è presente in questo file",
-    "sectionEmpty": "Nessuna chiave presente da eliminare in questo file"
+    "sectionEmpty": "Nessuna chiave presente da eliminare in questo file",
+    "renameKey": "Rinomina chiave"
   },
   "translation": {
     "translateWithAi": "✨ Traduci con IA",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Apri {key} in {filename}",
     "toggleInspector": "Ispettore",
     "closeInspector": "Chiudi ispettore"
+  },
+  "rename": {
+    "title": "Rinomina chiave di traduzione",
+    "subtitle": "Rinomina la chiave in tutti i file di localizzazione preservando i valori esistenti",
+    "oldKeyLabel": "Chiave attuale",
+    "newKeyLabel": "Nuovo nome chiave",
+    "newKeyPlaceholder": "es. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "File interessati: {count} / {total}",
+    "skippedFilesCount": "Ignorati: {count}",
+    "previewTitle": "Anteprima modifiche",
+    "preservedValue": "Valore conservato",
+    "sameKeyNotice": "Inserisci un nome chiave diverso per rinominare",
+    "noFilesMatch": "Nessun file contiene questa chiave",
+    "confirmButton": "Rinomina chiave",
+    "renaming": "Ridenominazione in corso...",
+    "errorEmpty": "Il nome della chiave non può essere vuoto",
+    "errorDotBoundary": "La chiave non può iniziare o terminare con un punto",
+    "errorConsecutiveDots": "La chiave non può contenere punti consecutivi (..)",
+    "errorEmptySegment": "I segmenti della chiave non possono essere vuoti",
+    "errorInvalidKey": "Formato nome chiave non valido"
   },
   "common": {
     "save": "Salva",

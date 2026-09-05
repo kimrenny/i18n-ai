@@ -6,6 +6,7 @@ export type LocalizationMutationType =
   | 'edit_key'
   | 'add_keys'
   | 'add_key'
+  | 'rename_key'
 
 export interface HistoryFileChange {
   targetFile: string

@@ -102,7 +102,8 @@
     "deleteUndoNote": "You can safely revert this action at any time using Undo (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Delete Section",
     "alreadyMissing": "Key is not present in this file",
-    "sectionEmpty": "No keys present to delete in this file"
+    "sectionEmpty": "No keys present to delete in this file",
+    "renameKey": "Rename Key"
   },
   "translation": {
     "translateWithAi": "✨ Translate with AI",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Open {key} in {filename}",
     "toggleInspector": "Inspector",
     "closeInspector": "Close Inspector"
+  },
+  "rename": {
+    "title": "Rename Translation Key",
+    "subtitle": "Rename key across all localization files while preserving existing values",
+    "oldKeyLabel": "Current Key",
+    "newKeyLabel": "New Key Name",
+    "newKeyPlaceholder": "e.g. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Affected files: {count} / {total}",
+    "skippedFilesCount": "Skipped: {count}",
+    "previewTitle": "Preview Changes",
+    "preservedValue": "Preserved value",
+    "sameKeyNotice": "Enter a different key name to rename",
+    "noFilesMatch": "No files contain this key",
+    "confirmButton": "Rename Key",
+    "renaming": "Renaming...",
+    "errorEmpty": "Key name cannot be empty",
+    "errorDotBoundary": "Key cannot start or end with a dot",
+    "errorConsecutiveDots": "Key cannot contain consecutive dots (..)",
+    "errorEmptySegment": "Key segments cannot be empty",
+    "errorInvalidKey": "Invalid key name format"
   },
   "common": {
     "save": "Save",

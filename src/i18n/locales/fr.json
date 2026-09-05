@@ -102,7 +102,8 @@
     "deleteUndoNote": "Vous pouvez annuler cette action à tout moment avec Annuler (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Supprimer la section",
     "alreadyMissing": "La clé n'est pas présente dans ce fichier",
-    "sectionEmpty": "Aucune clé à supprimer dans ce fichier"
+    "sectionEmpty": "Aucune clé à supprimer dans ce fichier",
+    "renameKey": "Renommer la clé"
   },
   "translation": {
     "translateWithAi": "✨ Traduire avec l'IA",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Ouvrir {key} dans {filename}",
     "toggleInspector": "Inspecteur",
     "closeInspector": "Fermer l'inspecteur"
+  },
+  "rename": {
+    "title": "Renommer la clé de traduction",
+    "subtitle": "Renommer la clé dans tous les fichiers de localisation en préservant les valeurs existantes",
+    "oldKeyLabel": "Clé actuelle",
+    "newKeyLabel": "Nouveau nom de clé",
+    "newKeyPlaceholder": "ex. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Fichiers affectés : {count} / {total}",
+    "skippedFilesCount": "Ignorés : {count}",
+    "previewTitle": "Aperçu des modifications",
+    "preservedValue": "Valeur conservée",
+    "sameKeyNotice": "Entrez un nom de clé différent pour renommer",
+    "noFilesMatch": "Aucun fichier ne contient cette clé",
+    "confirmButton": "Renommer la clé",
+    "renaming": "Renommage en cours...",
+    "errorEmpty": "Le nom de la clé ne peut pas être vide",
+    "errorDotBoundary": "La clé ne peut pas commencer ou se terminer par un point",
+    "errorConsecutiveDots": "La clé ne peut pas contenir de points consécutifs (..)",
+    "errorEmptySegment": "Les segments de clé ne peuvent pas être vides",
+    "errorInvalidKey": "Format de nom de clé non valide"
   },
   "common": {
     "save": "Enregistrer",

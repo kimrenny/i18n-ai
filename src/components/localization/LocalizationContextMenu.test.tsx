@@ -142,7 +142,39 @@ describe('LocalizationContextMenu', () => {
     expect(onRedo).toHaveBeenCalled()
   })
 
-  it('disables Delete Entry action for missing nodes', () => {
+  it('renders Rename Key action for present leaf nodes and triggers callback', () => {
+    const onRenameKey = vi.fn()
+    const onClose = vi.fn()
+
+    render(
+      <LocalizationContextMenu
+        state={{
+          x: 100,
+          y: 100,
+          node: sampleLeafNode,
+          targetFilename: 'en.json',
+        }}
+        canUndo={false}
+        canRedo={false}
+        onRenameKey={onRenameKey}
+        onDeleteKey={vi.fn()}
+        onDeleteSection={vi.fn()}
+        onUndo={vi.fn()}
+        onRedo={vi.fn()}
+        onClose={onClose}
+      />
+    )
+
+    const renameBtn = screen.getByRole('menuitem', { name: /rename key/i })
+    expect(renameBtn).toBeInTheDocument()
+    expect(renameBtn).not.toBeDisabled()
+
+    fireEvent.click(renameBtn)
+    expect(onRenameKey).toHaveBeenCalledWith('AUTH.LOGIN')
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('disables Delete and Rename actions for missing nodes', () => {
     const missingLeafNode: LocalizationTreeNode = {
       ...sampleLeafNode,
       isPresent: false,
@@ -160,6 +192,7 @@ describe('LocalizationContextMenu', () => {
         }}
         canUndo={false}
         canRedo={false}
+        onRenameKey={vi.fn()}
         onDeleteKey={vi.fn()}
         onDeleteSection={vi.fn()}
         onUndo={vi.fn()}
@@ -170,5 +203,7 @@ describe('LocalizationContextMenu', () => {
 
     const deleteBtn = screen.getByRole('menuitem', { name: /delete entry/i })
     expect(deleteBtn).toBeDisabled()
+    const renameBtn = screen.getByRole('menuitem', { name: /rename key/i })
+    expect(renameBtn).toBeDisabled()
   })
 })

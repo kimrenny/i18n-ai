@@ -102,7 +102,8 @@
     "deleteUndoNote": "Ви можете будь-коли повернути цю дію за допомогою кнопки Скасувати (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Видалити розділ",
     "alreadyMissing": "Ключ відсутній у цьому файлі",
-    "sectionEmpty": "У цьому файлі немає ключів для видалення"
+    "sectionEmpty": "У цьому файлі немає ключів для видалення",
+    "renameKey": "Перейменувати ключ"
   },
   "translation": {
     "translateWithAi": "✨ Перекласти за допомогою AI",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Відкрити {key} у {filename}",
     "toggleInspector": "Інспектор",
     "closeInspector": "Закрити інспектор"
+  },
+  "rename": {
+    "title": "Перейменувати ключ перекладу",
+    "subtitle": "Перейменування ключа в усіх файлах локалізації зі збереженням існуючих значень",
+    "oldKeyLabel": "Поточний ключ",
+    "newKeyLabel": "Нова назва ключа",
+    "newKeyPlaceholder": "напр. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Файлів до зміни: {count} / {total}",
+    "skippedFilesCount": "Пропущено: {count}",
+    "previewTitle": "Попередній перегляд змін",
+    "preservedValue": "Збережене значення",
+    "sameKeyNotice": "Введіть іншу назву ключа для перейменування",
+    "noFilesMatch": "Жоден файл не містить цього ключа",
+    "confirmButton": "Перейменувати ключ",
+    "renaming": "Перейменування...",
+    "errorEmpty": "Назва ключа не може бути порожньою",
+    "errorDotBoundary": "Ключ не може починатися або закінчуватися крапкою",
+    "errorConsecutiveDots": "Ключ не може містити дві або більше крапок поспіль (..)",
+    "errorEmptySegment": "Сегменти ключа не можуть бути порожніми",
+    "errorInvalidKey": "Неприпустимий формат назви ключа"
   },
   "common": {
     "save": "Зберегти",

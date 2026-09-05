@@ -102,7 +102,8 @@
     "deleteUndoNote": "您可以随时使用撤消 (Ctrl+Z) 恢复此操作。",
     "confirmDeleteSectionBtn": "删除分组",
     "alreadyMissing": "此文件中不存在该键",
-    "sectionEmpty": "此文件中没有要删除的键"
+    "sectionEmpty": "此文件中没有要删除的键",
+    "renameKey": "重命名键"
   },
   "translation": {
     "translateWithAi": "✨ 使用 AI 翻译",
@@ -419,6 +420,26 @@
     "openInEditorAria": "在 {filename} 中打开 {key}",
     "toggleInspector": "检查器",
     "closeInspector": "关闭检查器"
+  },
+  "rename": {
+    "title": "重命名翻译键",
+    "subtitle": "在所有本地化文件中重命名键并保留现有翻译值",
+    "oldKeyLabel": "当前键",
+    "newKeyLabel": "新键名",
+    "newKeyPlaceholder": "例如 ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "受影响文件: {count} / {total}",
+    "skippedFilesCount": "已跳过: {count}",
+    "previewTitle": "预览更改",
+    "preservedValue": "保留的值",
+    "sameKeyNotice": "请输入不同的键名以重命名",
+    "noFilesMatch": "没有任何文件包含此键",
+    "confirmButton": "重命名键",
+    "renaming": "正在重命名...",
+    "errorEmpty": "键名不能为空",
+    "errorDotBoundary": "键名不能以点开头或结尾",
+    "errorConsecutiveDots": "键名不能包含连续的点 (..)",
+    "errorEmptySegment": "键名分段不能为空",
+    "errorInvalidKey": "键名格式无效"
   },
   "common": {
     "save": "保存",

@@ -102,7 +102,8 @@
     "deleteUndoNote": "Tuto akci můžete kdykoli vrátit pomocí tlačítka Zpět (Ctrl+Z).",
     "confirmDeleteSectionBtn": "Smazat sekci",
     "alreadyMissing": "Klíč v tomto souboru neexistuje",
-    "sectionEmpty": "V tomto souboru nejsou žádné klíče ke smazání"
+    "sectionEmpty": "V tomto souboru nejsou žádné klíče ke smazání",
+    "renameKey": "Přejmenovat klíč"
   },
   "translation": {
     "translateWithAi": "✨ Přeložit pomocí AI",
@@ -419,6 +420,26 @@
     "openInEditorAria": "Otevřít {key} v {filename}",
     "toggleInspector": "Inspektor",
     "closeInspector": "Zavřít inspektor"
+  },
+  "rename": {
+    "title": "Přejmenovat klíč překladu",
+    "subtitle": "Přejmenovat klíč ve všech souborech lokalizace se zachováním stávajících hodnot",
+    "oldKeyLabel": "Aktuální klíč",
+    "newKeyLabel": "Nový název klíče",
+    "newKeyPlaceholder": "např. ADMIN.DASHBOARD.HEADER",
+    "affectedFilesCount": "Dotčené soubory: {count} / {total}",
+    "skippedFilesCount": "Přeskočeno: {count}",
+    "previewTitle": "Náhled změn",
+    "preservedValue": "Zachovaná hodnota",
+    "sameKeyNotice": "Pro přejmenování zadejte jiný název klíče",
+    "noFilesMatch": "Žádný soubor neobsahuje tento klíč",
+    "confirmButton": "Přejmenovat klíč",
+    "renaming": "Přejmenovávání...",
+    "errorEmpty": "Název klíče nesmí být prázdný",
+    "errorDotBoundary": "Klíč nesmí začínat ani končit tečkou",
+    "errorConsecutiveDots": "Klíč nesmí obsahovat po sobě jdoucí tečky (..)",
+    "errorEmptySegment": "Segmenty klíče nesmí být prázdné",
+    "errorInvalidKey": "Neplatný formát názvu klíče"
   },
   "common": {
     "save": "Uložit",
