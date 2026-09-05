@@ -154,4 +154,59 @@ describe('LocalizationHistoryManager', () => {
     expect(manager.canUndo('de.json')).toBe(true)
     expect(manager.canUndo('ru.json')).toBe(false)
   })
+
+  it('supports single-action batchChanges affecting multiple files', () => {
+    const action = manager.push({
+      targetFile: 'en.json',
+      targetFilePath: '/path/en.json',
+      type: 'add_key',
+      description: 'Add key SETTINGS.THEME to 3 files',
+      key: 'SETTINGS.THEME',
+      count: 3,
+      beforeRawJson: {},
+      afterRawJson: { SETTINGS: { THEME: 'Dark' } },
+      batchChanges: [
+        {
+          targetFile: 'en.json',
+          targetFilePath: '/path/en.json',
+          beforeRawJson: {},
+          afterRawJson: { SETTINGS: { THEME: 'Dark' } },
+        },
+        {
+          targetFile: 'de.json',
+          targetFilePath: '/path/de.json',
+          beforeRawJson: {},
+          afterRawJson: { SETTINGS: { THEME: 'Dunkel' } },
+        },
+        {
+          targetFile: 'uk.json',
+          targetFilePath: '/path/uk.json',
+          beforeRawJson: {},
+          afterRawJson: { SETTINGS: { THEME: 'Темна' } },
+        },
+      ],
+    })
+
+    // All affected files report canUndo = true
+    expect(manager.canUndo('en.json')).toBe(true)
+    expect(manager.canUndo('de.json')).toBe(true)
+    expect(manager.canUndo('uk.json')).toBe(true)
+    expect(manager.canUndo('fr.json')).toBe(false)
+
+    // Undoing from de.json pops the whole batch action
+    const undone = manager.undo('de.json')
+    expect(undone?.id).toBe(action.id)
+    expect(undone?.batchChanges).toHaveLength(3)
+
+    // Now all 3 files report canUndo = false and canRedo = true
+    expect(manager.canUndo('en.json')).toBe(false)
+    expect(manager.canUndo('de.json')).toBe(false)
+    expect(manager.canUndo('uk.json')).toBe(false)
+    expect(manager.canRedo('uk.json')).toBe(true)
+
+    // Redoing from uk.json restores the batch action
+    const redone = manager.redo('uk.json')
+    expect(redone?.id).toBe(action.id)
+    expect(manager.canUndo('en.json')).toBe(true)
+  })
 })

@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import type { MissingKeysAdditionPlan } from '../../types/localization'
+import { resolveLanguageFromFilename } from '../../services/aiTranslation'
+import { getLanguageDisplayName } from '../../services/localizationCoverage'
 import { useTranslation } from '../../i18n/useTranslation'
 
 interface AddMissingKeysModalProps {
@@ -16,25 +18,20 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
   onClose,
 }) => {
   const { t } = useTranslation()
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
-    new Set(plan.filesToModify.map((f) => f.filename))
+  const [selectedFilename, setSelectedFilename] = useState<string>(
+    plan.filesToModify[0]?.filename || ''
   )
 
-  const toggleFileExpanded = (filename: string) => {
-    setExpandedFiles((prev) => {
-      const next = new Set(prev)
-      if (next.has(filename)) {
-        next.delete(filename)
-      } else {
-        next.add(filename)
-      }
-      return next
-    })
-  }
+  const activeFile =
+    plan.filesToModify.find((f) => f.filename === selectedFilename) ||
+    plan.filesToModify[0]
+
+  const activeLangCode = activeFile ? resolveLanguageFromFilename(activeFile.filename) : ''
+  const activeLangName = activeFile ? getLanguageDisplayName(activeLangCode) : ''
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={t('addMissing.dialogAria')}>
-      <div className="modal-container">
+      <div className="modal-container add-missing-modal-container">
         <div className="modal-header">
           <div className="modal-title-group">
             <h2 className="modal-title">{t('addMissing.title')}</h2>
@@ -83,41 +80,73 @@ export const AddMissingKeysModal: React.FC<AddMissingKeysModalProps> = ({
           </div>
         )}
 
-        <div className="modal-files-list">
-          {plan.filesToModify.map((file) => {
-            const isExpanded = expandedFiles.has(file.filename)
-            return (
-              <div key={file.path} className="modal-file-card" data-testid={`preview-file-${file.filename}`}>
-                <button
-                  type="button"
-                  className="modal-file-header"
-                  onClick={() => toggleFileExpanded(file.filename)}
-                  aria-expanded={isExpanded}
-                >
-                  <div className="modal-file-info">
-                    <span className="modal-file-arrow">{isExpanded ? '▼' : '▶'}</span>
-                    <span className="modal-file-name">{file.filename}</span>
-                    <span className="modal-file-path">{file.path}</span>
-                  </div>
-                  <span className="modal-file-badge">
-                    {t('addMissing.keysBadge', { count: file.keysToAdd.length })}
-                  </span>
-                </button>
+        <div className="add-missing-body-layout">
+          {/* Left Column: Languages to update selector */}
+          <aside className="add-missing-sidebar" aria-label="Languages to update">
+            <span className="add-missing-sidebar-title">
+              {t('addMissing.filesToModify')}
+            </span>
+            <div className="add-missing-lang-list" role="tablist">
+              {plan.filesToModify.map((file) => {
+                const langCode = resolveLanguageFromFilename(file.filename)
+                const langName = getLanguageDisplayName(langCode)
+                const isSelected = activeFile && file.filename === activeFile.filename
 
-                {isExpanded && (
-                  <div className="modal-keys-table">
-                    {file.keysToAdd.map((k) => (
-                      <div key={k.key} className="modal-key-row">
-                        <span className="modal-key-name">{k.key}</span>
-                        <span className="modal-key-arrow">→</span>
-                        <span className="modal-key-val"><code>""</code></span>
-                      </div>
-                    ))}
+                return (
+                  <button
+                    key={file.path}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    className={`add-missing-lang-item ${isSelected ? 'active' : ''}`}
+                    onClick={() => setSelectedFilename(file.filename)}
+                    data-testid={`lang-item-${file.filename}`}
+                  >
+                    <div className="lang-item-info">
+                      <span className="lang-item-name">{langName}</span>
+                      <span className="lang-item-file">{file.filename}</span>
+                    </div>
+                    <span className="lang-item-badge">
+                      +{file.keysToAdd.length}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </aside>
+
+          {/* Right Column: Preview of the selected language */}
+          <main className="add-missing-preview-panel" data-testid={`preview-panel-${activeFile?.filename || 'none'}`}>
+            {activeFile ? (
+              <>
+                <header className="add-missing-preview-header">
+                  <div className="preview-header-left">
+                    <h3 className="preview-lang-title">{activeLangName}</h3>
+                    <span className="preview-file-tag">{activeFile.filename}</span>
                   </div>
-                )}
+                  <span className="preview-file-badge">
+                    {t('addMissing.keysBadge', { count: activeFile.keysToAdd.length })}
+                  </span>
+                </header>
+
+                <div className="preview-keys-scroll">
+                  {activeFile.keysToAdd.map((k) => (
+                    <div key={k.key} className="preview-key-entry">
+                      <span className="preview-key-path" title={k.key}>{k.key}</span>
+                      <div className="preview-key-val-row">
+                        <span className="preview-key-arrow">→</span>
+                        <span className="preview-key-val"><code>""</code></span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="preview-empty-state">
+                No file selected
               </div>
-            )
-          })}
+            )}
+          </main>
         </div>
 
         <div className="modal-actions">

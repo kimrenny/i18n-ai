@@ -4,6 +4,7 @@ import { useTranslation } from '../../i18n/useTranslation'
 
 interface LocalizationSummaryProps {
   comparisonResult: LocalizationComparisonResult
+  onOpenAddKeyModal?: () => void
   onOpenAddMissingModal?: () => void
   onNavigateMissing?: () => void
   onNavigateEmpty?: () => void
@@ -13,6 +14,7 @@ interface LocalizationSummaryProps {
 
 export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
   comparisonResult,
+  onOpenAddKeyModal,
   onOpenAddMissingModal,
   onNavigateMissing,
   onNavigateEmpty,
@@ -104,6 +106,17 @@ export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
             {isBatchTranslating
               ? t('translation.translating')
               : `${t('translation.translateAll')} (${totalUntranslated})`}
+          </button>
+        )}
+        {onOpenAddKeyModal && (
+          <button
+            type="button"
+            className="add-key-trigger-btn"
+            onClick={onOpenAddKeyModal}
+            title={t('addKey.title')}
+            data-testid="open-add-key-modal-btn"
+          >
+            {t('addKey.button')}
           </button>
         )}
         <button
