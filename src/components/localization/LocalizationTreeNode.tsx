@@ -71,6 +71,8 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
   const isCollapsed = collapsedSet.has(node.id)
   const isProblemActive =
     (node.isMissing || node.isEmpty) && node.fullKey === activeMissingKey
+  const isTargetActive =
+    !node.isMissing && !node.isEmpty && node.fullKey === activeMissingKey
   const isCurrentlyEditing = editingKey === node.fullKey
   const isStringValue =
     node.isPresent && (typeof node.value === 'string' || node.isEmpty)
@@ -135,8 +137,10 @@ export const LocalizationTreeNode: React.FC<LocalizationTreeNodeProps> = ({
         className={`tree-row ${node.isMissing ? 'row-missing' : ''} ${
           node.isEmpty ? 'row-empty' : ''
         } ${isProblemActive ? 'row-active-missing' : ''} ${
-          node.isConflict ? 'row-conflict' : ''
-        } ${isCurrentlyEditing ? 'row-editing' : ''}`}
+          isTargetActive ? 'row-active-target' : ''
+        } ${node.isConflict ? 'row-conflict' : ''} ${
+          isCurrentlyEditing ? 'row-editing' : ''
+        }`}
         style={{ paddingLeft: `${depth * 18 + 8}px` }}
         data-key={node.fullKey}
         data-testid={`tree-node-${node.fullKey}`}

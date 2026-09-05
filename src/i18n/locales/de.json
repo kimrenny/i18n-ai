@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} Probleme"
   },
+  "search": {
+    "title": "Suche",
+    "placeholder": "Schlüssel und Übersetzungen suchen...",
+    "resultsCount": "{count} Ergebnisse in {fileCount} Dateien",
+    "singleResult": "1 Ergebnis in 1 Datei",
+    "noResults": "Keine passenden Schlüssel oder Übersetzungen gefunden",
+    "noResultsHint": "Versuchen Sie einen anderen Schlüssel oder Textauszug",
+    "emptyQueryHint": "Schlüssel oder Übersetzung eingeben, um alle Dateien zu durchsuchen",
+    "noWorkspace": "Öffnen Sie einen Arbeitsbereich, um Lokalisierungsdateien zu durchsuchen",
+    "noFiles": "Keine Lokalisierungsdateien im Arbeitsbereich gefunden",
+    "matchTypeKey": "Schlüssel-Treffer",
+    "matchTypeValue": "Werte-Treffer",
+    "matchTypeBoth": "Schlüssel- & Werte-Treffer",
+    "openSearchTooltip": "Lokalisierungsdateien durchsuchen (Ctrl+F)",
+    "clearSearch": "Suche leeren",
+    "closeSearch": "Suche schließen",
+    "navigateHint": "Nutzen Sie ↑↓ zum Navigieren, Enter zum Auswählen, Esc zum Schließen"
+  },
   "common": {
     "save": "Speichern",
     "done": "Fertig",

@@ -2076,6 +2076,158 @@ describe('App', () => {
       expect(problemsHandle).toHaveAttribute('aria-valuenow', '250')
     })
   })
+
+  describe('Global Search Integration', () => {
+    const mockFiles = [
+      { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+      { name: 'de.json', path: 'C:/Projects/locales/de.json' },
+      { name: 'fr.json', path: 'C:/Projects/locales/fr.json' },
+    ]
+
+    const mockJsonData: Record<string, unknown> = {
+      'C:/Projects/locales/en.json': {
+        dashboard: {
+          title: 'Analytics Dashboard',
+          users: 'Active Users',
+        },
+        settings: {
+          admin: {
+            role: 'Super Administrator',
+            permissions: 'All Permissions',
+          },
+        },
+        actions: {
+          save: 'Save',
+        },
+      },
+      'C:/Projects/locales/de.json': {
+        dashboard: {
+          title: 'Analytik-Übersicht',
+          users: 'Aktive Benutzer',
+        },
+        settings: {
+          admin: {
+            role: 'Hauptadministrator',
+            permissions: 'Alle Berechtigungen',
+          },
+        },
+        actions: {
+          save: 'Speichern',
+        },
+      },
+      'C:/Projects/locales/fr.json': {
+        dashboard: {
+          title: 'Tableau de bord',
+        },
+        actions: {
+          save: 'Enregistrer',
+        },
+      },
+    }
+
+    it('opens Global Search via header search button and via Ctrl+F shortcut', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      // Open workspace
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument())
+
+      // Header button exists
+      const searchBtn = screen.getByTestId('ide-search-btn')
+      expect(searchBtn).toBeInTheDocument()
+
+      // Click Search button -> dialog opens
+      fireEvent.click(searchBtn)
+      expect(screen.getByTestId('global-search-dialog')).toBeInTheDocument()
+
+      // Close via Esc
+      fireEvent.keyDown(screen.getByTestId('global-search-dialog'), { key: 'Escape' })
+      expect(screen.queryByTestId('global-search-dialog')).not.toBeInTheDocument()
+
+      // Open via Ctrl+F
+      fireEvent.keyDown(window, { key: 'f', ctrlKey: true })
+      expect(screen.getByTestId('global-search-dialog')).toBeInTheDocument()
+    })
+
+    it('searches keys and values across files and navigates to the exact key in Diff Viewer', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument())
+
+      // Open Global Search
+      fireEvent.click(screen.getByTestId('ide-search-btn'))
+      expect(screen.getByTestId('global-search-dialog')).toBeInTheDocument()
+
+      // Search nested key 'permissions'
+      const searchInput = screen.getByTestId('global-search-input')
+      fireEvent.change(searchInput, { target: { value: 'permissions' } })
+
+      // Results summary shows 2 matches across 2 files (en.json and de.json)
+      expect(screen.getByTestId('search-summary-bar')).toHaveTextContent(/2 results/i)
+
+      // Click German result item
+      const deResult = screen.getByTestId('search-result-de.json-settings.admin.permissions')
+      expect(deResult).toBeInTheDocument()
+      fireEvent.click(deResult)
+
+      // Global Search closes
+      expect(screen.queryByTestId('global-search-dialog')).not.toBeInTheDocument()
+
+      // Diff Viewer opens
+      await waitFor(() => {
+        expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument()
+      })
+
+      // German file tab is activated
+      expect(screen.getByTestId('file-tab-de.json')).toHaveClass('active-tab')
+
+      // Target nested node is present in DOM and ancestors expanded
+      expect(screen.getByTestId('tree-node-settings.admin.permissions')).toBeInTheDocument()
+    })
+
+    it('searching by translation value snippet navigates to matching English key', async () => {
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/MyProject'),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (path: string) => mockJsonData[path] || {}),
+      })
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /select folder/i }))
+      await waitFor(() => expect(screen.getByTestId('coverage-dashboard')).toBeInTheDocument())
+
+      // Open Global Search
+      fireEvent.click(screen.getByTestId('ide-search-btn'))
+
+      // Search translation value 'Analytics'
+      const searchInput = screen.getByTestId('global-search-input')
+      fireEvent.change(searchInput, { target: { value: 'Analytics' } })
+
+      const enResult = screen.getByTestId('search-result-en.json-dashboard.title')
+      fireEvent.click(enResult)
+
+      // Diff Viewer opens with en.json active
+      await waitFor(() => {
+        expect(screen.getByTestId('localization-tree-panel')).toBeInTheDocument()
+      })
+      expect(screen.getByTestId('file-tab-en.json')).toHaveClass('active-tab')
+      expect(screen.getByTestId('tree-node-dashboard.title')).toBeInTheDocument()
+    })
+  })
 })
 
 

@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} problémů"
   },
+  "search": {
+    "title": "Hledat",
+    "placeholder": "Hledat klíče a překlady...",
+    "resultsCount": "{count} výsledků v {fileCount} souborech",
+    "singleResult": "1 výsledek v 1 souboru",
+    "noResults": "Nebyly nalezeny žádné odpovídající klíče ani překlady",
+    "noResultsHint": "Zkuste vyhledat jiný klíč nebo část překladu",
+    "emptyQueryHint": "Zadejte klíč nebo překlad pro vyhledávání ve všech souborech",
+    "noWorkspace": "Otevřete pracovní prostor pro vyhledávání v souborech lokalizace",
+    "noFiles": "V pracovním prostoru nebyly nalezeny žádné lokalizační soubory",
+    "matchTypeKey": "Shoda klíče",
+    "matchTypeValue": "Shoda hodnoty",
+    "matchTypeBoth": "Shoda klíče i hodnoty",
+    "openSearchTooltip": "Hledat v souborech lokalizace (Ctrl+F)",
+    "clearSearch": "Vymazat hledání",
+    "closeSearch": "Zavřít hledání",
+    "navigateHint": "Použijte ↑↓ pro navigaci, Enter pro přechod na klíč, Esc pro zavření"
+  },
   "common": {
     "save": "Uložit",
     "done": "Hotovo",

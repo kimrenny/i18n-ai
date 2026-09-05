@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} problemas"
   },
+  "search": {
+    "title": "Buscar",
+    "placeholder": "Buscar claves y traducciones...",
+    "resultsCount": "{count} resultados en {fileCount} archivos",
+    "singleResult": "1 resultado en 1 archivo",
+    "noResults": "No se encontraron claves o traducciones coincidentes",
+    "noResultsHint": "Intente buscar otra clave o fragmento de traducción",
+    "emptyQueryHint": "Escriba una clave o traducción para buscar en todos los archivos",
+    "noWorkspace": "Abra un espacio de trabajo para buscar archivos de localización",
+    "noFiles": "No se detectaron archivos de localización en el espacio de trabajo",
+    "matchTypeKey": "Coincidencia de clave",
+    "matchTypeValue": "Coincidencia de valor",
+    "matchTypeBoth": "Coincidencia de clave y valor",
+    "openSearchTooltip": "Buscar en archivos de localización (Ctrl+F)",
+    "clearSearch": "Borrar búsqueda",
+    "closeSearch": "Cerrar búsqueda",
+    "navigateHint": "Use ↑↓ para navegar, Enter para saltar a la clave, Esc para cerrar"
+  },
   "common": {
     "save": "Guardar",
     "done": "Listo",

@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} проблем"
   },
+  "search": {
+    "title": "Пошук",
+    "placeholder": "Пошук ключів та перекладів...",
+    "resultsCount": "Результатів: {count} у {fileCount} файлах",
+    "singleResult": "1 результат в 1 файлі",
+    "noResults": "Відповідних ключів або перекладів не знайдено",
+    "noResultsHint": "Спробуйте інший ключ або фрагмент перекладу",
+    "emptyQueryHint": "Введіть ключ або текст для пошуку по всіх файлах",
+    "noWorkspace": "Відкрийте робочу область для пошуку файлів локалізації",
+    "noFiles": "У робочій області не виявлено файлів локалізації",
+    "matchTypeKey": "Збіг за ключем",
+    "matchTypeValue": "Збіг за значенням",
+    "matchTypeBoth": "Збіг за ключем і значенням",
+    "openSearchTooltip": "Пошук по файлах локалізації (Ctrl+F)",
+    "clearSearch": "Очистити пошук",
+    "closeSearch": "Закрити пошук",
+    "navigateHint": "Використовуйте ↑↓ для навігації, Enter для переходу, Esc для закриття"
+  },
   "common": {
     "save": "Зберегти",
     "done": "Готово",

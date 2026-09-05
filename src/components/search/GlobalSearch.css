@@ -1,0 +1,346 @@
+/* Global Search Overlay & Dialog */
+.global-search-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 15, 29, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 5vh;
+  z-index: 1000;
+  animation: searchFadeIn 0.15s ease-out;
+}
+
+@keyframes searchFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.global-search-dialog {
+  width: 90%;
+  max-width: 680px;
+  max-height: 80vh;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: searchSlideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes searchSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Header bar */
+.global-search-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f172a;
+}
+
+.search-icon {
+  font-size: 1.15rem;
+  color: #38bdf8;
+  user-select: none;
+}
+
+.global-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  font-family: inherit;
+  color: #f8fafc;
+}
+
+.global-search-input::placeholder {
+  color: #64748b;
+}
+
+.search-clear-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.search-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+}
+
+.search-close-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: ui-monospace, monospace;
+}
+
+.search-close-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+}
+
+/* Summary Bar */
+.global-search-summary-bar {
+  padding: 0.45rem 1.25rem;
+  background: rgba(15, 23, 42, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Body */
+.global-search-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+  min-height: 180px;
+  max-height: calc(80vh - 120px);
+}
+
+/* Empty States */
+.search-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.empty-state-icon {
+  font-size: 2.2rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.7;
+}
+
+.empty-state-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #cbd5e1;
+  margin: 0 0 0.25rem 0;
+}
+
+.empty-state-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* Groups List */
+.search-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.search-group-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1.25rem;
+  background: rgba(15, 23, 42, 0.4);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  user-select: none;
+}
+
+.group-file-icon {
+  font-size: 0.85rem;
+}
+
+.group-file-name {
+  color: #e2e8f0;
+  font-family: ui-monospace, monospace;
+}
+
+.group-language-badge {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+}
+
+.group-match-count {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+/* Result Items */
+.search-group-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 1.25rem;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  border-left: 3px solid transparent;
+}
+
+.search-result-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.search-result-item.is-selected {
+  background: rgba(56, 189, 248, 0.12);
+  border-left-color: #38bdf8;
+}
+
+.result-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.result-item-key {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-item-val {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-highlight {
+  background: rgba(250, 204, 21, 0.35);
+  color: #fef08a;
+  padding: 0.05rem 0.2rem;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+.search-empty-val-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+}
+
+.result-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.match-tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.match-tag-key {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.match-tag-value {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.match-tag-both {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+/* Footer Bar */
+.global-search-footer {
+  padding: 0.6rem 1.25rem;
+  background: #0f172a;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.search-footer-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.shortcut-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.shortcut-pill kbd {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.68rem;
+  font-family: ui-monospace, monospace;
+  color: #cbd5e1;
+}

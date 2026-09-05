@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count}개 문제"
   },
+  "search": {
+    "title": "검색",
+    "placeholder": "키 및 번역 검색...",
+    "resultsCount": "{fileCount}개 파일에서 {count}개 결과",
+    "singleResult": "1개 파일에서 1개 결과",
+    "noResults": "일치하는 키 또는 번역을 찾을 수 없습니다",
+    "noResultsHint": "다른 키나 번역 텍스트를 검색해 보세요",
+    "emptyQueryHint": "모든 파일에서 검색할 키나 번역을 입력하세요",
+    "noWorkspace": "현지화 파일을 검색하려면 작업 영역을 여세요",
+    "noFiles": "작업 영역에서 현지화 파일이 감지되지 않았습니다",
+    "matchTypeKey": "키 일치",
+    "matchTypeValue": "값 일치",
+    "matchTypeBoth": "키 및 값 일치",
+    "openSearchTooltip": "현지화 파일 전체 검색 (Ctrl+F)",
+    "clearSearch": "검색 지우기",
+    "closeSearch": "검색 닫기",
+    "navigateHint": "↑↓로 이동, Enter로 키 이동, Esc로 닫기"
+  },
   "common": {
     "save": "저장",
     "done": "완료",

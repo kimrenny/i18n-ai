@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} 个问题"
   },
+  "search": {
+    "title": "搜索",
+    "placeholder": "搜索键和翻译...",
+    "resultsCount": "在 {fileCount} 个文件中找到 {count} 个结果",
+    "singleResult": "在 1 个文件中找到 1 个结果",
+    "noResults": "未找到匹配的键或翻译",
+    "noResultsHint": "尝试搜索其他键或翻译片段",
+    "emptyQueryHint": "输入键或翻译片段以在所有文件中搜索",
+    "noWorkspace": "打开工作区以搜索本地化文件",
+    "noFiles": "工作区中未检测到本地化文件",
+    "matchTypeKey": "键匹配",
+    "matchTypeValue": "值匹配",
+    "matchTypeBoth": "键和值匹配",
+    "openSearchTooltip": "在本地化文件中搜索 (Ctrl+F)",
+    "clearSearch": "清空搜索",
+    "closeSearch": "关闭搜索",
+    "navigateHint": "使用 ↑↓ 导航，Enter 跳转至键，Esc 关闭"
+  },
   "common": {
     "save": "保存",
     "done": "完成",

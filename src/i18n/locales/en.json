@@ -356,6 +356,24 @@
     "languageGroupHeader": "{language} ({count})",
     "problemsCount": "{count} problems"
   },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search keys and translations...",
+    "resultsCount": "{count} results in {fileCount} files",
+    "singleResult": "1 result in 1 file",
+    "noResults": "No matching keys or translations found",
+    "noResultsHint": "Try searching for a different key or translation snippet",
+    "emptyQueryHint": "Type a key or translation snippet to search across all files",
+    "noWorkspace": "Open a workspace to search localization files",
+    "noFiles": "No localization files detected in the workspace",
+    "matchTypeKey": "Key match",
+    "matchTypeValue": "Value match",
+    "matchTypeBoth": "Key & Value match",
+    "openSearchTooltip": "Search across localization files (Ctrl+F)",
+    "clearSearch": "Clear search",
+    "closeSearch": "Close search",
+    "navigateHint": "Use ↑↓ to navigate, Enter to jump to key, Esc to close"
+  },
   "common": {
     "save": "Save",
     "done": "Done",
