@@ -408,6 +408,16 @@ textarea,
   color: #4ade80;
 }
 
+.statusbar-quality-btn.has-problems {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.statusbar-quality-btn.no-problems {
+  color: #4ade80;
+}
+
+
 .files-section {
   margin: 1.5rem 0;
   text-align: left;

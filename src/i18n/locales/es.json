@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Límite de tasa — reintentando {current}/{total} ({attempt}/{maxRetries}) en {seconds}s...",
     "batchCompleted": "Traducción por lotes completada ({count} claves)",
     "dismiss": "Descartar"
+  },
+  "quality": {
+    "title": "Calidad",
+    "ariaLabel": "Panel de calidad de localización",
+    "totalIssues": "{count} problemas",
+    "errors": "Errores",
+    "warnings": "Advertencias",
+    "info": "Info",
+    "severityError": "Error",
+    "severityWarning": "Advertencia",
+    "severityInfo": "Info",
+    "allSeverities": "Todas las gravedades",
+    "allTypes": "Todos los tipos",
+    "allLanguages": "Todos los idiomas",
+    "noIssuesTitle": "No se detectaron problemas de calidad",
+    "noIssuesDesc": "Todas las traducciones superaron las comprobaciones de calidad estructurales y técnicas.",
+    "noFilteredIssues": "Ningún problema coincide con los filtros.",
+    "closePanel": "Cerrar panel de calidad",
+    "typeMissing": "Traducción faltante",
+    "typeEmpty": "Traducción vacía",
+    "typePlaceholderMismatch": "Discrepancia de marcadores",
+    "typeTagMismatch": "Discrepancia de etiquetas",
+    "typeSameAsReference": "Igual a la referencia",
+    "typeWhitespaceMismatch": "Discrepancia de espacios",
+    "typeStructuralConflict": "Conflicto estructural",
+    "statusBarItem": "Calidad {count}",
+    "inspectorTitle": "Comprobaciones de calidad",
+    "noKeyIssues": "Sin problemas de calidad para esta clave"
   }
 }

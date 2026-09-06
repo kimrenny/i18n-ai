@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Ліміт запитів — повтор {current}/{total} ({attempt}/{maxRetries}) через {seconds} сек...",
     "batchCompleted": "Пакетний переклад завершено ({count} ключів)",
     "dismiss": "Закрити"
+  },
+  "quality": {
+    "title": "Якість",
+    "ariaLabel": "Панель якості локалізації",
+    "totalIssues": "Проблем: {count}",
+    "errors": "Помилки",
+    "warnings": "Попередження",
+    "info": "Інфо",
+    "severityError": "Помилка",
+    "severityWarning": "Попередження",
+    "severityInfo": "Інфо",
+    "allSeverities": "Усі рівні",
+    "allTypes": "Усі типи проблем",
+    "allLanguages": "Усі мови",
+    "noIssuesTitle": "Проблем із якістю не виявлено",
+    "noIssuesDesc": "Усі переклади пройшли структурні та технічні перевірки якості.",
+    "noFilteredIssues": "Немає проблем, що відповідають фільтрам.",
+    "closePanel": "Закрити панель якості",
+    "typeMissing": "Відсутній переклад",
+    "typeEmpty": "Порожній переклад",
+    "typePlaceholderMismatch": "Невідповідність заповнювачів",
+    "typeTagMismatch": "Невідповідність тегів",
+    "typeSameAsReference": "Збігається з еталоном",
+    "typeWhitespaceMismatch": "Невідповідність пробілів",
+    "typeStructuralConflict": "Структурний конфлікт",
+    "statusBarItem": "Якість {count}",
+    "inspectorTitle": "Перевірка якості",
+    "noKeyIssues": "Немає проблем із якістю для цього ключа"
   }
 }

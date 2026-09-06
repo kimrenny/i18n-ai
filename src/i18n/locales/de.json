@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Ratenlimit — wiederhole {current}/{total} ({attempt}/{maxRetries}) in {seconds}s...",
     "batchCompleted": "Batch-Übersetzung abgeschlossen ({count} Schlüssel)",
     "dismiss": "Schließen"
+  },
+  "quality": {
+    "title": "Qualität",
+    "ariaLabel": "Qualitätsbereich Lokalisierung",
+    "totalIssues": "{count} Probleme",
+    "errors": "Fehler",
+    "warnings": "Warnungen",
+    "info": "Info",
+    "severityError": "Fehler",
+    "severityWarning": "Warnung",
+    "severityInfo": "Info",
+    "allSeverities": "Alle Schweregrade",
+    "allTypes": "Alle Problemtypen",
+    "allLanguages": "Alle Sprachen",
+    "noIssuesTitle": "Keine Qualitätsprobleme erkannt",
+    "noIssuesDesc": "Alle Übersetzungen haben die strukturellen und technischen Qualitätsprüfungen bestanden.",
+    "noFilteredIssues": "Keine Probleme entsprechen den Filtern.",
+    "closePanel": "Qualitätsbereich schließen",
+    "typeMissing": "Fehlende Übersetzung",
+    "typeEmpty": "Leere Übersetzung",
+    "typePlaceholderMismatch": "Platzhalter-Abweichung",
+    "typeTagMismatch": "Tag-Abweichung",
+    "typeSameAsReference": "Identisch mit Referenz",
+    "typeWhitespaceMismatch": "Leerzeichen-Abweichung",
+    "typeStructuralConflict": "Strukturkonflikt",
+    "statusBarItem": "Qualität {count}",
+    "inspectorTitle": "Qualitätsprüfungen",
+    "noKeyIssues": "Keine Qualitätsprobleme für diesen Schlüssel"
   }
 }

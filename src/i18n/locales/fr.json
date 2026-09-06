@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Limite atteinte — nouvelle tentative {current}/{total} ({attempt}/{maxRetries}) dans {seconds}s...",
     "batchCompleted": "Traduction par lot terminée ({count} clés)",
     "dismiss": "Fermer"
+  },
+  "quality": {
+    "title": "Qualité",
+    "ariaLabel": "Panneau de qualité de localisation",
+    "totalIssues": "{count} problèmes",
+    "errors": "Erreurs",
+    "warnings": "Avertissements",
+    "info": "Info",
+    "severityError": "Erreur",
+    "severityWarning": "Avertissement",
+    "severityInfo": "Info",
+    "allSeverities": "Toutes les gravités",
+    "allTypes": "Tous les types",
+    "allLanguages": "Toutes les langues",
+    "noIssuesTitle": "Aucun problème de qualité détecté",
+    "noIssuesDesc": "Toutes les traductions ont passé les contrôles de qualité structurels et techniques.",
+    "noFilteredIssues": "Aucun problème ne correspond aux filtres.",
+    "closePanel": "Fermer le panneau de qualité",
+    "typeMissing": "Traduction manquante",
+    "typeEmpty": "Traduction vide",
+    "typePlaceholderMismatch": "Divergence d'espaces réservés",
+    "typeTagMismatch": "Divergence de balises",
+    "typeSameAsReference": "Identique à la référence",
+    "typeWhitespaceMismatch": "Divergence d'espacement",
+    "typeStructuralConflict": "Conflit structurel",
+    "statusBarItem": "Qualité {count}",
+    "inspectorTitle": "Contrôles de qualité",
+    "noKeyIssues": "Aucun problème de qualité pour cette clé"
   }
 }

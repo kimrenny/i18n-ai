@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Limit zapytań — ponawianie {current}/{total} ({attempt}/{maxRetries}) za {seconds}s...",
     "batchCompleted": "Tłumaczenie zbiorcze zakończone ({count} kluczy)",
     "dismiss": "Zamknij"
+  },
+  "quality": {
+    "title": "Jakość",
+    "ariaLabel": "Panel jakości lokalizacji",
+    "totalIssues": "{count} problemów",
+    "errors": "Błędy",
+    "warnings": "Ostrzeżenia",
+    "info": "Informacja",
+    "severityError": "Błąd",
+    "severityWarning": "Ostrzeżenie",
+    "severityInfo": "Informacja",
+    "allSeverities": "Wszystkie poziomy",
+    "allTypes": "Wszystkie typy problemów",
+    "allLanguages": "Wszystkie języki",
+    "noIssuesTitle": "Nie wykryto problemów z jakością",
+    "noIssuesDesc": "Wszystkie tłumaczenia przeszły kontrole strukturalne i techniczne.",
+    "noFilteredIssues": "Brak problemów pasujących do filtrów.",
+    "closePanel": "Zamknij panel jakości",
+    "typeMissing": "Brakujące tłumaczenie",
+    "typeEmpty": "Puste tłumaczenie",
+    "typePlaceholderMismatch": "Niezgodność symboli zastępczych",
+    "typeTagMismatch": "Niezgodność tagów",
+    "typeSameAsReference": "Identyczne z referencją",
+    "typeWhitespaceMismatch": "Niezgodność białych znaków",
+    "typeStructuralConflict": "Konflikt strukturalny",
+    "statusBarItem": "Jakość {count}",
+    "inspectorTitle": "Kontrola jakości",
+    "noKeyIssues": "Brak problemów z jakością dla tego klucza"
   }
 }

@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Limite superato — nuovo tentativo {current}/{total} ({attempt}/{maxRetries}) tra {seconds}s...",
     "batchCompleted": "Traduzione in blocco completata ({count} chiavi)",
     "dismiss": "Chiudi"
+  },
+  "quality": {
+    "title": "Qualità",
+    "ariaLabel": "Pannello qualità localizzazione",
+    "totalIssues": "{count} problemi",
+    "errors": "Errori",
+    "warnings": "Avvisi",
+    "info": "Info",
+    "severityError": "Errore",
+    "severityWarning": "Avviso",
+    "severityInfo": "Info",
+    "allSeverities": "Tutte le gravità",
+    "allTypes": "Tutti i tipi",
+    "allLanguages": "Tutte le lingue",
+    "noIssuesTitle": "Nessun problema di qualità rilevato",
+    "noIssuesDesc": "Tutte le traduzioni hanno superato i controlli di qualità strutturali e tecnici.",
+    "noFilteredIssues": "Nessun problema corrisponde ai filtri.",
+    "closePanel": "Chiudi pannello qualità",
+    "typeMissing": "Traduzione mancante",
+    "typeEmpty": "Traduzione vuota",
+    "typePlaceholderMismatch": "Discrepanza nei segnaposto",
+    "typeTagMismatch": "Discrepanza nei tag",
+    "typeSameAsReference": "Identico al riferimento",
+    "typeWhitespaceMismatch": "Discrepanza negli spazi",
+    "typeStructuralConflict": "Conflitto strutturale",
+    "statusBarItem": "Qualità {count}",
+    "inspectorTitle": "Controlli di qualità",
+    "noKeyIssues": "Nessun problema di qualità per questa chiave"
   }
 }

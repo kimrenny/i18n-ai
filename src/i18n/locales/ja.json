@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "レート制限 — {current}/{total} を{seconds}秒後に再試行 ({attempt}/{maxRetries})...",
     "batchCompleted": "一括翻訳が完了しました ({count} 件のキー)",
     "dismiss": "閉じる"
+  },
+  "quality": {
+    "title": "品質",
+    "ariaLabel": "ローカリゼーション品質パネル",
+    "totalIssues": "{count} 件の問題",
+    "errors": "エラー",
+    "warnings": "警告",
+    "info": "情報",
+    "severityError": "エラー",
+    "severityWarning": "警告",
+    "severityInfo": "情報",
+    "allSeverities": "すべての重大度",
+    "allTypes": "すべての問題タイプ",
+    "allLanguages": "すべての言語",
+    "noIssuesTitle": "品質上の問題は検出されませんでした",
+    "noIssuesDesc": "すべての翻訳が構造的および技術的な品質チェックに合格しました。",
+    "noFilteredIssues": "現在のフィルターに一致する問題はありません。",
+    "closePanel": "品質パネルを閉じる",
+    "typeMissing": "翻訳の欠落",
+    "typeEmpty": "空の翻訳",
+    "typePlaceholderMismatch": "プレースホルダーの不一致",
+    "typeTagMismatch": "タグの不一致",
+    "typeSameAsReference": "参照言語と同一",
+    "typeWhitespaceMismatch": "空白の不一致",
+    "typeStructuralConflict": "構造の競合",
+    "statusBarItem": "品質 {count}",
+    "inspectorTitle": "品質チェック",
+    "noKeyIssues": "このキーに品質上の問題はありません"
   }
 }
