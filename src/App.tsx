@@ -807,6 +807,8 @@ const AppContent: React.FC<AppContentProps> = ({
                   handleRefreshFiles()
                   refreshGitSummary()
                 }}
+                preflightReport={workspacePreflight}
+                onNavigateToIssue={handleNavigateFromQuality}
               />
             ) : selectedDirectory ? (
               /* If workspace is open, render Translation Coverage Dashboard as default view */

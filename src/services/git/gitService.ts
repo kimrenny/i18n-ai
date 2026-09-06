@@ -9,6 +9,7 @@ import type {
   GitBranchListResult,
   GitBranchSwitchResult,
   GitBranchCreateResult,
+  GitCommitSelectedResult,
 } from '../../types/git'
 
 export interface ParsedDiffLine {
@@ -387,4 +388,42 @@ export function validateBranchNameInput(name: string): { valid: boolean; errorKe
   }
   return { valid: true }
 }
+
+/**
+ * Invokes preload API to commit selected files safely.
+ */
+export async function commitGitSelected(
+  dirPath: string,
+  filePaths: string[],
+  message: string
+): Promise<GitCommitSelectedResult> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitCommitSelected) {
+    return {
+      success: false,
+      error: 'Git integration requires Electron runtime environment.',
+    }
+  }
+
+  try {
+    const res = await window.electronAPI.gitCommitSelected(dirPath, filePaths, message)
+    return res as GitCommitSelectedResult
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+/**
+ * Renderer-side validation for commit message input.
+ */
+export function validateCommitMessage(message: string): { valid: boolean; errorKey?: string } {
+  const trimmed = message.trim()
+  if (!trimmed) {
+    return { valid: false, errorKey: 'git.commit.errorEmptyMessage' }
+  }
+  return { valid: true }
+}
+
 

@@ -16,17 +16,29 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
+  min-height: 50px;
   background: var(--bg-secondary, #181825);
   border-bottom: 1px solid var(--border-color, #313244);
   gap: 12px;
   flex-shrink: 0;
+  box-sizing: border-box;
+  z-index: 10;
+  position: relative;
 }
 
-.git-toolbar-left,
+.git-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
 .git-toolbar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .git-repo-badge {
@@ -43,17 +55,20 @@
 
 .git-subtabs {
   display: inline-flex;
+  align-items: center;
   background: var(--bg-tertiary, #313244);
   border-radius: 6px;
   padding: 2px;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .git-subtab-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 0 12px;
+  height: 28px;
   border-radius: 4px;
   border: none;
   background: transparent;
@@ -61,6 +76,9 @@
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 
@@ -92,6 +110,8 @@
   color: var(--text-secondary, #a6adc8);
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .git-filter-checkbox input[type="checkbox"] {
@@ -123,9 +143,8 @@
 /* Left Files / Commits Panel */
 .git-files-panel,
 .git-commits-panel {
-  width: 360px;
   min-width: 280px;
-  max-width: 480px;
+  max-width: 560px;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary, #181825);
@@ -138,16 +157,25 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 8px 12px;
+  min-height: 42px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--border-color, #313244);
   font-size: 0.85rem;
   font-weight: 600;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .git-panel-title {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  flex-shrink: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .git-panel-count {
@@ -158,7 +186,9 @@
 .git-panel-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .git-link-btn {
@@ -351,6 +381,7 @@
 /* Diff Panel (Right Column) */
 .git-diff-panel {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary, #1e1e2e);
@@ -363,6 +394,7 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
+  min-height: 0;
 }
 
 .git-diff-header {
@@ -370,9 +402,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 14px;
+  min-height: 42px;
+  box-sizing: border-box;
   background: var(--bg-secondary, #181825);
   border-bottom: 1px solid var(--border-color, #313244);
   gap: 12px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
 }
 
 .git-diff-title-area {
@@ -380,6 +417,8 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .git-diff-title {
@@ -390,6 +429,8 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .git-diff-stat-badges {
@@ -398,14 +439,36 @@
   font-family: monospace;
   font-size: 0.75rem;
   font-weight: 600;
+  flex-shrink: 0;
+}
+
+.git-diff-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.git-open-editor-btn {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .git-diff-content {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
   font-size: 0.82rem;
   background: #11111b;
+  position: relative;
+  z-index: 1;
 }
 
 .git-diff-table {
@@ -558,6 +621,7 @@
 /* Commit Details Panel */
 .git-commit-details-panel {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary, #1e1e2e);
@@ -568,17 +632,22 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
   overflow: hidden;
+  min-height: 0;
 }
 
 .git-commit-meta-card {
-  padding: 14px 18px;
+  padding: 12px 16px;
   background: var(--bg-secondary, #181825);
   border-bottom: 1px solid var(--border-color, #313244);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 100px;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .git-commit-detail-header {
@@ -696,8 +765,13 @@
 }
 
 .git-commit-diff-wrapper {
-  flex: 1;
+  flex: none;
+  min-height: 140px;
+  max-height: 700px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary, #1e1e2e);
 }
 
 /* Clean / Empty / Unavailable States */
@@ -1162,3 +1236,465 @@
   padding: 12px 20px;
   border-top: 1px solid var(--border-color, #313244);
 }
+
+/* Commit Selected Button */
+.git-commit-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #a6e3a1 0%, #94e2d5 100%);
+  color: #11111b !important;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 2px 6px rgba(166, 227, 161, 0.25);
+  transition: all 0.2s ease;
+}
+
+.git-commit-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(166, 227, 161, 0.35);
+  filter: brightness(1.05);
+}
+
+.git-commit-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Commit Selected Modal */
+.git-commit-modal-container {
+  max-width: 680px;
+  width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.git-commit-modal-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.git-commit-modal-body {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Commit Message Input */
+.git-commit-message-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.git-commit-msg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.git-commit-msg-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.git-commit-summary-length {
+  font-size: 0.76rem;
+  color: var(--text-tertiary, #6c7086);
+  font-family: var(--font-mono, monospace);
+}
+
+.git-commit-msg-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #313244);
+  background: var(--bg-tertiary, #313244);
+  color: var(--text-primary, #cdd6f4);
+  resize: vertical;
+  min-height: 72px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.git-commit-msg-input:focus {
+  outline: none;
+  border-color: var(--accent-primary, #89b4fa);
+}
+
+.git-commit-msg-input.is-invalid {
+  border-color: #f38ba8;
+}
+
+.git-commit-msg-hint {
+  font-size: 0.74rem;
+  color: var(--text-tertiary, #6c7086);
+  line-height: 1.3;
+}
+
+.git-commit-msg-error {
+  font-size: 0.78rem;
+  color: #f38ba8;
+  font-weight: 500;
+}
+
+/* Preflight Card */
+.git-commit-preflight-card {
+  padding: 12px 14px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid transparent;
+}
+
+.git-commit-preflight-card.preflight-pass {
+  background: rgba(166, 227, 161, 0.08);
+  border-color: rgba(166, 227, 161, 0.25);
+}
+
+.git-commit-preflight-card.preflight-warnings {
+  background: rgba(249, 226, 175, 0.08);
+  border-color: rgba(249, 226, 175, 0.25);
+}
+
+.git-commit-preflight-card.preflight-failed {
+  background: rgba(243, 139, 168, 0.08);
+  border-color: rgba(243, 139, 168, 0.25);
+}
+
+.git-commit-preflight-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.git-commit-preflight-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.preflight-pass .git-commit-preflight-badge {
+  background: #a6e3a1;
+  color: #11111b;
+}
+
+.preflight-warnings .git-commit-preflight-badge {
+  background: #f9e2af;
+  color: #11111b;
+}
+
+.preflight-failed .git-commit-preflight-badge {
+  background: #f38ba8;
+  color: #11111b;
+}
+
+.git-commit-preflight-summary {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #a6adc8);
+}
+
+.git-commit-preflight-block-msg {
+  font-size: 0.82rem;
+  color: #f38ba8;
+  font-weight: 600;
+}
+
+.git-commit-preflight-issues {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.git-commit-preflight-issue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.git-commit-issue-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.git-commit-issue-badge.badge-error {
+  background: #f38ba8;
+  color: #11111b;
+}
+
+.git-commit-issue-badge.badge-warn {
+  background: #f9e2af;
+  color: #11111b;
+}
+
+.git-commit-issue-text {
+  flex: 1;
+  color: var(--text-primary, #cdd6f4);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.74rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-commit-issue-link {
+  background: transparent;
+  border: none;
+  color: var(--accent-primary, #89b4fa);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 4px;
+}
+
+.git-commit-issue-link:hover {
+  text-decoration: underline;
+}
+
+.git-commit-preflight-ack {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: var(--text-primary, #cdd6f4);
+  cursor: pointer;
+  user-select: none;
+}
+
+.git-commit-preflight-ack input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: #f9e2af;
+}
+
+/* Selected Files Breakdown */
+.git-commit-files-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.git-commit-files-header {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.git-commit-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 110px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.git-commit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--bg-tertiary, #313244);
+  border: 1px solid var(--border-color, #45475a);
+  font-size: 0.78rem;
+  color: var(--text-primary, #cdd6f4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.git-commit-chip:hover {
+  border-color: var(--accent-primary, #89b4fa);
+}
+
+.git-commit-chip.is-active {
+  background: rgba(137, 180, 250, 0.15);
+  border-color: var(--accent-primary, #89b4fa);
+  color: var(--accent-primary, #89b4fa);
+  font-weight: 600;
+}
+
+.git-commit-chip-badge {
+  display: inline-block;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(137, 180, 250, 0.2);
+  color: var(--accent-primary, #89b4fa);
+}
+
+.git-commit-chip-stats {
+  font-size: 0.72rem;
+  color: var(--text-tertiary, #6c7086);
+  font-family: var(--font-mono, monospace);
+}
+
+/* Mini Diff Preview */
+.git-commit-diff-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #313244);
+  background: var(--bg-secondary, #181825);
+  overflow: hidden;
+}
+
+.git-commit-diff-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--bg-tertiary, #313244);
+  font-size: 0.76rem;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-secondary, #a6adc8);
+}
+
+.git-commit-diff-stats {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.git-commit-mini-diff {
+  max-height: 140px;
+  overflow-y: auto;
+  font-size: 0.76rem;
+  font-family: var(--font-mono, monospace);
+  line-height: 1.4;
+  padding: 6px 0;
+  background: #11111b;
+}
+
+.git-commit-diff-line {
+  padding: 1px 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.git-commit-diff-line.line-add {
+  background: rgba(166, 227, 161, 0.12);
+  color: #a6e3a1;
+}
+
+.git-commit-diff-line.line-del {
+  background: rgba(243, 139, 168, 0.12);
+  color: #f38ba8;
+}
+
+.git-commit-diff-line.line-hunk {
+  background: rgba(137, 180, 250, 0.1);
+  color: #89b4fa;
+}
+
+.git-commit-diff-line.line-ctx {
+  color: var(--text-secondary, #a6adc8);
+}
+
+.git-commit-diff-line.line-empty {
+  color: var(--text-tertiary, #6c7086);
+  font-style: italic;
+  padding: 8px 12px;
+}
+
+/* Error states inside modal */
+.git-commit-unrelated-error,
+.git-commit-hook-error,
+.git-commit-server-error {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.git-commit-unrelated-error {
+  background: rgba(249, 226, 175, 0.1);
+  border: 1px solid rgba(249, 226, 175, 0.3);
+  color: #f9e2af;
+}
+
+.git-commit-unrelated-list {
+  margin: 6px 0 0 16px;
+  padding: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.76rem;
+}
+
+.git-commit-hook-error,
+.git-commit-server-error {
+  background: rgba(243, 139, 168, 0.12);
+  border: 1px solid rgba(243, 139, 168, 0.3);
+  color: #f38ba8;
+}
+
+.git-commit-hook-error pre {
+  margin: 6px 0 0 0;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ================= Responsive Layout Rules ================= */
+@media (max-width: 960px) {
+  .git-toolbar {
+    padding: 6px 12px;
+    gap: 8px;
+  }
+
+  .git-branch-selector-container {
+    max-width: 200px;
+  }
+
+  .git-branch-name {
+    max-width: 120px;
+  }
+
+  .git-files-panel,
+  .git-commits-panel {
+    min-width: 240px;
+  }
+}
+
+@media (max-width: 720px) {
+  .git-toolbar {
+    flex-wrap: wrap;
+    min-height: auto;
+  }
+
+  .git-toolbar-left {
+    flex-wrap: wrap;
+  }
+
+  .git-toolbar-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+

@@ -17,6 +17,7 @@ import {
   getGitBranches,
   switchGitBranch,
   createGitBranch,
+  commitGitSelected,
   runGit,
 } from './gitService'
 
@@ -572,5 +573,310 @@ describe('gitService real repository integration', () => {
       expect(switchRes.currentBranch).toBe('branch-b')
     })
   })
+
+  describe('Real Git Repository Selective Commit Workflow', () => {
+    let commitRepoDir: string | null = null
+
+    beforeAll(async () => {
+      if (!isGitAvailable) return
+      commitRepoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'i18n-commit-test-'))
+      await runGit(commitRepoDir, ['init'])
+      await runGit(commitRepoDir, ['config', 'user.name', 'Tester'])
+      await runGit(commitRepoDir, ['config', 'user.email', 'tester@example.com'])
+
+      // Baseline commit with localization files and source files
+      await fs.mkdir(path.join(commitRepoDir, 'locales'), { recursive: true })
+      await fs.mkdir(path.join(commitRepoDir, 'src'), { recursive: true })
+
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ hello: 'Hello', save: 'Save' }, null, 2),
+        'utf8'
+      )
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'de.json'),
+        JSON.stringify({ hello: 'Hallo', save: 'Speichern' }, null, 2),
+        'utf8'
+      )
+      await fs.writeFile(
+        path.join(commitRepoDir, 'src', 'index.ts'),
+        'export const app = "main";\n',
+        'utf8'
+      )
+      await fs.writeFile(
+        path.join(commitRepoDir, 'extra.txt'),
+        'baseline extra file\n',
+        'utf8'
+      )
+
+      await runGit(commitRepoDir, ['add', '.'])
+      await runGit(commitRepoDir, ['commit', '-m', 'Initial baseline commit'])
+    })
+
+    afterAll(async () => {
+      if (commitRepoDir) {
+        try {
+          await fs.rm(commitRepoDir, { recursive: true, force: true })
+        } catch {
+          // ignore cleanup errors on windows locks
+        }
+      }
+    })
+
+    it('rejects empty commit message or empty file selection', async () => {
+      if (!isGitAvailable || !commitRepoDir) return
+
+      const emptyMsgRes = await commitGitSelected(commitRepoDir, ['locales/en.json'], '')
+      expect(emptyMsgRes.success).toBe(false)
+      expect(emptyMsgRes.error).toContain('Commit message cannot be empty')
+
+      const whitespaceMsgRes = await commitGitSelected(commitRepoDir, ['locales/en.json'], '   ')
+      expect(whitespaceMsgRes.success).toBe(false)
+
+      const emptyFilesRes = await commitGitSelected(commitRepoDir, [], 'Valid message')
+      expect(emptyFilesRes.success).toBe(false)
+      expect(emptyFilesRes.error).toContain('No files selected')
+    })
+
+    it('Scenario 8: blocks commit when unrelated staged file exists without touching working tree', async () => {
+      if (!isGitAvailable || !commitRepoDir) return
+
+      // File A = locales/en.json
+      // File B = locales/de.json
+      // File C = src/index.ts
+      // File D = extra.txt (pre-staged)
+
+      // Modify all 4 files
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ hello: 'Hello modified A', save: 'Save' }, null, 2),
+        'utf8'
+      )
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'de.json'),
+        JSON.stringify({ hello: 'Hallo modified B', save: 'Speichern' }, null, 2),
+        'utf8'
+      )
+      await fs.writeFile(
+        path.join(commitRepoDir, 'src', 'index.ts'),
+        'export const app = "modified C";\n',
+        'utf8'
+      )
+      await fs.writeFile(
+        path.join(commitRepoDir, 'extra.txt'),
+        'modified D pre-staged\n',
+        'utf8'
+      )
+
+      // Pre-stage D
+      await runGit(commitRepoDir, ['add', 'extra.txt'])
+
+      // Attempt to commit only A and B
+      const selected = ['locales/en.json', 'locales/de.json']
+      const commitRes = await commitGitSelected(commitRepoDir, selected, 'feat: update locales')
+
+      // Commit must be blocked
+      expect(commitRes.success).toBe(false)
+      expect(commitRes.blockedByUnrelatedStaged).toBe(true)
+      expect(commitRes.unrelatedStagedFiles).toBeDefined()
+      expect(commitRes.unrelatedStagedFiles).toContain('extra.txt')
+
+      // Verify nothing was reset or discarded
+      const statusAfter = await getGitStatus(commitRepoDir)
+      expect(statusAfter.files.some((f) => f.path.includes('extra.txt') && (f.hasStagedChanges || f.stagingStatus === 'staged'))).toBe(true)
+      expect(statusAfter.files.some((f) => f.path.includes('en.json'))).toBe(true)
+      expect(statusAfter.files.some((f) => f.path.includes('de.json'))).toBe(true)
+      expect(statusAfter.files.some((f) => f.path.includes('index.ts'))).toBe(true)
+
+      // Contents are intact
+      const enContent = await fs.readFile(path.join(commitRepoDir, 'locales', 'en.json'), 'utf8')
+      expect(enContent).toContain('Hello modified A')
+      const indexContent = await fs.readFile(path.join(commitRepoDir, 'src', 'index.ts'), 'utf8')
+      expect(indexContent).toContain('modified C')
+    })
+
+    it('Scenario 8 continued: commits only selected files A & B, leaving C uncommitted in working tree', async () => {
+      if (!isGitAvailable || !commitRepoDir) return
+
+      // Unstage extra.txt manually to allow clean commit test
+      await runGit(commitRepoDir, ['restore', '--staged', 'extra.txt'])
+
+      // Select A and B
+      const selected = ['locales/en.json', 'locales/de.json']
+      const commitRes = await commitGitSelected(
+        commitRepoDir,
+        selected,
+        'feat(i18n): update EN and DE translations\n\nDetailed multiline explanation.'
+      )
+
+      expect(commitRes.success).toBe(true)
+      expect(commitRes.commitHash).toBeDefined()
+      expect(commitRes.shortHash).toBeDefined()
+      expect(commitRes.committedFiles).toBeDefined()
+      expect(commitRes.committedFiles).toHaveLength(2)
+      expect(commitRes.committedFiles?.some((p) => p.includes('en.json'))).toBe(true)
+      expect(commitRes.committedFiles?.some((p) => p.includes('de.json'))).toBe(true)
+      expect(commitRes.committedFiles?.some((p) => p.includes('index.ts'))).toBe(false)
+      expect(commitRes.committedFiles?.some((p) => p.includes('extra.txt'))).toBe(false)
+
+      // Inspect working tree status: C and D remain modified and uncommitted!
+      const statusAfter = await getGitStatus(commitRepoDir)
+      const modifiedFiles = statusAfter.files.map((f) => f.path)
+      expect(modifiedFiles.some((p) => p.includes('src/index.ts') || p.includes('src\\index.ts'))).toBe(true)
+      expect(modifiedFiles.some((p) => p.includes('extra.txt'))).toBe(true)
+      expect(modifiedFiles.some((p) => p.includes('en.json'))).toBe(false)
+      expect(modifiedFiles.some((p) => p.includes('de.json'))).toBe(false)
+
+      // Verify commit in log and details
+      const log = await getGitLog(commitRepoDir, 1)
+      expect(log[0].hash).toBe(commitRes.commitHash)
+      expect(log[0].subject).toBe('feat(i18n): update EN and DE translations')
+
+      const details = await getCommitDetails(commitRepoDir, commitRes.commitHash!)
+      expect(details?.body).toBe('Detailed multiline explanation.')
+    })
+
+    it('Scenario 4: handles partially staged file A, committing its complete version while keeping unselected C untouched', async () => {
+      if (!isGitAvailable || !commitRepoDir) return
+
+      // Modify A and stage first part
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ hello: 'Hello Staged 1', save: 'Save' }, null, 2),
+        'utf8'
+      )
+      await runGit(commitRepoDir, ['add', 'locales/en.json'])
+
+      // Add second unstaged modification to A
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ hello: 'Hello Complete Version', save: 'Save Updated' }, null, 2),
+        'utf8'
+      )
+
+      // Modify B (completely unstaged)
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'de.json'),
+        JSON.stringify({ hello: 'Hallo Complete Version', save: 'Speichern Updated' }, null, 2),
+        'utf8'
+      )
+
+      // Verify status shows A is partially staged
+      const statusPre = await getGitStatus(commitRepoDir)
+      const enStat = statusPre.files.find((f) => f.path.includes('en.json'))
+      expect(enStat?.stagingStatus).toBe('partially_staged')
+
+      // Commit only A and B
+      const commitRes = await commitGitSelected(
+        commitRepoDir,
+        ['locales/en.json', 'locales/de.json'],
+        'feat: commit complete version of A and B'
+      )
+
+      expect(commitRes.success).toBe(true)
+
+      // Verify the committed content of A in HEAD is the COMPLETE version
+      const headEnShow = await runGit(commitRepoDir, ['show', 'HEAD:locales/en.json'])
+      expect(headEnShow.stdout).toContain('Hello Complete Version')
+      expect(headEnShow.stdout).toContain('Save Updated')
+
+      // Verify C (src/index.ts) is still untouched in working tree
+      const indexContent = await fs.readFile(path.join(commitRepoDir, 'src', 'index.ts'), 'utf8')
+      expect(indexContent).toContain('modified C')
+    })
+
+    it('Scenario 6: handles added, deleted, modified, and renamed files', async () => {
+      if (!isGitAvailable || !commitRepoDir) return
+
+      // 1. Added file (untracked)
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'fr.json'),
+        JSON.stringify({ hello: 'Bonjour' }, null, 2),
+        'utf8'
+      )
+
+      // 2. Modified file
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ hello: 'Hello New Epoch', save: 'Save' }, null, 2),
+        'utf8'
+      )
+
+      // Commit addition and modification
+      const commitAddRes = await commitGitSelected(
+        commitRepoDir,
+        ['locales/fr.json', 'locales/en.json'],
+        'feat: add fr.json and update en.json'
+      )
+      expect(commitAddRes.success).toBe(true)
+
+      // 3. Deleted file
+      await fs.unlink(path.join(commitRepoDir, 'locales', 'fr.json'))
+
+      // Commit deletion
+      const commitDelRes = await commitGitSelected(
+        commitRepoDir,
+        ['locales/fr.json'],
+        'chore: remove fr.json'
+      )
+      expect(commitDelRes.success).toBe(true)
+
+      // Verify deletion committed
+      const showDel = await getCommitDetails(commitRepoDir, commitDelRes.commitHash!)
+      expect(showDel?.changedFiles.some((f) => f.filename === 'fr.json')).toBe(true)
+    })
+
+    it('Scenario 3: handles hook failure with hookFailed: true and leaves user state untouched', async () => {
+      if (!isGitAvailable || !commitRepoDir) return
+
+      const hooksDir = path.join(commitRepoDir, '.git', 'hooks')
+      await fs.mkdir(hooksDir, { recursive: true })
+      const preCommitPath = path.join(hooksDir, 'pre-commit')
+
+      // Create a failing hook script
+      const hookScript = '#!/bin/sh\necho "Pre-commit hook validation failed for testing" >&2\nexit 1\n'
+      await fs.writeFile(preCommitPath, hookScript, { mode: 0o777 })
+
+      // Modify en.json
+      await fs.writeFile(
+        path.join(commitRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ hello: 'Hello with failing hook' }, null, 2),
+        'utf8'
+      )
+
+      const commitRes = await commitGitSelected(
+        commitRepoDir,
+        ['locales/en.json'],
+        'feat: test hook failure'
+      )
+
+      // Must report failure and hookFailed = true
+      expect(commitRes.success).toBe(false)
+      expect(commitRes.hookFailed).toBe(true)
+      expect(commitRes.error).toContain('Pre-commit hook')
+
+      // Staged files remain staged and changes are not lost
+      const statusAfter = await getGitStatus(commitRepoDir)
+      expect(statusAfter.files.some((f) => f.path.includes('en.json'))).toBe(true)
+
+      // Remove hook for cleanup and unstage en.json for clean subsequent tests
+      await fs.unlink(preCommitPath)
+      await runGit(commitRepoDir, ['restore', '--staged', 'locales/en.json'])
+    })
+
+    it('Scenario 5: rejects stale selection if file is no longer in working changes', async () => {
+      if (!isGitAvailable || !commitRepoDir) return
+
+      const staleRes = await commitGitSelected(
+        commitRepoDir,
+        ['locales/non-existent-file.json'],
+        'feat: stale selection test'
+      )
+
+      expect(staleRes.success).toBe(false)
+      expect(staleRes.staleSelection).toBe(true)
+    })
+  })
 })
+
 

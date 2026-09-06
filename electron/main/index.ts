@@ -22,6 +22,7 @@ import {
   getGitBranches,
   switchGitBranch,
   createGitBranch,
+  commitGitSelected,
 } from './gitService'
 import {
   migrateAppSettings,
@@ -590,6 +591,24 @@ app.whenReady().then(() => {
     'git:createBranch',
     async (_, payload: { directoryPath: string; branchName: string }) => {
       return await createGitBranch(payload.directoryPath, payload.branchName)
+    }
+  )
+
+  ipcMain.handle(
+    'git:commitSelected',
+    async (
+      _,
+      payload: {
+        directoryPath: string
+        filePaths: string[]
+        message: string
+      }
+    ) => {
+      return await commitGitSelected(
+        payload.directoryPath,
+        payload.filePaths,
+        payload.message
+      )
     }
   )
 
