@@ -14,6 +14,10 @@ import type {
   GitCommitDetails,
   GitCommitFileChange,
   GitFileDiff,
+  GitBranchInfo,
+  GitBranchListResult,
+  GitBranchSwitchResult,
+  GitBranchCreateResult,
 } from '../../src/types/git'
 
 const execFileAsync = promisify(execFile)
@@ -645,3 +649,239 @@ export async function getFileDiff(
     deletions,
   }
 }
+
+/**
+ * Validates a proposed Git branch name according to standard Git ref format rules.
+ */
+export function validateBranchName(name: string): { valid: boolean; error?: string } {
+  const trimmed = name.trim()
+  if (!trimmed) {
+    return { valid: false, error: 'Branch name cannot be empty.' }
+  }
+  if (trimmed.includes(' ')) {
+    return { valid: false, error: 'Branch name cannot contain spaces.' }
+  }
+  if (trimmed.startsWith('/') || trimmed.endsWith('/') || trimmed.endsWith('.')) {
+    return { valid: false, error: 'Branch name cannot start or end with "/" or ".".' }
+  }
+  if (trimmed.includes('..') || trimmed.includes('//') || trimmed.includes('@{')) {
+    return { valid: false, error: 'Branch name cannot contain consecutive dots, slashes, or "@{"' }
+  }
+  if (/[~^:?*[\\]/.test(trimmed)) {
+    return { valid: false, error: 'Branch name contains invalid characters (~, ^, :, ?, *, [, \\).' }
+  }
+  if (trimmed.endsWith('.lock')) {
+    return { valid: false, error: 'Branch name cannot end with .lock.' }
+  }
+  for (let i = 0; i < trimmed.length; i++) {
+    const code = trimmed.charCodeAt(i)
+    if (code < 32 || code === 127) {
+      return { valid: false, error: 'Branch name cannot contain control characters.' }
+    }
+  }
+  return { valid: true }
+}
+
+/**
+ * Parses machine-readable output from `git branch --format=...`
+ */
+export function parseBranchOutput(output: string): GitBranchListResult {
+  if (!output || !output.trim()) {
+    return {
+      currentBranch: '',
+      isDetachedHead: false,
+      branches: [],
+    }
+  }
+
+  const lines = output.split('\n')
+  const branches: GitBranchInfo[] = []
+  let currentBranch = ''
+  let isDetachedHead = false
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    const parts = trimmed.split('\0')
+    const headFlag = parts[0]?.trim() || ''
+    const branchName = parts[1]?.trim() || ''
+    const commitHash = parts[2]?.trim() || undefined
+    const upstream = parts[3]?.trim() || undefined
+
+    const isHead = headFlag === '*'
+
+    if (isHead) {
+      // Check if detached HEAD
+      const detachedMatch = branchName.match(/^\(HEAD detached (?:at|from) (.+)\)$/) || branchName.match(/^\(detached from (.+)\)$/)
+      if (detachedMatch) {
+        isDetachedHead = true
+        currentBranch = `HEAD (${detachedMatch[1] || commitHash || 'detached'})`
+        // We don't add the pseudo "(HEAD detached at...)" as a normal local branch
+      } else {
+        isDetachedHead = false
+        currentBranch = branchName
+        branches.push({
+          name: branchName,
+          isCurrent: true,
+          commitHash,
+          upstream: upstream || undefined,
+        })
+      }
+    } else {
+      if (branchName && !branchName.startsWith('(')) {
+        branches.push({
+          name: branchName,
+          isCurrent: false,
+          commitHash,
+          upstream: upstream || undefined,
+        })
+      }
+    }
+  }
+
+  // Deterministic sorting: current branch first, then alphabetically
+  branches.sort((a, b) => {
+    if (a.isCurrent !== b.isCurrent) {
+      return a.isCurrent ? -1 : 1
+    }
+    return a.name.localeCompare(b.name)
+  })
+
+  return {
+    currentBranch: currentBranch || (branches[0]?.isCurrent ? branches[0].name : 'main'),
+    isDetachedHead,
+    branches,
+  }
+}
+
+/**
+ * Retrieves list of local branches for a workspace.
+ */
+export async function getGitBranches(dirPath: string): Promise<GitBranchListResult> {
+  const repoInfo = await getRepositoryInfo(dirPath)
+  if (!repoInfo.isRepository || !repoInfo.rootPath) {
+    return {
+      currentBranch: '',
+      isDetachedHead: false,
+      branches: [],
+      error: 'Not a git repository.',
+    }
+  }
+
+  const rootPath = repoInfo.rootPath
+  const branchRes = await runGit(rootPath, [
+    'branch',
+    '--format=%(HEAD)%00%(refname:short)%00%(objectname:short)%00%(upstream:short)',
+  ])
+
+  if (branchRes.exitCode !== 0) {
+    return {
+      currentBranch: repoInfo.currentBranch || '',
+      isDetachedHead: !!repoInfo.isDetachedHead,
+      branches: [],
+      error: branchRes.stderr || 'Failed to list branches.',
+    }
+  }
+
+  return parseBranchOutput(branchRes.stdout)
+}
+
+/**
+ * Safely switches / checkouts an existing local branch.
+ * Does NOT discard or force overwrite local changes.
+ */
+export async function switchGitBranch(
+  dirPath: string,
+  branchName: string
+): Promise<GitBranchSwitchResult> {
+  const repoInfo = await getRepositoryInfo(dirPath)
+  if (!repoInfo.isRepository || !repoInfo.rootPath) {
+    return {
+      success: false,
+      currentBranch: '',
+      isDetachedHead: false,
+      error: 'Not a git repository.',
+    }
+  }
+
+  const trimmedBranch = branchName.trim()
+  if (!trimmedBranch) {
+    return {
+      success: false,
+      currentBranch: repoInfo.currentBranch || '',
+      isDetachedHead: !!repoInfo.isDetachedHead,
+      error: 'Branch name cannot be empty.',
+    }
+  }
+
+  const rootPath = repoInfo.rootPath
+  const checkoutRes = await runGit(rootPath, ['checkout', trimmedBranch])
+
+  if (checkoutRes.exitCode === 0) {
+    return {
+      success: true,
+      currentBranch: trimmedBranch,
+      isDetachedHead: false,
+    }
+  }
+
+  const stderr = checkoutRes.stderr.toLowerCase()
+  const isBlockedByChanges =
+    stderr.includes('would be overwritten by checkout') ||
+    stderr.includes('please commit your changes or stash them') ||
+    stderr.includes('untracked working tree files would be overwritten') ||
+    stderr.includes('your local changes')
+
+  return {
+    success: false,
+    currentBranch: repoInfo.currentBranch || '',
+    isDetachedHead: !!repoInfo.isDetachedHead,
+    error: checkoutRes.stderr || 'Failed to switch branch.',
+    blockedByWorkingChanges: isBlockedByChanges,
+  }
+}
+
+/**
+ * Creates a new local branch and switches to it.
+ */
+export async function createGitBranch(
+  dirPath: string,
+  branchName: string
+): Promise<GitBranchCreateResult> {
+  const repoInfo = await getRepositoryInfo(dirPath)
+  if (!repoInfo.isRepository || !repoInfo.rootPath) {
+    return {
+      success: false,
+      branchName,
+      error: 'Not a git repository.',
+    }
+  }
+
+  const validation = validateBranchName(branchName)
+  if (!validation.valid) {
+    return {
+      success: false,
+      branchName,
+      error: validation.error || 'Invalid branch name.',
+    }
+  }
+
+  const rootPath = repoInfo.rootPath
+  const trimmedBranch = branchName.trim()
+  const createRes = await runGit(rootPath, ['checkout', '-b', trimmedBranch])
+
+  if (createRes.exitCode === 0) {
+    return {
+      success: true,
+      branchName: trimmedBranch,
+    }
+  }
+
+  return {
+    success: false,
+    branchName: trimmedBranch,
+    error: createRes.stderr || 'Failed to create branch.',
+  }
+}
+

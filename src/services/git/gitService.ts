@@ -5,6 +5,10 @@ import type {
   GitCommitDetails,
   GitFileDiff,
   GitFileStatus,
+  GitBranchInfo,
+  GitBranchListResult,
+  GitBranchSwitchResult,
+  GitBranchCreateResult,
 } from '../../types/git'
 
 export interface ParsedDiffLine {
@@ -260,3 +264,127 @@ export function filterLocalizationFiles(files: GitFileStatus[]): GitFileStatus[]
 export function filterLocalizationCommits(commits: GitCommitSummary[]): GitCommitSummary[] {
   return commits.filter((c) => c.isLocalizationCommit)
 }
+
+/**
+ * Invokes preload API to fetch branch list.
+ */
+export async function fetchGitBranches(dirPath: string): Promise<GitBranchListResult> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitGetBranches) {
+    return {
+      currentBranch: '',
+      isDetachedHead: false,
+      branches: [],
+      error: 'Git integration requires Electron runtime environment.',
+    }
+  }
+
+  try {
+    const res = await window.electronAPI.gitGetBranches(dirPath)
+    return res as GitBranchListResult
+  } catch (err) {
+    return {
+      currentBranch: '',
+      isDetachedHead: false,
+      branches: [],
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+/**
+ * Invokes preload API to switch / checkout an existing local branch.
+ */
+export async function switchGitBranch(
+  dirPath: string,
+  branchName: string
+): Promise<GitBranchSwitchResult> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitSwitchBranch) {
+    return {
+      success: false,
+      currentBranch: '',
+      isDetachedHead: false,
+      error: 'Git integration requires Electron runtime environment.',
+    }
+  }
+
+  try {
+    const res = await window.electronAPI.gitSwitchBranch(dirPath, branchName)
+    return res as GitBranchSwitchResult
+  } catch (err) {
+    return {
+      success: false,
+      currentBranch: '',
+      isDetachedHead: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+/**
+ * Invokes preload API to create a new local branch and switch to it.
+ */
+export async function createGitBranch(
+  dirPath: string,
+  branchName: string
+): Promise<GitBranchCreateResult> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitCreateBranch) {
+    return {
+      success: false,
+      branchName,
+      error: 'Git integration requires Electron runtime environment.',
+    }
+  }
+
+  try {
+    const res = await window.electronAPI.gitCreateBranch(dirPath, branchName)
+    return res as GitBranchCreateResult
+  } catch (err) {
+    return {
+      success: false,
+      branchName,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+/**
+ * Filter branch list by search query.
+ */
+export function filterBranches(branches: GitBranchInfo[], query: string): GitBranchInfo[] {
+  const trimmed = query.trim().toLowerCase()
+  if (!trimmed) return branches
+  return branches.filter((b) => b.name.toLowerCase().includes(trimmed))
+}
+
+/**
+ * Renderer-side validation for branch name input with localization error keys.
+ */
+export function validateBranchNameInput(name: string): { valid: boolean; errorKey?: string } {
+  const trimmed = name.trim()
+  if (!trimmed) {
+    return { valid: false, errorKey: 'git.errorEmpty' }
+  }
+  if (trimmed.includes(' ')) {
+    return { valid: false, errorKey: 'git.errorSpaces' }
+  }
+  if (trimmed.startsWith('/') || trimmed.endsWith('/') || trimmed.endsWith('.')) {
+    return { valid: false, errorKey: 'git.errorBoundary' }
+  }
+  if (trimmed.includes('..') || trimmed.includes('//') || trimmed.includes('@{')) {
+    return { valid: false, errorKey: 'git.errorConsecutive' }
+  }
+  if (/[~^:?*[\\]/.test(trimmed)) {
+    return { valid: false, errorKey: 'git.errorInvalidChars' }
+  }
+  if (trimmed.endsWith('.lock')) {
+    return { valid: false, errorKey: 'git.errorLock' }
+  }
+  for (let i = 0; i < trimmed.length; i++) {
+    const code = trimmed.charCodeAt(i)
+    if (code < 32 || code === 127) {
+      return { valid: false, errorKey: 'git.errorControlChars' }
+    }
+  }
+  return { valid: true }
+}
+

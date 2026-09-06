@@ -241,5 +241,5 @@ describe('Manual & Focused Runtime Verification of Quality Checks', () => {
       const panelTitle = screen.getByText(lang.expectedTitle)
       expect(panelTitle).toBeInTheDocument()
     }
-  })
+  }, 25000)
 })

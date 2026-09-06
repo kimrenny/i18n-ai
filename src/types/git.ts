@@ -96,3 +96,32 @@ export interface GitFileDiff {
   deletions: number
   error?: string
 }
+
+export interface GitBranchInfo {
+  name: string
+  isCurrent: boolean
+  isDetached?: boolean
+  commitHash?: string
+  upstream?: string
+}
+
+export interface GitBranchListResult {
+  currentBranch: string
+  isDetachedHead: boolean
+  branches: GitBranchInfo[]
+  error?: string
+}
+
+export interface GitBranchSwitchResult {
+  success: boolean
+  currentBranch: string
+  isDetachedHead: boolean
+  error?: string
+  blockedByWorkingChanges?: boolean
+}
+
+export interface GitBranchCreateResult {
+  success: boolean
+  branchName: string
+  error?: string
+}
