@@ -14,6 +14,13 @@ import {
 } from './freeTranslationService'
 import { isLocalizationFile } from '../../src/services/localizationDetector'
 import {
+  getRepositoryInfo,
+  getGitStatus,
+  getGitLog,
+  getCommitDetails,
+  getFileDiff,
+} from './gitService'
+import {
   migrateAppSettings,
   DEFAULT_APP_SETTINGS,
   type AppSettings,
@@ -502,6 +509,66 @@ app.whenReady().then(() => {
         `[main] ai:translateBatch invoked with ${payload?.request?.entries?.length} entries for "${payload?.request?.targetFile}" with provider "${canonical.aiTranslation.provider}"`
       )
       return await performBatchAiTranslation(payload.request, canonical.aiTranslation)
+    }
+  )
+
+  // Git IPC Handlers
+  ipcMain.handle('git:getRepositoryInfo', async (_, directoryPath: string) => {
+    return await getRepositoryInfo(directoryPath)
+  })
+
+  ipcMain.handle(
+    'git:getStatus',
+    async (
+      _,
+      payload: { directoryPath: string; localizationOnly?: boolean }
+    ) => {
+      return await getGitStatus(payload.directoryPath, payload.localizationOnly)
+    }
+  )
+
+  ipcMain.handle(
+    'git:getLog',
+    async (
+      _,
+      payload: {
+        directoryPath: string
+        maxCount?: number
+        localizationOnly?: boolean
+      }
+    ) => {
+      return await getGitLog(
+        payload.directoryPath,
+        payload.maxCount,
+        payload.localizationOnly
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'git:getCommitDetails',
+    async (_, payload: { directoryPath: string; hash: string }) => {
+      return await getCommitDetails(payload.directoryPath, payload.hash)
+    }
+  )
+
+  ipcMain.handle(
+    'git:getFileDiff',
+    async (
+      _,
+      payload: {
+        directoryPath: string
+        filePath: string
+        hash?: string
+        staged?: boolean
+      }
+    ) => {
+      return await getFileDiff(
+        payload.directoryPath,
+        payload.filePath,
+        payload.hash,
+        payload.staged
+      )
     }
   )
 

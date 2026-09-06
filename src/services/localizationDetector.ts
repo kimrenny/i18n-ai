@@ -86,6 +86,27 @@ export function isRecognizedLocaleCode(code: string): boolean {
   return STANDARD_LOCALE_CODES.has(normalized) || STANDARD_LOCALE_CODES.has(lower)
 }
 
+/**
+ * Extracts a normalized locale code from a filename if present (e.g. 'en.json' -> 'en', 'messages_ua.json' -> 'uk').
+ */
+export function extractLocaleFromFilename(fileName: string): string | undefined {
+  const lowerName = fileName.toLowerCase().trim()
+  const baseNameWithoutExt = lowerName.replace(/\.json$/, '')
+
+  if (isRecognizedLocaleCode(baseNameWithoutExt)) {
+    return normalizeLocaleCode(baseNameWithoutExt)
+  }
+
+  const parts = baseNameWithoutExt.split(/[_.-]/).filter(Boolean)
+  for (const part of parts) {
+    if (isRecognizedLocaleCode(part)) {
+      return normalizeLocaleCode(part)
+    }
+  }
+
+  return undefined
+}
+
 export const LOCALIZATION_DIR_NAMES = new Set([
   'locales',
   'locale',

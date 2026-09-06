@@ -37,6 +37,28 @@ export interface ElectronAPI {
     request: import('../services/aiTranslation').BatchAiTranslationRequest,
     settings: AiTranslationSettings | AppSettings
   ) => Promise<import('../services/aiTranslation').BatchAiTranslationResult>
+  gitGetRepositoryInfo?: (
+    directoryPath: string
+  ) => Promise<import('./git').GitRepositoryInfo>
+  gitGetStatus?: (
+    directoryPath: string,
+    localizationOnly?: boolean
+  ) => Promise<import('./git').GitStatusSummary>
+  gitGetLog?: (
+    directoryPath: string,
+    limit?: number,
+    localizationOnly?: boolean
+  ) => Promise<import('./git').GitCommitSummary[]>
+  gitGetCommitDetails?: (
+    directoryPath: string,
+    commitHash: string
+  ) => Promise<import('./git').GitCommitDetails>
+  gitGetFileDiff?: (
+    directoryPath: string,
+    filePath: string,
+    commitHash?: string,
+    staged?: boolean
+  ) => Promise<import('./git').GitFileDiff>
 }
 
 declare global {

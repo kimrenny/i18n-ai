@@ -22,6 +22,9 @@ import type { LocalizationProblem } from './types/localizationProblems'
 import { ProblemsPanel } from './components/problems/ProblemsPanel'
 import { QualityPanel } from './components/quality/QualityPanel'
 import { PreflightValidatorPanel } from './components/preflight/PreflightValidatorPanel'
+import { GitSourceControlView } from './components/git/GitSourceControlView'
+import { fetchRepositoryInfo, fetchGitStatus } from './services/git/gitService'
+import type { GitRepositoryInfo, GitStatusSummary } from './types/git'
 import { calculateWorkspaceQuality } from './services/localizationQuality'
 import { validateWorkspacePreflight } from './services/localizationValidation'
 import type { LocalizationQualityIssue } from './types/localizationQuality'
@@ -140,12 +143,36 @@ const AppContent: React.FC<AppContentProps> = ({
     onExpand: () => setIsPreflightOpen(true),
   })
 
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'dashboard' | 'diff' | 'preview'>('dashboard')
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'dashboard' | 'diff' | 'preview' | 'git'>('dashboard')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [gitRepoInfo, setGitRepoInfo] = useState<GitRepositoryInfo | null>(null)
+  const [gitStatus, setGitStatus] = useState<GitStatusSummary | null>(null)
   const [selectedLanguageTarget, setSelectedLanguageTarget] = useState<{
     filename: string
     problem: ProblemNavigationTarget | null
   } | null>(null)
+
+  const refreshGitSummary = useCallback(async (dirPath?: string | null) => {
+    const target = dirPath !== undefined ? dirPath : selectedDirectory
+    if (!target) {
+      setGitRepoInfo(null)
+      setGitStatus(null)
+      return
+    }
+    try {
+      const info = await fetchRepositoryInfo(target)
+      setGitRepoInfo(info)
+      if (info.isRepository) {
+        const status = await fetchGitStatus(target)
+        setGitStatus(status)
+      } else {
+        setGitStatus(null)
+      }
+    } catch {
+      setGitRepoInfo(null)
+      setGitStatus(null)
+    }
+  }, [selectedDirectory])
 
   // Global keyboard shortcut: Ctrl+F / Cmd+F opens/focuses Global Search
   useEffect(() => {
@@ -275,8 +302,9 @@ const AppContent: React.FC<AppContentProps> = ({
       }
     }
 
+    refreshGitSummary(directory)
     return true
-  }, [])
+  }, [refreshGitSummary])
 
   // Automatically restore last opened workspace on application startup
   useEffect(() => {
@@ -450,7 +478,9 @@ const AppContent: React.FC<AppContentProps> = ({
       const newComparison = compareLocalizationFiles(validFiles)
       setComparisonResult(newComparison)
     }
-  }, [jsonFiles, checkedPaths, t])
+
+    refreshGitSummary()
+  }, [jsonFiles, checkedPaths, t, refreshGitSummary])
 
   const successfulParsedFiles = useMemo(() => {
     if (!parseResults) return []
@@ -550,6 +580,29 @@ const AppContent: React.FC<AppContentProps> = ({
     [comparisonResult, successfulParsedFiles]
   )
 
+  const handleNavigateFromGit = useCallback(
+    (filename: string, fullPath: string) => {
+      let currentComparison = comparisonResult
+      if (!currentComparison && successfulParsedFiles.length >= 2) {
+        currentComparison = compareLocalizationFiles(successfulParsedFiles)
+        setComparisonResult(currentComparison)
+      }
+      const matchedFile = successfulParsedFiles.find(
+        (f) => f.filename === filename || f.path === fullPath
+      )
+      if (matchedFile) {
+        setSelectedLanguageTarget({
+          filename: matchedFile.filename,
+          problem: null,
+        })
+        setActiveWorkspaceTab('diff')
+      } else {
+        handleSelectFile(fullPath, filename, isLocalizationFile(filename))
+      }
+    },
+    [comparisonResult, successfulParsedFiles, handleSelectFile]
+  )
+
   const folderName = useMemo(() => {
     if (!selectedDirectory) return null
     return treeData?.rootName || selectedDirectory.split(/[/|\\]/).filter(Boolean).pop() || selectedDirectory
@@ -612,6 +665,21 @@ const AppContent: React.FC<AppContentProps> = ({
               title={selectedPreviewFile.name}
             >
               📄 {selectedPreviewFile.name}
+            </button>
+          )}
+
+          {selectedDirectory && (
+            <button
+              type="button"
+              className={`app-btn app-btn-md ide-tab-toggle-btn ide-git-btn ${activeWorkspaceTab === 'git' ? 'is-active-tab' : ''}`}
+              onClick={() => setActiveWorkspaceTab('git')}
+              title={t('git.viewSourceControlTooltip')}
+              data-testid="ide-git-btn"
+            >
+              🌿 {t('git.tabTitleShort')}
+              {gitStatus && gitStatus.totalChanges > 0 && (
+                <span className="ide-tab-badge">{gitStatus.totalChanges}</span>
+              )}
             </button>
           )}
 
@@ -729,6 +797,16 @@ const AppContent: React.FC<AppContentProps> = ({
                 initialActiveFilename={selectedLanguageTarget?.filename}
                 initialProblem={selectedLanguageTarget?.problem}
                 qualityIssues={workspaceQuality.issues}
+              />
+            ) : activeWorkspaceTab === 'git' && selectedDirectory ? (
+              /* If Source Control tab is active, render GitSourceControlView */
+              <GitSourceControlView
+                workspacePath={selectedDirectory}
+                onNavigateToLocalizationFile={handleNavigateFromGit}
+                onRefreshWorkspace={() => {
+                  handleRefreshFiles()
+                  refreshGitSummary()
+                }}
               />
             ) : selectedDirectory ? (
               /* If workspace is open, render Translation Coverage Dashboard as default view */
@@ -925,6 +1003,32 @@ const AppContent: React.FC<AppContentProps> = ({
                   : workspacePreflight.status === 'WARNINGS'
                   ? t('preflight.statusBarWarnings', { count: workspacePreflight.totalWarnings })
                   : t('preflight.statusBarFailed', { count: workspacePreflight.totalErrors })}
+              </button>
+              <span className="statusbar-separator">|</span>
+              <button
+                type="button"
+                className={`statusbar-btn statusbar-git-btn ${
+                  !gitRepoInfo?.isRepository
+                    ? 'git-status-not-repo'
+                    : !gitRepoInfo.isGitAvailable
+                    ? 'git-status-unavailable'
+                    : gitStatus && gitStatus.totalChanges > 0
+                    ? 'git-status-changes'
+                    : 'git-status-clean'
+                }`}
+                data-testid="statusbar-git-btn"
+                onClick={() => {
+                  setActiveWorkspaceTab('git')
+                }}
+                title={t('git.viewSourceControlTooltip')}
+              >
+                {!gitRepoInfo?.isRepository
+                  ? t('git.statusBarNotRepo')
+                  : !gitRepoInfo.isGitAvailable
+                  ? t('git.statusBarUnavailable')
+                  : gitStatus && gitStatus.totalChanges > 0
+                  ? t('git.statusBarChanges', { count: gitStatus.totalChanges })
+                  : t('git.statusBarClean')}
               </button>
             </>
           )}

@@ -3083,3 +3083,45 @@ textarea,
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
 }
 
+/* =========================================================
+   Git Source Control & Status Bar Integration
+   ========================================================= */
+
+.ide-git-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ide-tab-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--accent-primary, #89b4fa);
+  color: #11111b;
+}
+
+.statusbar-git-btn {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.statusbar-git-btn.git-status-clean {
+  color: #a6e3a1;
+}
+
+.statusbar-git-btn.git-status-changes {
+  color: #f9e2af;
+}
+
+.statusbar-git-btn.git-status-unavailable {
+  color: #f38ba8;
+}
+
+.statusbar-git-btn.git-status-not-repo {
+  color: #6c7086;
+}
+
+

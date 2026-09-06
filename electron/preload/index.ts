@@ -39,6 +39,36 @@ export const electronAPI = {
     ipcRenderer.invoke('ai:translate', { request, settings }),
   translateBatchWithAi: (request: unknown, settings: unknown): Promise<unknown> =>
     ipcRenderer.invoke('ai:translateBatch', { request, settings }),
+  gitGetRepositoryInfo: (directoryPath: string): Promise<unknown> =>
+    ipcRenderer.invoke('git:getRepositoryInfo', directoryPath),
+  gitGetStatus: (
+    directoryPath: string,
+    localizationOnly?: boolean
+  ): Promise<unknown> =>
+    ipcRenderer.invoke('git:getStatus', { directoryPath, localizationOnly }),
+  gitGetLog: (
+    directoryPath: string,
+    maxCount?: number,
+    localizationOnly?: boolean
+  ): Promise<unknown> =>
+    ipcRenderer.invoke('git:getLog', { directoryPath, maxCount, localizationOnly }),
+  gitGetCommitDetails: (
+    directoryPath: string,
+    hash: string
+  ): Promise<unknown> =>
+    ipcRenderer.invoke('git:getCommitDetails', { directoryPath, hash }),
+  gitGetFileDiff: (
+    directoryPath: string,
+    filePath: string,
+    hash?: string,
+    staged?: boolean
+  ): Promise<unknown> =>
+    ipcRenderer.invoke('git:getFileDiff', {
+      directoryPath,
+      filePath,
+      hash,
+      staged,
+    }),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
