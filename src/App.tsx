@@ -21,7 +21,9 @@ import type { ProblemNavigationTarget } from './types/localizationCoverage'
 import type { LocalizationProblem } from './types/localizationProblems'
 import { ProblemsPanel } from './components/problems/ProblemsPanel'
 import { QualityPanel } from './components/quality/QualityPanel'
+import { PreflightValidatorPanel } from './components/preflight/PreflightValidatorPanel'
 import { calculateWorkspaceQuality } from './services/localizationQuality'
+import { validateWorkspacePreflight } from './services/localizationValidation'
 import type { LocalizationQualityIssue } from './types/localizationQuality'
 import { GlobalSearch } from './components/search/GlobalSearch'
 import { useResizablePanel } from './hooks/useResizablePanel'
@@ -125,6 +127,19 @@ const AppContent: React.FC<AppContentProps> = ({
     onExpand: () => setIsQualityOpen(true),
   })
 
+  // Pre-flight Validator Panel Resizing Hook (vertical: min 140px, max 650px, default 380px, collapseThreshold 90px)
+  const [isPreflightOpen, setIsPreflightOpen] = useState(false)
+  const preflightResize = useResizablePanel({
+    direction: 'vertical',
+    initialSize: 380,
+    minSize: 140,
+    maxSize: 650,
+    collapseThreshold: 90,
+    isCollapsed: !isPreflightOpen,
+    onCollapse: () => setIsPreflightOpen(false),
+    onExpand: () => setIsPreflightOpen(true),
+  })
+
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'dashboard' | 'diff' | 'preview'>('dashboard')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [selectedLanguageTarget, setSelectedLanguageTarget] = useState<{
@@ -157,6 +172,8 @@ const AppContent: React.FC<AppContentProps> = ({
     setSelectedPreviewFile(null)
     setSelectedLanguageTarget(null)
     setIsProblemsOpen(false)
+    setIsQualityOpen(false)
+    setIsPreflightOpen(false)
     setActiveWorkspaceTab('dashboard')
 
     let discoveredCandidates: DiscoveredFile[] = []
@@ -456,6 +473,10 @@ const AppContent: React.FC<AppContentProps> = ({
   const workspaceQuality = useMemo(() => {
     return calculateWorkspaceQuality(successfulParsedFiles, comparisonResult)
   }, [successfulParsedFiles, comparisonResult])
+
+  const workspacePreflight = useMemo(() => {
+    return validateWorkspacePreflight(workspaceQuality)
+  }, [workspaceQuality])
 
   const handleSelectDashboardLanguage = useCallback(
     (filename: string) => {
@@ -801,6 +822,32 @@ const AppContent: React.FC<AppContentProps> = ({
               }}
             />
           )}
+
+          {/* Bottom Pre-flight Validator Panel */}
+          {selectedDirectory && (
+            <PreflightValidatorPanel
+              isOpen={isPreflightOpen}
+              onClose={() => setIsPreflightOpen(false)}
+              report={workspacePreflight}
+              onRunValidation={() => {
+                if (successfulParsedFiles.length >= 2) {
+                  setComparisonResult(compareLocalizationFiles(successfulParsedFiles))
+                }
+              }}
+              onNavigateQuality={handleNavigateFromQuality}
+              height={preflightResize.size}
+              isResizing={preflightResize.isResizing}
+              resizeHandleProps={{
+                onPointerDown: preflightResize.handlePointerDown,
+                onPointerMove: preflightResize.handlePointerMove,
+                onPointerUp: preflightResize.handlePointerUp,
+                onKeyDown: preflightResize.handleKeyDown,
+                valueNow: preflightResize.size,
+                valueMin: 140,
+                valueMax: 650,
+              }}
+            />
+          )}
         </main>
       </div>
 
@@ -857,6 +904,27 @@ const AppContent: React.FC<AppContentProps> = ({
                 title={t('quality.ariaLabel')}
               >
                 {t('quality.statusBarItem', { count: workspaceQuality.totalIssues })}
+              </button>
+              <span className="statusbar-separator">|</span>
+              <button
+                type="button"
+                className={`statusbar-btn statusbar-preflight-btn statusbar-preflight-${workspacePreflight.status.toLowerCase()}`}
+                data-testid="statusbar-preflight-btn"
+                onClick={() => {
+                  if (!isPreflightOpen) {
+                    preflightResize.resetToLastSize()
+                    setIsPreflightOpen(true)
+                  } else {
+                    setIsPreflightOpen(false)
+                  }
+                }}
+                title={t('preflight.ariaLabel')}
+              >
+                {workspacePreflight.status === 'PASS'
+                  ? t('preflight.statusBarPass')
+                  : workspacePreflight.status === 'WARNINGS'
+                  ? t('preflight.statusBarWarnings', { count: workspacePreflight.totalWarnings })
+                  : t('preflight.statusBarFailed', { count: workspacePreflight.totalErrors })}
               </button>
             </>
           )}
