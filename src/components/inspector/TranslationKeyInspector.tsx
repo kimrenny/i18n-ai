@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import type { ParsedLocalizationFile } from '../../types/localization'
+import type { LocalizationQualityIssue } from '../../types/localizationQuality'
 import { inspectTranslationKey } from '../../services/localizationKeyInspector'
 import { useTranslation } from '../../i18n/useTranslation'
 import './TranslationKeyInspector.css'
@@ -7,6 +8,7 @@ import './TranslationKeyInspector.css'
 export interface TranslationKeyInspectorProps {
   selectedKey: string | null
   parsedFiles: readonly ParsedLocalizationFile[]
+  qualityIssues?: readonly LocalizationQualityIssue[]
   onNavigateLanguage: (filename: string, key: string) => void
   onClose: () => void
 }
@@ -14,6 +16,7 @@ export interface TranslationKeyInspectorProps {
 export const TranslationKeyInspector: React.FC<TranslationKeyInspectorProps> = ({
   selectedKey,
   parsedFiles,
+  qualityIssues,
   onNavigateLanguage,
   onClose,
 }) => {
@@ -23,6 +26,11 @@ export const TranslationKeyInspector: React.FC<TranslationKeyInspectorProps> = (
   const inspectionResult = useMemo(() => {
     return inspectTranslationKey(selectedKey, parsedFiles)
   }, [selectedKey, parsedFiles])
+
+  const keyQualityIssues = useMemo(() => {
+    if (!selectedKey || !qualityIssues) return []
+    return qualityIssues.filter((i) => i.key === selectedKey)
+  }, [selectedKey, qualityIssues])
 
   const handleCopyKey = async () => {
     if (!inspectionResult?.key) return
@@ -142,6 +150,43 @@ export const TranslationKeyInspector: React.FC<TranslationKeyInspectorProps> = (
                 )}
               </div>
             </div>
+
+            {/* Quality Issues for Selected Key */}
+            {keyQualityIssues.length > 0 && (
+              <div className="inspector-quality-section" data-testid="inspector-quality-section">
+                <div className="inspector-quality-header">
+                  <span className="inspector-section-label">{t('quality.inspectorTitle')}</span>
+                  <span className="inspector-quality-badge">
+                    {t('quality.totalIssues', { count: keyQualityIssues.length })}
+                  </span>
+                </div>
+                <div className="inspector-quality-list" role="list">
+                  {keyQualityIssues.map((issue) => (
+                    <div
+                      key={issue.id}
+                      className={`inspector-quality-item severity-${issue.severity}`}
+                      data-testid={`inspector-quality-item-${issue.id}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onNavigateLanguage(issue.filename, issue.key)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          onNavigateLanguage(issue.filename, issue.key)
+                        }
+                      }}
+                      title={issue.message}
+                    >
+                      <span className={`inspector-quality-severity severity-${issue.severity}`}>
+                        {issue.severity.toUpperCase()}
+                      </span>
+                      <span className="inspector-quality-lang">{issue.languageName}</span>
+                      <span className="inspector-quality-msg">{issue.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Translations List */}
             <div className="inspector-trans-section">

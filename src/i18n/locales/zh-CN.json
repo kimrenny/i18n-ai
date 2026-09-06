@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "超出速率限制 — 将在 {seconds} 秒后重试 {current}/{total} ({attempt}/{maxRetries})...",
     "batchCompleted": "批量翻译完成 ({count} 个键)",
     "dismiss": "关闭"
+  },
+  "quality": {
+    "title": "质量",
+    "ariaLabel": "本地化质量面板",
+    "totalIssues": "{count} 个问题",
+    "errors": "错误",
+    "warnings": "警告",
+    "info": "信息",
+    "severityError": "错误",
+    "severityWarning": "警告",
+    "severityInfo": "信息",
+    "allSeverities": "所有严重级别",
+    "allTypes": "所有问题类型",
+    "allLanguages": "所有语言",
+    "noIssuesTitle": "未检测到质量问题",
+    "noIssuesDesc": "所有翻译均已通过结构和技术质量检查。",
+    "noFilteredIssues": "没有符合当前筛选条件的问题。",
+    "closePanel": "关闭质量面板",
+    "typeMissing": "缺失翻译",
+    "typeEmpty": "空白翻译",
+    "typePlaceholderMismatch": "占位符不匹配",
+    "typeTagMismatch": "标签不匹配",
+    "typeSameAsReference": "与参考语言相同",
+    "typeWhitespaceMismatch": "空白符不一致",
+    "typeStructuralConflict": "结构冲突",
+    "statusBarItem": "质量 {count}",
+    "inspectorTitle": "质量检查",
+    "noKeyIssues": "此键没有质量问题"
   }
 }

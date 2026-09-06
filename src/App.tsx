@@ -20,6 +20,9 @@ import { calculateWorkspaceProblems } from './services/localizationProblems'
 import type { ProblemNavigationTarget } from './types/localizationCoverage'
 import type { LocalizationProblem } from './types/localizationProblems'
 import { ProblemsPanel } from './components/problems/ProblemsPanel'
+import { QualityPanel } from './components/quality/QualityPanel'
+import { calculateWorkspaceQuality } from './services/localizationQuality'
+import type { LocalizationQualityIssue } from './types/localizationQuality'
 import { GlobalSearch } from './components/search/GlobalSearch'
 import { useResizablePanel } from './hooks/useResizablePanel'
 import type {
@@ -84,6 +87,7 @@ const AppContent: React.FC<AppContentProps> = ({
   const [previewIsBinary, setPreviewIsBinary] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [isProblemsOpen, setIsProblemsOpen] = useState(false)
+  const [isQualityOpen, setIsQualityOpen] = useState(false)
 
   // Explorer Resizing Hook (horizontal: min 180px, max 600px, default 280px, collapseThreshold 120px)
   const explorerResize = useResizablePanel({
@@ -107,6 +111,18 @@ const AppContent: React.FC<AppContentProps> = ({
     isCollapsed: !isProblemsOpen,
     onCollapse: () => setIsProblemsOpen(false),
     onExpand: () => setIsProblemsOpen(true),
+  })
+
+  // Quality Panel Resizing Hook (vertical: min 120px, max 600px, default 220px, collapseThreshold 80px)
+  const qualityResize = useResizablePanel({
+    direction: 'vertical',
+    initialSize: 220,
+    minSize: 120,
+    maxSize: 600,
+    collapseThreshold: 80,
+    isCollapsed: !isQualityOpen,
+    onCollapse: () => setIsQualityOpen(false),
+    onExpand: () => setIsQualityOpen(true),
   })
 
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'dashboard' | 'diff' | 'preview'>('dashboard')
@@ -437,6 +453,10 @@ const AppContent: React.FC<AppContentProps> = ({
     return calculateWorkspaceProblems(successfulParsedFiles)
   }, [successfulParsedFiles])
 
+  const workspaceQuality = useMemo(() => {
+    return calculateWorkspaceQuality(successfulParsedFiles, comparisonResult)
+  }, [successfulParsedFiles, comparisonResult])
+
   const handleSelectDashboardLanguage = useCallback(
     (filename: string) => {
       let currentComparison = comparisonResult
@@ -463,6 +483,25 @@ const AppContent: React.FC<AppContentProps> = ({
         problem: {
           key: problem.key,
           mode: problem.type,
+        },
+      })
+      setActiveWorkspaceTab('diff')
+    },
+    [comparisonResult, successfulParsedFiles]
+  )
+
+  const handleNavigateFromQuality = useCallback(
+    (issue: LocalizationQualityIssue) => {
+      let currentComparison = comparisonResult
+      if (!currentComparison && successfulParsedFiles.length >= 2) {
+        currentComparison = compareLocalizationFiles(successfulParsedFiles)
+        setComparisonResult(currentComparison)
+      }
+      setSelectedLanguageTarget({
+        filename: issue.filename,
+        problem: {
+          key: issue.key,
+          mode: issue.type === 'missing_translation' ? 'missing' : 'empty',
         },
       })
       setActiveWorkspaceTab('diff')
@@ -668,6 +707,7 @@ const AppContent: React.FC<AppContentProps> = ({
                 onRefreshFiles={handleRefreshFiles}
                 initialActiveFilename={selectedLanguageTarget?.filename}
                 initialProblem={selectedLanguageTarget?.problem}
+                qualityIssues={workspaceQuality.issues}
               />
             ) : selectedDirectory ? (
               /* If workspace is open, render Translation Coverage Dashboard as default view */
@@ -740,6 +780,27 @@ const AppContent: React.FC<AppContentProps> = ({
               }}
             />
           )}
+
+          {/* Bottom Quality Panel */}
+          {selectedDirectory && (
+            <QualityPanel
+              isOpen={isQualityOpen}
+              onClose={() => setIsQualityOpen(false)}
+              summary={workspaceQuality}
+              onNavigateQuality={handleNavigateFromQuality}
+              height={qualityResize.size}
+              isResizing={qualityResize.isResizing}
+              resizeHandleProps={{
+                onPointerDown: qualityResize.handlePointerDown,
+                onPointerMove: qualityResize.handlePointerMove,
+                onPointerUp: qualityResize.handlePointerUp,
+                onKeyDown: qualityResize.handleKeyDown,
+                valueNow: qualityResize.size,
+                valueMin: 120,
+                valueMax: 600,
+              }}
+            />
+          )}
         </main>
       </div>
 
@@ -777,6 +838,25 @@ const AppContent: React.FC<AppContentProps> = ({
                 title={t('problems.ariaLabel')}
               >
                 {t('problems.statusBarItem', { count: workspaceProblems.totalProblems })}
+              </button>
+              <span className="statusbar-separator">|</span>
+              <button
+                type="button"
+                className={`statusbar-btn statusbar-quality-btn ${
+                  workspaceQuality.totalIssues > 0 ? 'has-problems' : 'no-problems'
+                }`}
+                data-testid="statusbar-quality-btn"
+                onClick={() => {
+                  if (!isQualityOpen) {
+                    qualityResize.resetToLastSize()
+                    setIsQualityOpen(true)
+                  } else {
+                    setIsQualityOpen(false)
+                  }
+                }}
+                title={t('quality.ariaLabel')}
+              >
+                {t('quality.statusBarItem', { count: workspaceQuality.totalIssues })}
               </button>
             </>
           )}

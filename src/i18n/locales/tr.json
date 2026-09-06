@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "İstek sınırı — yeniden deneme {current}/{total} ({attempt}/{maxRetries}) {seconds}s sonra...",
     "batchCompleted": "Toplu çeviri tamamlandı ({count} anahtar)",
     "dismiss": "Kapat"
+  },
+  "quality": {
+    "title": "Kalite",
+    "ariaLabel": "Yerelleştirme Kalite Paneli",
+    "totalIssues": "{count} sorun",
+    "errors": "Hatalar",
+    "warnings": "Uyarılar",
+    "info": "Bilgi",
+    "severityError": "Hata",
+    "severityWarning": "Uyarı",
+    "severityInfo": "Bilgi",
+    "allSeverities": "Tüm Önem Dereceleri",
+    "allTypes": "Tüm Sorun Türleri",
+    "allLanguages": "Tüm Diller",
+    "noIssuesTitle": "Kalite sorunu bulunamadı",
+    "noIssuesDesc": "Tüm çeviriler yapısal ve teknik kalite kontrollerinden geçti.",
+    "noFilteredIssues": "Filtrelerle eşleşen sorun bulunamadı.",
+    "closePanel": "Kalite Panelini Kapat",
+    "typeMissing": "Eksik Çeviri",
+    "typeEmpty": "Boş Çeviri",
+    "typePlaceholderMismatch": "Yer Tutucu Uyuşmazlığı",
+    "typeTagMismatch": "Etiket Uyuşmazlığı",
+    "typeSameAsReference": "Referansla Aynı",
+    "typeWhitespaceMismatch": "Boşluk Uyuşmazlığı",
+    "typeStructuralConflict": "Yapısal Çakışma",
+    "statusBarItem": "Kalite {count}",
+    "inspectorTitle": "Kalite Kontrolleri",
+    "noKeyIssues": "Bu anahtar için kalite sorunu yok"
   }
 }

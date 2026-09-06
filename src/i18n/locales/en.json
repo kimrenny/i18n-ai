@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Rate limited — retrying {current}/{total} ({attempt}/{maxRetries}) in {seconds}s...",
     "batchCompleted": "Batch translation completed ({count} keys)",
     "dismiss": "Dismiss"
+  },
+  "quality": {
+    "title": "Quality",
+    "ariaLabel": "Localization Quality Panel",
+    "totalIssues": "{count} issues",
+    "errors": "Errors",
+    "warnings": "Warnings",
+    "info": "Info",
+    "severityError": "Error",
+    "severityWarning": "Warning",
+    "severityInfo": "Info",
+    "allSeverities": "All Severities",
+    "allTypes": "All Issue Types",
+    "allLanguages": "All Languages",
+    "noIssuesTitle": "No quality issues detected",
+    "noIssuesDesc": "All translations passed structural and technical quality checks.",
+    "noFilteredIssues": "No quality issues match the current filters.",
+    "closePanel": "Close Quality Panel",
+    "typeMissing": "Missing Translation",
+    "typeEmpty": "Empty Translation",
+    "typePlaceholderMismatch": "Placeholder Mismatch",
+    "typeTagMismatch": "Tag Mismatch",
+    "typeSameAsReference": "Same as Reference",
+    "typeWhitespaceMismatch": "Whitespace Mismatch",
+    "typeStructuralConflict": "Structural Conflict",
+    "statusBarItem": "Quality {count}",
+    "inspectorTitle": "Quality Checks",
+    "noKeyIssues": "No quality issues for this key"
   }
 }

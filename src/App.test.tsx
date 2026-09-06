@@ -1517,16 +1517,22 @@ describe('App', () => {
     expect(screen.getByText('example.ts')).toBeInTheDocument()
     expect(screen.getByText('config.json')).toBeInTheDocument()
 
-    // 3. Expanding src/ or locales/ does NOT change the workspace root
+    // 3. Expanding / toggling src/ or locales/ does NOT change the workspace root
     const srcDir = screen.getByText('src')
     fireEvent.click(srcDir)
     expect(screen.getByTestId('selected-path-display')).toHaveTextContent('C:/Users/dev/MyProject')
 
+    await waitFor(() => {
+      expect(screen.getByText('locales')).toBeInTheDocument()
+    })
     const localesDir = screen.getByText('locales')
     fireEvent.click(localesDir)
     expect(screen.getByTestId('selected-path-display')).toHaveTextContent('C:/Users/dev/MyProject')
 
     // 4. en.json, ru.json, uk.json, and ua.json receive translation checkboxes
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: /select en\.json/i })).toBeInTheDocument()
+    })
     const enCheckbox = screen.getByRole('checkbox', { name: /select en\.json/i })
     const ruCheckbox = screen.getByRole('checkbox', { name: /select ru\.json/i })
     const ukCheckbox = screen.getByRole('checkbox', { name: /select uk\.json/i })
@@ -3375,7 +3381,88 @@ describe('App', () => {
       })
     })
   })
+
+  describe('Localization Quality Checks Integration', () => {
+    it('displays quality status bar item, opens Quality panel, and navigates to diff viewer', async () => {
+      const mockEn = {
+        GREETING: 'Hello {name}!',
+        EMPTY_REF: '',
+        SAME_STR: 'Click here',
+      }
+      const mockDe = {
+        GREETING: 'Hallo!', // missing {name} placeholder
+        EMPTY_REF: '',
+        SAME_STR: 'Click here', // same as reference
+      }
+
+      window.electronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/locales'),
+        readDirectoryTree: vi.fn().mockResolvedValue({
+          rootPath: 'C:/Projects/locales',
+          rootName: 'locales',
+          entries: [
+            {
+              name: 'en.json',
+              path: 'C:/Projects/locales/en.json',
+              relativePath: 'en.json',
+              isDirectory: false,
+              isLocalizationCandidate: true,
+            },
+            {
+              name: 'de.json',
+              path: 'C:/Projects/locales/de.json',
+              relativePath: 'de.json',
+              isDirectory: false,
+              isLocalizationCandidate: true,
+            },
+          ],
+        }),
+        readJsonFile: vi.fn().mockImplementation(async (filePath: string) => {
+          if (filePath.endsWith('en.json')) return mockEn
+          if (filePath.endsWith('de.json')) return mockDe
+          throw new Error('Not found')
+        }),
+      })
+
+      render(<App />)
+
+      const selectFolderBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(selectFolderBtn)
+
+      // Wait for files to be parsed and Dashboard to render
+      await waitFor(() => {
+        expect(screen.getByTestId('coverage-row-de.json')).toBeInTheDocument()
+      })
+
+      // Verify Status bar Quality button is rendered
+      expect(screen.getByTestId('statusbar-quality-btn')).toBeInTheDocument()
+
+      const qualityStatusBtn = screen.getByTestId('statusbar-quality-btn')
+      expect(qualityStatusBtn).toHaveTextContent(/Quality/i)
+
+      // Click to open Quality panel
+      fireEvent.click(qualityStatusBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('quality-panel')).toBeInTheDocument()
+      })
+
+      expect(screen.getByTestId('quality-total-badge')).toBeInTheDocument()
+
+      // Find the placeholder mismatch issue
+      const placeholderIssue = screen.getByTestId('quality-item-de.json:placeholder_mismatch:GREETING')
+      expect(placeholderIssue).toBeInTheDocument()
+
+      // Click the issue to navigate to Diff Viewer
+      fireEvent.click(placeholderIssue)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('diff-viewer-section')).toBeInTheDocument()
+      })
+    })
+  })
 })
+
 
 
 

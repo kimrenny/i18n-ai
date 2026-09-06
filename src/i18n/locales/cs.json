@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Limit požadavků — opakování {current}/{total} ({attempt}/{maxRetries}) za {seconds} s...",
     "batchCompleted": "Hromadný překlad dokončen ({count} klíčů)",
     "dismiss": "Zavřít"
+  },
+  "quality": {
+    "title": "Kvalita",
+    "ariaLabel": "Panel kvality lokalizace",
+    "totalIssues": "{count} problémů",
+    "errors": "Chyby",
+    "warnings": "Varování",
+    "info": "Info",
+    "severityError": "Chyba",
+    "severityWarning": "Varování",
+    "severityInfo": "Info",
+    "allSeverities": "Všechny závažnosti",
+    "allTypes": "Všechny typy problémů",
+    "allLanguages": "Všechny jazyky",
+    "noIssuesTitle": "Nebyly zjištěny žádné problémy s kvalitou",
+    "noIssuesDesc": "Všechny překlady prošly strukturálními a technickými kontrolami kvality.",
+    "noFilteredIssues": "Žádné problémy neodpovídají filtrům.",
+    "closePanel": "Zavřít panel kvality",
+    "typeMissing": "Chybějící překlad",
+    "typeEmpty": "Prázdný překlad",
+    "typePlaceholderMismatch": "Neshoda zástupných symbolů",
+    "typeTagMismatch": "Neshoda značek",
+    "typeSameAsReference": "Stejné jako reference",
+    "typeWhitespaceMismatch": "Neshoda mezer",
+    "typeStructuralConflict": "Strukturální konflikt",
+    "statusBarItem": "Kvalita {count}",
+    "inspectorTitle": "Kontroly kvality",
+    "noKeyIssues": "Žádné problémy s kvalitou pro tento klíč"
   }
 }

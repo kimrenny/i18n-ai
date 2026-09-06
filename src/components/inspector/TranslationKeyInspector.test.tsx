@@ -134,4 +134,36 @@ describe('TranslationKeyInspector Component', () => {
     fireEvent.click(screen.getByLabelText(/close inspector/i))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('renders quality issues section when quality issues exist for selected key', () => {
+    const qualityIssues = [
+      {
+        id: 'uk.json:placeholder_mismatch:ADMIN.TITLE',
+        type: 'placeholder_mismatch' as const,
+        severity: 'error' as const,
+        filename: 'uk.json',
+        referenceFilename: 'en.json',
+        languageCode: 'uk',
+        languageName: 'Ukrainian',
+        key: 'ADMIN.TITLE',
+        message: 'Placeholder count mismatch: expected 1, found 0',
+      },
+    ]
+
+    const onNavigateLanguage = vi.fn()
+
+    renderInspector({
+      selectedKey: 'ADMIN.TITLE',
+      qualityIssues,
+      onNavigateLanguage,
+    })
+
+    expect(screen.getByTestId('inspector-quality-section')).toBeInTheDocument()
+    expect(screen.getByText(/Placeholder count mismatch/)).toBeInTheDocument()
+
+    const issueItem = screen.getByTestId('inspector-quality-item-uk.json:placeholder_mismatch:ADMIN.TITLE')
+    fireEvent.click(issueItem)
+    expect(onNavigateLanguage).toHaveBeenCalledWith('uk.json', 'ADMIN.TITLE')
+  })
 })
+

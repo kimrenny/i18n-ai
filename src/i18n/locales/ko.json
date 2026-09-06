@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "요청 한도 도달 — {current}/{total} {seconds}초 후 재시도 ({attempt}/{maxRetries})...",
     "batchCompleted": "일괄 번역 완료 ({count}개 키)",
     "dismiss": "닫기"
+  },
+  "quality": {
+    "title": "품질",
+    "ariaLabel": "로컬라이제이션 품질 패널",
+    "totalIssues": "{count}개 문제",
+    "errors": "오류",
+    "warnings": "경고",
+    "info": "정보",
+    "severityError": "오류",
+    "severityWarning": "경고",
+    "severityInfo": "정보",
+    "allSeverities": "모든 심각도",
+    "allTypes": "모든 문제 유형",
+    "allLanguages": "모든 언어",
+    "noIssuesTitle": "품질 문제가 감지되지 않았습니다",
+    "noIssuesDesc": "모든 번역이 구조적 및 기술적 품질 검사를 통과했습니다.",
+    "noFilteredIssues": "현재 필터와 일치하는 문제가 없습니다.",
+    "closePanel": "품질 패널 닫기",
+    "typeMissing": "누락된 번역",
+    "typeEmpty": "빈 번역",
+    "typePlaceholderMismatch": "자리표시자 불일치",
+    "typeTagMismatch": "태그 불일치",
+    "typeSameAsReference": "참조와 동일함",
+    "typeWhitespaceMismatch": "공백 불일치",
+    "typeStructuralConflict": "구조적 충돌",
+    "statusBarItem": "품질 {count}",
+    "inspectorTitle": "품질 검사",
+    "noKeyIssues": "이 키에 대한 품질 문제가 없습니다"
   }
 }

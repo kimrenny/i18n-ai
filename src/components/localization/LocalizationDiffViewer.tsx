@@ -55,6 +55,8 @@ import { planAddTranslationKey } from '../../services/localizationKeyInsertion'
 import type { AddKeyTargetMode } from '../../types/localizationKeyInsertion'
 import type { ProblemNavigationTarget } from '../../types/localizationCoverage'
 import { TranslationKeyInspector } from '../inspector/TranslationKeyInspector'
+import type { LocalizationQualityIssue } from '../../types/localizationQuality'
+import { calculateWorkspaceQuality } from '../../services/localizationQuality'
 import { TranslationHistory } from '../history/TranslationHistory'
 import type { TranslationHistoryItem } from '../../types/localizationHistoryView'
 import {
@@ -77,6 +79,7 @@ interface LocalizationDiffViewerProps {
   onRefreshFiles: () => Promise<void>
   initialActiveFilename?: string
   initialProblem?: ProblemNavigationTarget | null
+  qualityIssues?: readonly LocalizationQualityIssue[]
 }
 
 function collectFolderIds(nodes: TreeNodeType[]): string[] {
@@ -97,6 +100,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   onRefreshFiles,
   initialActiveFilename,
   initialProblem,
+  qualityIssues,
 }) => {
   const { t } = useTranslation()
   const initialFilename = initialActiveFilename || comparisonResult.comparedFiles[0]?.filename || ''
@@ -104,6 +108,11 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   const [activeMissingKey, setActiveMissingKey] = useState<string | null>(initialProblem?.key || null)
   const [selectedKey, setSelectedKey] = useState<string | null>(initialProblem?.key || null)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
+
+  const effectiveQualityIssues = useMemo(() => {
+    if (qualityIssues) return qualityIssues
+    return calculateWorkspaceQuality(parsedFiles, comparisonResult).issues
+  }, [qualityIssues, parsedFiles, comparisonResult])
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [selectedHistoryItemId, setSelectedHistoryItemId] = useState<string | null>(null)
   const [isRevertingHistory, setIsRevertingHistory] = useState(false)
@@ -1705,6 +1714,7 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
                 <TranslationKeyInspector
                   selectedKey={selectedKey}
                   parsedFiles={parsedFiles}
+                  qualityIssues={effectiveQualityIssues}
                   onNavigateLanguage={handleNavigateFromInspector}
                   onClose={() => setIsInspectorOpen(false)}
                 />

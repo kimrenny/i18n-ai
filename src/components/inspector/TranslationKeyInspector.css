@@ -408,3 +408,87 @@
 .inspector-open-btn:active {
   transform: scale(0.96);
 }
+
+/* Quality Section */
+.inspector-quality-section {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.inspector-quality-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inspector-quality-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+.inspector-quality-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inspector-quality-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.inspector-quality-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.inspector-quality-severity {
+  font-size: 0.64rem;
+  font-weight: 700;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.inspector-quality-severity.severity-error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.inspector-quality-severity.severity-warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.inspector-quality-severity.severity-info {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+.inspector-quality-lang {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.inspector-quality-msg {
+  color: #cbd5e1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+

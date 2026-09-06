@@ -512,5 +512,33 @@
     "batchRetryingCountdown": "Лимит запросов — повтор {current}/{total} ({attempt}/{maxRetries}) через {seconds} сек...",
     "batchCompleted": "Пакетный перевод завершён ({count} ключей)",
     "dismiss": "Закрыть"
+  },
+  "quality": {
+    "title": "Качество",
+    "ariaLabel": "Панель качества локализации",
+    "totalIssues": "Проблем: {count}",
+    "errors": "Ошибки",
+    "warnings": "Предупреждения",
+    "info": "Инфо",
+    "severityError": "Ошибка",
+    "severityWarning": "Предупреждение",
+    "severityInfo": "Инфо",
+    "allSeverities": "Все уровни",
+    "allTypes": "Все типы проблем",
+    "allLanguages": "Все языки",
+    "noIssuesTitle": "Проблем с качеством не обнаружено",
+    "noIssuesDesc": "Все переводы прошли структурные и технические проверки качества.",
+    "noFilteredIssues": "Нет проблем, соответствующих фильтрам.",
+    "closePanel": "Закрыть панель качества",
+    "typeMissing": "Отсутствует перевод",
+    "typeEmpty": "Пустой перевод",
+    "typePlaceholderMismatch": "Несовпадение плейсхолдеров",
+    "typeTagMismatch": "Несовпадение тегов",
+    "typeSameAsReference": "Совпадает с эталоном",
+    "typeWhitespaceMismatch": "Несовпадение пробелов",
+    "typeStructuralConflict": "Структурный конфликт",
+    "statusBarItem": "Качество {count}",
+    "inspectorTitle": "Проверка качества",
+    "noKeyIssues": "Нет проблем с качеством для этого ключа"
   }
 }
