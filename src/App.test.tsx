@@ -3550,6 +3550,176 @@ describe('App', () => {
       })
     })
   })
+
+  describe('Git Source Control & Status Bar Integration', () => {
+    it('renders Git tab and status bar button, opens Source Control view, and navigates back to editor', async () => {
+      const enData = { hello: 'Hello', world: 'World' }
+      const deData = { hello: 'Hallo' }
+
+      const mockFiles = [
+        { name: 'en.json', path: 'C:/Projects/locales/en.json' },
+        { name: 'de.json', path: 'C:/Projects/locales/de.json' },
+      ]
+
+      const mockElectronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue('C:/Projects/locales'),
+        readDirectoryTree: vi.fn().mockResolvedValue({
+          rootPath: 'C:/Projects/locales',
+          rootName: 'locales',
+          entries: [
+            {
+              name: 'en.json',
+              path: 'C:/Projects/locales/en.json',
+              relativePath: 'en.json',
+              isDirectory: false,
+              isLocalizationCandidate: true,
+            },
+            {
+              name: 'de.json',
+              path: 'C:/Projects/locales/de.json',
+              relativePath: 'de.json',
+              isDirectory: false,
+              isLocalizationCandidate: true,
+            },
+          ],
+        }),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (filePath: string) => {
+          if (filePath.endsWith('en.json')) return enData
+          if (filePath.endsWith('de.json')) return deData
+          throw new Error('File not found')
+        }),
+        gitGetRepositoryInfo: vi.fn().mockResolvedValue({
+          isGitAvailable: true,
+          isRepository: true,
+          rootPath: 'C:/Projects',
+          currentBranch: 'feature/i18n',
+          isDetachedHead: false,
+        }),
+        gitGetStatus: vi.fn().mockResolvedValue({
+          isRepository: true,
+          rootPath: 'C:/Projects',
+          branch: 'feature/i18n',
+          isDetachedHead: false,
+          files: [
+            {
+              path: 'locales/en.json',
+              filename: 'en.json',
+              status: 'modified',
+              stagingStatus: 'staged',
+              statusCode: 'M ',
+              hasStagedChanges: true,
+              hasUnstagedChanges: false,
+              additions: 2,
+              deletions: 0,
+              isLocalization: true,
+              languageCode: 'en',
+            },
+          ],
+          totalChanges: 1,
+          totalModified: 1,
+          totalAdded: 0,
+          totalDeleted: 0,
+          totalRenamed: 0,
+          totalUntracked: 0,
+          totalStaged: 1,
+          totalUnstaged: 0,
+          totalPartiallyStaged: 0,
+          localizationFilesCount: 1,
+          allFilesCount: 1,
+        }),
+        gitGetLog: vi.fn().mockResolvedValue([
+          {
+            hash: '1234567890abcdef1234567890abcdef12345678',
+            shortHash: '1234567',
+            authorName: 'Developer',
+            authorEmail: 'dev@example.com',
+            timestamp: 1700000000000,
+            subject: 'feat: add initial translations',
+            isLocalizationCommit: true,
+            localizationFilesCount: 1,
+            totalFilesCount: 1,
+            totalAdditions: 5,
+            totalDeletions: 0,
+          },
+        ]),
+        gitGetCommitDetails: vi.fn().mockResolvedValue({
+          hash: '1234567890abcdef1234567890abcdef12345678',
+          shortHash: '1234567',
+          authorName: 'Developer',
+          authorEmail: 'dev@example.com',
+          timestamp: 1700000000000,
+          subject: 'feat: add initial translations',
+          body: '',
+          isLocalizationCommit: true,
+          localizationFilesCount: 1,
+          totalFilesCount: 1,
+          totalAdditions: 5,
+          totalDeletions: 0,
+          changedFiles: [
+            {
+              path: 'locales/en.json',
+              filename: 'en.json',
+              additions: 5,
+              deletions: 0,
+              isLocalization: true,
+              languageCode: 'en',
+            },
+          ],
+        }),
+        gitGetFileDiff: vi.fn().mockResolvedValue({
+          filePath: 'locales/en.json',
+          diff: '@@ -1,2 +1,3 @@\n+ "new": "value"',
+          isBinary: false,
+          additions: 1,
+          deletions: 0,
+        }),
+      })
+
+      window.electronAPI = mockElectronAPI
+
+      render(<App />)
+
+      const selectFolderBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(selectFolderBtn)
+
+      // Wait for files to be parsed and Dashboard to render
+      await waitFor(() => {
+        expect(screen.getByTestId('coverage-row-de.json')).toBeInTheDocument()
+      })
+
+      // Verify Status bar Git button is rendered with change count
+      await waitFor(() => {
+        expect(screen.getByTestId('statusbar-git-btn')).toBeInTheDocument()
+        expect(screen.getByTestId('ide-git-btn')).toBeInTheDocument()
+      })
+
+      const gitStatusBtn = screen.getByTestId('statusbar-git-btn')
+      expect(gitStatusBtn).toHaveTextContent(/Git 1/i)
+
+      // Click Git status bar button -> switches to Source Control tab
+      fireEvent.click(gitStatusBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-source-control-view')).toBeInTheDocument()
+      })
+
+      // Verify Git working changes are displayed
+      expect(screen.getByTestId('git-file-en.json')).toBeInTheDocument()
+
+      // Click "Open in Localization Editor"
+      await waitFor(() => {
+        expect(screen.getByTestId('git-open-editor-btn')).toBeInTheDocument()
+      })
+      const openEditorBtn = screen.getByTestId('git-open-editor-btn')
+      fireEvent.click(openEditorBtn)
+
+      // Switches back to Diff Viewer
+      await waitFor(() => {
+        expect(screen.getByTestId('diff-viewer-section')).toBeInTheDocument()
+      })
+    })
+  })
 })
 
 
