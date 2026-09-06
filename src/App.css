@@ -417,6 +417,21 @@ textarea,
   color: #4ade80;
 }
 
+.statusbar-preflight-btn.statusbar-preflight-pass {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.statusbar-preflight-btn.statusbar-preflight-warnings {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.statusbar-preflight-btn.statusbar-preflight-failed {
+  color: #f87171;
+  font-weight: 600;
+}
+
 
 .files-section {
   margin: 1.5rem 0;

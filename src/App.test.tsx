@@ -1314,6 +1314,9 @@ describe('App', () => {
     // 2. Expand nested folders
     const srcFolder = screen.getByText('src')
     fireEvent.click(srcFolder)
+    await waitFor(() => {
+      expect(screen.getByText('locales')).toBeInTheDocument()
+    })
     const localesFolder = screen.getByText('locales')
     fireEvent.click(localesFolder)
 
@@ -3456,12 +3459,99 @@ describe('App', () => {
       // Click the issue to navigate to Diff Viewer
       fireEvent.click(placeholderIssue)
 
+    })
+
+    it('integrates Pre-flight Validator into status bar, opens panel, allows filtering, and navigates issues', async () => {
+      const mockDir = 'C:/Projects/locales_preflight'
+      const mockFiles = ['en.json', 'de.json']
+
+      const enData = {
+        APP_NAME: 'Localization AI',
+        GREETING: 'Hello {name}!',
+        AUTH: {
+          LOGIN: 'Log in',
+        },
+      }
+
+      const deData = {
+        APP_NAME: 'Localization AI',
+        GREETING: 'Hallo {name} {extra}!',
+        // AUTH.LOGIN missing
+      }
+
+      const mockElectronAPI = createMockElectronAPI({
+        selectDirectory: vi.fn().mockResolvedValue(mockDir),
+        readDirectoryTree: vi.fn().mockResolvedValue({
+          rootPath: mockDir,
+          rootName: 'locales_preflight',
+          entries: [
+            {
+              name: 'en.json',
+              path: `${mockDir}/en.json`,
+              relativePath: 'en.json',
+              isDirectory: false,
+              isLocalizationCandidate: true,
+            },
+            {
+              name: 'de.json',
+              path: `${mockDir}/de.json`,
+              relativePath: 'de.json',
+              isDirectory: false,
+              isLocalizationCandidate: true,
+            },
+          ],
+        }),
+        getJsonFiles: vi.fn().mockResolvedValue(mockFiles),
+        readJsonFile: vi.fn().mockImplementation(async (filePath: string) => {
+          if (filePath.endsWith('en.json')) return enData
+          if (filePath.endsWith('de.json')) return deData
+          throw new Error('File not found')
+        }),
+      })
+
+      window.electronAPI = mockElectronAPI
+
+      render(<App />)
+
+      const selectFolderBtn = screen.getByRole('button', { name: /select folder/i })
+      fireEvent.click(selectFolderBtn)
+
+      // Wait for files to be parsed and Dashboard to render
+      await waitFor(() => {
+        expect(screen.getByTestId('coverage-row-de.json')).toBeInTheDocument()
+      })
+
+      // Verify Status bar Pre-flight button is rendered
+      expect(screen.getByTestId('statusbar-preflight-btn')).toBeInTheDocument()
+
+      const preflightStatusBtn = screen.getByTestId('statusbar-preflight-btn')
+      expect(preflightStatusBtn).toHaveTextContent(/Validation ✕ 2/i)
+
+      // Click to open Pre-flight panel
+      fireEvent.click(preflightStatusBtn)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('preflight-panel')).toBeInTheDocument()
+      })
+
+      expect(screen.getByTestId('preflight-hero-card')).toBeInTheDocument()
+      expect(screen.getByTestId('preflight-check-missing_translations')).toBeInTheDocument()
+      expect(screen.getByTestId('preflight-check-placeholder_mismatches')).toBeInTheDocument()
+
+      // Find the placeholder mismatch issue in preflight
+      const phIssue = screen.getByTestId('preflight-issue-de.json:placeholder_mismatch:GREETING')
+      expect(phIssue).toBeInTheDocument()
+
+      // Click the issue to navigate to Diff Viewer
+      fireEvent.click(phIssue)
+
       await waitFor(() => {
         expect(screen.getByTestId('diff-viewer-section')).toBeInTheDocument()
       })
     })
   })
 })
+
 
 
 
