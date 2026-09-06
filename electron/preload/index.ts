@@ -75,6 +75,16 @@ export const electronAPI = {
     ipcRenderer.invoke('git:switchBranch', { directoryPath, branchName }),
   gitCreateBranch: (directoryPath: string, branchName: string): Promise<unknown> =>
     ipcRenderer.invoke('git:createBranch', { directoryPath, branchName }),
+  gitCommitSelected: (
+    directoryPath: string,
+    filePaths: string[],
+    message: string
+  ): Promise<unknown> =>
+    ipcRenderer.invoke('git:commitSelected', {
+      directoryPath,
+      filePaths,
+      message,
+    }),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

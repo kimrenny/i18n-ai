@@ -9,10 +9,26 @@ import {
   fetchGitBranches,
   switchGitBranch,
   createGitBranch,
+  commitGitSelected,
+  validateCommitMessage,
 } from './gitService'
 import type { GitFileStatus, GitCommitSummary, GitBranchInfo } from '../../types/git'
 
 describe('renderer gitService helpers', () => {
+  describe('validateCommitMessage', () => {
+    it('rejects empty and whitespace-only commit messages', () => {
+      expect(validateCommitMessage('').valid).toBe(false)
+      expect(validateCommitMessage('   ').valid).toBe(false)
+      expect(validateCommitMessage('\n\t').valid).toBe(false)
+      expect(validateCommitMessage('').errorKey).toBe('git.commit.errorEmptyMessage')
+    })
+
+    it('accepts valid single-line and multi-line commit messages', () => {
+      expect(validateCommitMessage('feat: add spanish translations').valid).toBe(true)
+      expect(validateCommitMessage('feat(i18n): update strings\n\nDetailed body paragraph.').valid).toBe(true)
+    })
+  })
+
   describe('parseDiffContent', () => {
     it('parses patch diff into hunks, additions, deletions, context and metadata', () => {
       const diffText = [
@@ -205,6 +221,7 @@ describe('renderer gitService helpers', () => {
         gitGetBranches: vi.fn(),
         gitSwitchBranch: vi.fn(),
         gitCreateBranch: vi.fn(),
+        gitCommitSelected: vi.fn(),
       } as unknown as typeof window.electronAPI
     })
 
@@ -241,6 +258,26 @@ describe('renderer gitService helpers', () => {
       const res = await createGitBranch('/repo', 'feature/new')
       expect(res.success).toBe(true)
       expect(res.branchName).toBe('feature/new')
+    })
+
+    it('calls gitCommitSelected bridge safely', async () => {
+      vi.mocked(window.electronAPI!.gitCommitSelected!).mockResolvedValue({
+        success: true,
+        commitHash: 'abcdef1234567890',
+        shortHash: 'abcdef1',
+        committedFiles: ['locales/en.json'],
+        additions: 3,
+        deletions: 1,
+      })
+
+      const res = await commitGitSelected('/repo', ['locales/en.json'], 'feat: test commit')
+      expect(res.success).toBe(true)
+      expect(res.shortHash).toBe('abcdef1')
+      expect(window.electronAPI!.gitCommitSelected).toHaveBeenCalledWith(
+        '/repo',
+        ['locales/en.json'],
+        'feat: test commit'
+      )
     })
   })
 })

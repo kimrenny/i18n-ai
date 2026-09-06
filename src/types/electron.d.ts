@@ -70,6 +70,11 @@ export interface ElectronAPI {
     directoryPath: string,
     branchName: string
   ) => Promise<import('./git').GitBranchCreateResult>
+  gitCommitSelected?: (
+    directoryPath: string,
+    filePaths: string[],
+    message: string
+  ) => Promise<import('./git').GitCommitSelectedResult>
 }
 
 declare global {

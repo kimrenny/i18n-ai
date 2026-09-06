@@ -20,10 +20,16 @@ import {
   fetchGitBranches,
   switchGitBranch,
   createGitBranch,
+  commitGitSelected,
 } from '../../services/git/gitService'
 import { BranchSelectorDropdown } from './BranchSelectorDropdown'
 import { CreateBranchModal } from './CreateBranchModal'
 import { DirtyCheckoutModal } from './DirtyCheckoutModal'
+import { CommitSelectedModal } from './CommitSelectedModal'
+import { ResizeHandle } from '../common/ResizeHandle'
+import { useResizablePanel } from '../../hooks/useResizablePanel'
+import type { WorkspacePreflightReport } from '../../types/localizationValidation'
+import type { LocalizationQualityIssue } from '../../types/localizationQuality'
 import { useTranslation } from '../../i18n/useTranslation'
 import './GitSourceControlView.css'
 
@@ -31,6 +37,8 @@ interface GitSourceControlViewProps {
   workspacePath: string
   onNavigateToLocalizationFile?: (filename: string, fullPath: string) => void
   onRefreshWorkspace?: () => void
+  preflightReport?: WorkspacePreflightReport | null
+  onNavigateToIssue?: (issue: LocalizationQualityIssue) => void
 }
 
 type GitViewSubTab = 'working' | 'history'
@@ -39,6 +47,8 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
   workspacePath,
   onNavigateToLocalizationFile,
   onRefreshWorkspace,
+  preflightReport,
+  onNavigateToIssue,
 }) => {
   const { t, language } = useTranslation()
 
@@ -51,6 +61,13 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [branchSuccessBanner, setBranchSuccessBanner] = useState<string | null>(null)
+
+  // Commit Workflow State
+  const [isCommitModalOpen, setIsCommitModalOpen] = useState(false)
+  const [isCommitting, setIsCommitting] = useState(false)
+  const [commitError, setCommitError] = useState<string | null>(null)
+  const [unrelatedStagedFiles, setUnrelatedStagedFiles] = useState<string[] | undefined>(undefined)
+  const [isHookFailed, setIsHookFailed] = useState(false)
 
   // Branch Management State
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
@@ -79,6 +96,31 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
   const [selectedCommitFile, setSelectedCommitFile] = useState<GitCommitFileChange | null>(null)
   const [commitDiff, setCommitDiff] = useState<GitFileDiff | null>(null)
   const [isLoadingHistoryDiff, setIsLoadingHistoryDiff] = useState<boolean>(false)
+
+  // Resizable Panels
+  const historyDiffResize = useResizablePanel({
+    direction: 'vertical',
+    initialSize: 340,
+    minSize: 140,
+    maxSize: 700,
+    reverseDelta: true,
+  })
+
+  const filesPanelResize = useResizablePanel({
+    direction: 'horizontal',
+    initialSize: 360,
+    minSize: 280,
+    maxSize: 560,
+    reverseDelta: false,
+  })
+
+  const commitsPanelResize = useResizablePanel({
+    direction: 'horizontal',
+    initialSize: 360,
+    minSize: 280,
+    maxSize: 560,
+    reverseDelta: false,
+  })
 
   // Refresh entire Git data
   const refreshGitData = useCallback(async () => {
@@ -521,6 +563,60 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
     [workspacePath, refreshGitData, onRefreshWorkspace, t]
   )
 
+  const selectedFilesForCommit = useMemo(() => {
+    if (!statusSummary) return []
+    return statusSummary.files.filter((f) => selectedFileIds.has(f.path))
+  }, [statusSummary, selectedFileIds])
+
+  // Handle selective commit
+  const handleExecuteCommit = useCallback(
+    async (commitMsg: string) => {
+      if (!workspacePath || selectedFilesForCommit.length === 0) return
+      setIsCommitting(true)
+      setCommitError(null)
+      setUnrelatedStagedFiles(undefined)
+      setIsHookFailed(false)
+
+      try {
+        const filePaths = selectedFilesForCommit.map((f) => f.path)
+        const res = await commitGitSelected(workspacePath, filePaths, commitMsg)
+
+        if (res.success) {
+          setIsCommitModalOpen(false)
+          // Clear committed files from selection
+          setSelectedFileIds((prev) => {
+            const next = new Set(prev)
+            for (const p of filePaths) {
+              next.delete(p)
+            }
+            return next
+          })
+          const displayMsg = commitMsg.length > 40 ? `${commitMsg.slice(0, 37)}...` : commitMsg
+          setBranchSuccessBanner(
+            t('git.commitSuccess', {
+              count: res.committedFiles?.length || filePaths.length,
+              hash: res.shortHash || '',
+              message: displayMsg,
+            })
+          )
+          setTimeout(() => setBranchSuccessBanner(null), 5000)
+          await refreshGitData()
+          onRefreshWorkspace?.()
+        } else {
+          setCommitError(res.error || 'Commit failed')
+          setUnrelatedStagedFiles(res.unrelatedStagedFiles)
+          setIsHookFailed(!!res.hookFailed)
+          await refreshGitData()
+        }
+      } catch (err) {
+        setCommitError(err instanceof Error ? err.message : String(err))
+      } finally {
+        setIsCommitting(false)
+      }
+    },
+    [workspacePath, selectedFilesForCommit, refreshGitData, onRefreshWorkspace, t]
+  )
+
   // Unavailable / Not repository view
   if (!isLoading && repoInfo && !repoInfo.isGitAvailable) {
     return (
@@ -718,7 +814,10 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
           /* ================= Working Changes Layout ================= */
           <div className="git-working-layout">
             {/* Left Column: Changed Files List */}
-            <div className="git-files-panel">
+            <div
+              className="git-files-panel"
+              style={{ width: `${filesPanelResize.size}px` }}
+            >
               <div className="git-panel-header">
                 <div className="git-panel-title">
                   <span>{t('git.changedFiles')}</span>
@@ -742,6 +841,16 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
                       title={t('git.clearSelectionTooltip')}
                     >
                       {t('git.clearSelection')}
+                    </button>
+                    <button
+                      type="button"
+                      className="app-btn app-btn-sm app-btn-primary git-commit-action-btn"
+                      onClick={() => setIsCommitModalOpen(true)}
+                      disabled={selectedFilesForCommit.length === 0}
+                      title={selectedFilesForCommit.length === 0 ? t('git.selectFilesToCommit') : t('git.commitSelectedTooltip')}
+                      data-testid="git-commit-selected-btn"
+                    >
+                      💾 {t('git.commitSelected', { count: selectedFilesForCommit.length })}
                     </button>
                   </div>
                 )}
@@ -809,6 +918,7 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
                             checked={isChecked}
                             onChange={() => {}}
                             aria-label={`${t('git.selected')}: ${file.filename}`}
+                            data-testid={`git-file-checkbox-${file.filename}`}
                           />
                         </label>
 
@@ -853,6 +963,20 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
               </div>
             </div>
 
+            <ResizeHandle
+              direction="horizontal"
+              onPointerDown={filesPanelResize.handlePointerDown}
+              onPointerMove={filesPanelResize.handlePointerMove}
+              onPointerUp={filesPanelResize.handlePointerUp}
+              onKeyDown={filesPanelResize.handleKeyDown}
+              isResizing={filesPanelResize.isResizing}
+              valueNow={filesPanelResize.size}
+              valueMin={280}
+              valueMax={560}
+              ariaLabel={t('git.changedFiles')}
+              testId="git-files-resize-handle"
+            />
+
             {/* Right Column: Diff & Editor Navigation */}
             <div className="git-diff-panel">
               {renderDiffViewer(
@@ -884,7 +1008,10 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
           /* ================= Git History Layout ================= */
           <div className="git-history-layout">
             {/* Left Column: Commit List */}
-            <div className="git-commits-panel">
+            <div
+              className="git-commits-panel"
+              style={{ width: `${commitsPanelResize.size}px` }}
+            >
               <div className="git-panel-header">
                 <div className="git-panel-title">
                   <span>{t('git.commitHistory')}</span>
@@ -956,6 +1083,20 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
               </div>
             </div>
 
+            <ResizeHandle
+              direction="horizontal"
+              onPointerDown={commitsPanelResize.handlePointerDown}
+              onPointerMove={commitsPanelResize.handlePointerMove}
+              onPointerUp={commitsPanelResize.handlePointerUp}
+              onKeyDown={commitsPanelResize.handleKeyDown}
+              isResizing={commitsPanelResize.isResizing}
+              valueNow={commitsPanelResize.size}
+              valueMin={280}
+              valueMax={560}
+              ariaLabel={t('git.commitHistory')}
+              testId="git-commits-resize-handle"
+            />
+
             {/* Middle/Right Column: Selected Commit Details & Diff */}
             <div className="git-commit-details-panel">
               {selectedCommit && commitDetails ? (
@@ -1026,8 +1167,31 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
                     </div>
                   </div>
 
+                  {/* Vertical Resize Handle between metadata card and diff viewer */}
+                  <ResizeHandle
+                    direction="vertical"
+                    onPointerDown={historyDiffResize.handlePointerDown}
+                    onPointerMove={historyDiffResize.handlePointerMove}
+                    onPointerUp={historyDiffResize.handlePointerUp}
+                    onKeyDown={historyDiffResize.handleKeyDown}
+                    isResizing={historyDiffResize.isResizing}
+                    valueNow={historyDiffResize.size}
+                    valueMin={140}
+                    valueMax={700}
+                    ariaLabel={t('git.diffPreview') || 'Resize Diff Viewer'}
+                    testId="git-diff-resize-handle"
+                  />
+
                   {/* Diff for selected file in commit */}
-                  <div className="git-commit-diff-wrapper">
+                  <div
+                    className="git-commit-diff-wrapper"
+                    style={{
+                      height: `${historyDiffResize.size}px`,
+                      minHeight: '140px',
+                      maxHeight: '700px',
+                      flex: 'none',
+                    }}
+                  >
                     {renderDiffViewer(
                       commitDiff,
                       isLoadingHistoryDiff,
@@ -1075,6 +1239,26 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
             performSwitchBranch(pendingSwitchBranch)
           }
         }}
+      />
+
+      {/* Commit Selected Modal */}
+      <CommitSelectedModal
+        isOpen={isCommitModalOpen}
+        workspacePath={workspacePath}
+        selectedFiles={selectedFilesForCommit}
+        preflightReport={preflightReport}
+        isCommitting={isCommitting}
+        commitError={commitError}
+        unrelatedStagedFiles={unrelatedStagedFiles}
+        isHookFailed={isHookFailed}
+        onClose={() => {
+          setIsCommitModalOpen(false)
+          setCommitError(null)
+          setUnrelatedStagedFiles(undefined)
+          setIsHookFailed(false)
+        }}
+        onCommit={handleExecuteCommit}
+        onNavigateToIssue={onNavigateToIssue}
       />
     </div>
   )

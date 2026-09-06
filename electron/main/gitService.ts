@@ -18,6 +18,7 @@ import type {
   GitBranchListResult,
   GitBranchSwitchResult,
   GitBranchCreateResult,
+  GitCommitSelectedResult,
 } from '../../src/types/git'
 
 const execFileAsync = promisify(execFile)
@@ -486,7 +487,7 @@ export async function getCommitDetails(dirPath: string, commitHash: string): Pro
     'show',
     '-n',
     '1',
-    `--pretty=format:%H%x1f%h%x1f%an%x1f%ae%x1f%at%x1f%s%x1f%b`,
+    `--pretty=format:%H%x1f%h%x1f%an%x1f%ae%x1f%at%x1f%s%x1f%b%x1e`,
     '--numstat',
     commitHash,
   ])
@@ -495,15 +496,13 @@ export async function getCommitDetails(dirPath: string, commitHash: string): Pro
     throw new Error(`Failed to load commit details: ${showRes.stderr}`)
   }
 
-  const lines = showRes.stdout.split('\n')
-  const header = lines[0] || ''
-  const fields = header.split('\x1f')
+  const [headerPart, numstatPart = ''] = showRes.stdout.split('\x1e')
+  const fields = headerPart.split('\x1f')
 
   const [hash, shortHash, authorName, authorEmail, unixTimestampStr, subject, body = ''] = fields
   const timestamp = (parseInt(unixTimestampStr, 10) || 0) * 1000
 
-  const numstatText = lines.slice(1).join('\n')
-  const numstatMap = parseNumstatOutput(numstatText)
+  const numstatMap = parseNumstatOutput(numstatPart)
 
   const changedFiles: GitCommitFileChange[] = []
   let totalAdditions = 0
@@ -884,4 +883,190 @@ export async function createGitBranch(
     error: createRes.stderr || 'Failed to create branch.',
   }
 }
+
+/**
+ * Selectively commits specific working tree changes safely.
+ * Stages only the selected paths and re-verifies the index before commit.
+ */
+export async function commitGitSelected(
+  dirPath: string,
+  filePaths: string[],
+  message: string
+): Promise<GitCommitSelectedResult> {
+  const repoInfo = await getRepositoryInfo(dirPath)
+  if (!repoInfo.isRepository || !repoInfo.rootPath) {
+    return {
+      success: false,
+      error: 'Not a git repository.',
+    }
+  }
+
+  const rootPath = repoInfo.rootPath
+  const trimmedMessage = message.trim()
+  if (!trimmedMessage) {
+    return {
+      success: false,
+      error: 'Commit message cannot be empty.',
+    }
+  }
+
+  if (!filePaths || filePaths.length === 0) {
+    return {
+      success: false,
+      error: 'No files selected for commit.',
+    }
+  }
+
+  const norm = (p: string) => p.replace(/\\/g, '/').replace(/^\.\//, '').trim()
+  const selectedNormSet = new Set(filePaths.map(norm))
+
+  // Step 1: Read initial status
+  const initialStatus = await getGitStatus(rootPath)
+
+  // Step 2: Check for unrelated staged files
+  const existingStagedFiles = initialStatus.files.filter(
+    (f) => f.hasStagedChanges || f.stagingStatus === 'staged' || f.stagingStatus === 'partially_staged'
+  )
+  const unrelatedStaged = existingStagedFiles.filter(
+    (f) => !selectedNormSet.has(norm(f.path)) && (!f.oldPath || !selectedNormSet.has(norm(f.oldPath)))
+  )
+
+  if (unrelatedStaged.length > 0) {
+    return {
+      success: false,
+      blockedByUnrelatedStaged: true,
+      unrelatedStagedFiles: unrelatedStaged.map((f) => f.path),
+      error: 'Repository contains unrelated staged files in the index. Please commit or unstage them first.',
+    }
+  }
+
+  // Step 3: Verify selection freshness against working changes
+  const workingMap = new Map<string, GitFileStatus>()
+  for (const f of initialStatus.files) {
+    workingMap.set(norm(f.path), f)
+    if (f.oldPath) {
+      workingMap.set(norm(f.oldPath), f)
+    }
+  }
+
+  for (const selPath of selectedNormSet) {
+    if (!workingMap.has(selPath)) {
+      return {
+        success: false,
+        staleSelection: true,
+        error: `Selected file "${selPath}" is no longer modified or present in working changes.`,
+      }
+    }
+  }
+
+  // Step 4: Stage ONLY the selected paths
+  const addPaths: string[] = []
+  const rmPaths: string[] = []
+
+  for (const selPath of selectedNormSet) {
+    const fileStat = workingMap.get(selPath)
+    if (fileStat && fileStat.status === 'deleted') {
+      rmPaths.push(selPath)
+    } else {
+      addPaths.push(selPath)
+    }
+  }
+
+  if (addPaths.length > 0) {
+    const addRes = await runGit(rootPath, ['add', '--', ...addPaths])
+    if (addRes.exitCode !== 0) {
+      return {
+        success: false,
+        error: addRes.stderr || 'Failed to stage selected files.',
+      }
+    }
+  }
+
+  if (rmPaths.length > 0) {
+    const rmRes = await runGit(rootPath, ['add', '--', ...rmPaths])
+    if (rmRes.exitCode !== 0) {
+      await runGit(rootPath, ['rm', '--', ...rmPaths])
+    }
+  }
+
+  // Step 5: Re-verify Git index immediately before commit
+  const postStageStatus = await getGitStatus(rootPath)
+  const stagedAfter = postStageStatus.files.filter(
+    (f) => f.hasStagedChanges || f.stagingStatus === 'staged' || f.stagingStatus === 'partially_staged'
+  )
+  const stagedPaths = stagedAfter.map((f) => norm(f.path))
+  const stagedPathSet = new Set(stagedPaths)
+
+  // Verify that all selected paths are staged
+  for (const selPath of selectedNormSet) {
+    if (!stagedPathSet.has(selPath)) {
+      const matched = stagedAfter.some((f) => f.oldPath && norm(f.oldPath) === selPath)
+      if (!matched) {
+        return {
+          success: false,
+          error: `Selected file "${selPath}" was not successfully staged in the index.`,
+        }
+      }
+    }
+  }
+
+  // Verify no unselected path is staged
+  for (const stagedFile of stagedAfter) {
+    const stagedNorm = norm(stagedFile.path)
+    const oldNorm = stagedFile.oldPath ? norm(stagedFile.oldPath) : null
+    if (!selectedNormSet.has(stagedNorm) && (!oldNorm || !selectedNormSet.has(oldNorm))) {
+      return {
+        success: false,
+        blockedByUnrelatedStaged: true,
+        unrelatedStagedFiles: [stagedFile.path],
+        error: `Unexpected file "${stagedFile.path}" was found staged in the index before commit.`,
+      }
+    }
+  }
+
+  // Step 6: Execute commit
+  const commitRes = await runGit(rootPath, ['commit', '-m', trimmedMessage])
+  if (commitRes.exitCode !== 0) {
+    const stderrLower = commitRes.stderr.toLowerCase()
+    const isHook =
+      stderrLower.includes('hook') ||
+      stderrLower.includes('pre-commit') ||
+      stderrLower.includes('commit-msg')
+
+    return {
+      success: false,
+      hookFailed: isHook,
+      error: commitRes.stderr || 'Git commit was rejected.',
+    }
+  }
+
+  // Step 7: Inspect new commit
+  const hashRes = await runGit(rootPath, ['rev-parse', 'HEAD'])
+  const shortHashRes = await runGit(rootPath, ['rev-parse', '--short', 'HEAD'])
+  const commitHash = hashRes.stdout.trim()
+  const shortHash = shortHashRes.stdout.trim()
+
+  const showRes = await runGit(rootPath, ['show', '--numstat', '--format=', commitHash])
+  const showNumstats = parseNumstatOutput(showRes.stdout)
+
+  let totalAdditions = 0
+  let totalDeletions = 0
+  const committedFilesList: string[] = []
+
+  for (const [filePath, stats] of showNumstats.entries()) {
+    committedFilesList.push(filePath)
+    totalAdditions += stats.additions
+    totalDeletions += stats.deletions
+  }
+
+  return {
+    success: true,
+    commitHash,
+    shortHash,
+    committedFiles: committedFilesList.length > 0 ? committedFilesList : Array.from(selectedNormSet),
+    additions: totalAdditions,
+    deletions: totalDeletions,
+  }
+}
+
 

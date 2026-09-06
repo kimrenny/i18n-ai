@@ -125,3 +125,17 @@ export interface GitBranchCreateResult {
   branchName: string
   error?: string
 }
+
+export interface GitCommitSelectedResult {
+  success: boolean
+  commitHash?: string
+  shortHash?: string
+  committedFiles?: string[]
+  additions?: number
+  deletions?: number
+  error?: string
+  blockedByUnrelatedStaged?: boolean
+  unrelatedStagedFiles?: string[]
+  hookFailed?: boolean
+  staleSelection?: boolean
+}
