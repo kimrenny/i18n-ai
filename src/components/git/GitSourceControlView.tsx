@@ -7,6 +7,7 @@ import type {
   GitFileStatus,
   GitCommitFileChange,
   GitFileDiff,
+  GitBranchInfo,
 } from '../../types/git'
 import {
   fetchRepositoryInfo,
@@ -16,7 +17,13 @@ import {
   fetchFileDiff,
   formatGitCommitDate,
   parseDiffContent,
+  fetchGitBranches,
+  switchGitBranch,
+  createGitBranch,
 } from '../../services/git/gitService'
+import { BranchSelectorDropdown } from './BranchSelectorDropdown'
+import { CreateBranchModal } from './CreateBranchModal'
+import { DirtyCheckoutModal } from './DirtyCheckoutModal'
 import { useTranslation } from '../../i18n/useTranslation'
 import './GitSourceControlView.css'
 
@@ -40,8 +47,21 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
   const [repoInfo, setRepoInfo] = useState<GitRepositoryInfo | null>(null)
   const [statusSummary, setStatusSummary] = useState<GitStatusSummary | null>(null)
   const [commits, setCommits] = useState<GitCommitSummary[]>([])
+  const [branches, setBranches] = useState<GitBranchInfo[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [branchSuccessBanner, setBranchSuccessBanner] = useState<string | null>(null)
+
+  // Branch Management State
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isCreatingBranch, setIsCreatingBranch] = useState(false)
+  const [createBranchError, setCreateBranchError] = useState<string | null>(null)
+
+  const [isDirtyModalOpen, setIsDirtyModalOpen] = useState(false)
+  const [pendingSwitchBranch, setPendingSwitchBranch] = useState<string | null>(null)
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false)
+  const [switchBranchError, setSwitchBranchError] = useState<string | null>(null)
 
   // Filters
   const [workingLocOnly, setWorkingLocOnly] = useState<boolean>(false)
@@ -81,8 +101,25 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
         return
       }
 
-      const status = await fetchGitStatus(workspacePath)
+      const [status, branchResult, log] = await Promise.all([
+        fetchGitStatus(workspacePath),
+        fetchGitBranches(workspacePath),
+        fetchGitLog(workspacePath, 50),
+      ])
+
       setStatusSummary(status)
+      setBranches(branchResult.branches)
+      if (branchResult.currentBranch) {
+        setRepoInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentBranch: branchResult.currentBranch,
+                isDetachedHead: branchResult.isDetachedHead,
+              }
+            : prev
+        )
+      }
 
       // Auto-select first changed file if none selected or selected is gone
       if (status.files.length > 0) {
@@ -97,7 +134,6 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
         setWorkingDiff(null)
       }
 
-      const log = await fetchGitLog(workspacePath, 50)
       setCommits(log)
 
       if (log.length > 0) {
@@ -408,6 +444,83 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
     )
   }
 
+  // Handle switching branch
+  const performSwitchBranch = useCallback(
+    async (targetBranch: string) => {
+      if (!workspacePath) return
+      setIsSwitchingBranch(true)
+      setSwitchBranchError(null)
+
+      try {
+        const res = await switchGitBranch(workspacePath, targetBranch)
+        if (res.success) {
+          setIsDirtyModalOpen(false)
+          setPendingSwitchBranch(null)
+          setBranchSuccessBanner(t('git.switchSuccess', { branch: targetBranch }))
+          setTimeout(() => setBranchSuccessBanner(null), 4000)
+          await refreshGitData()
+          onRefreshWorkspace?.()
+        } else {
+          if (res.blockedByWorkingChanges) {
+            setSwitchBranchError(t('git.errorBlockedByChanges'))
+          } else {
+            setSwitchBranchError(
+              res.error ? t('git.errorBranchOpFailed', { error: res.error }) : t('git.errorBlockedByChanges')
+            )
+          }
+        }
+      } catch (err) {
+        setSwitchBranchError(err instanceof Error ? err.message : String(err))
+      } finally {
+        setIsSwitchingBranch(false)
+      }
+    },
+    [workspacePath, refreshGitData, onRefreshWorkspace, t]
+  )
+
+  const handleSelectBranch = useCallback(
+    (targetBranch: string) => {
+      // If working tree is dirty, prompt with warning modal
+      if (statusSummary && statusSummary.totalChanges > 0) {
+        setPendingSwitchBranch(targetBranch)
+        setSwitchBranchError(null)
+        setIsDirtyModalOpen(true)
+      } else {
+        performSwitchBranch(targetBranch)
+      }
+    },
+    [statusSummary, performSwitchBranch]
+  )
+
+  // Handle creating branch
+  const handleCreateBranch = useCallback(
+    async (newBranchName: string) => {
+      if (!workspacePath) return
+      setIsCreatingBranch(true)
+      setCreateBranchError(null)
+
+      try {
+        const res = await createGitBranch(workspacePath, newBranchName)
+        if (res.success) {
+          setIsCreateModalOpen(false)
+          setBranchSuccessBanner(t('git.createSuccess', { branch: newBranchName }))
+          setTimeout(() => setBranchSuccessBanner(null), 4000)
+          await refreshGitData()
+          onRefreshWorkspace?.()
+        } else {
+          setCreateBranchError(
+            res.error ? t('git.errorBranchOpFailed', { error: res.error }) : 'Failed to create branch'
+          )
+        }
+      } catch (err) {
+        setCreateBranchError(err instanceof Error ? err.message : String(err))
+      } finally {
+        setIsCreatingBranch(false)
+      }
+    },
+    [workspacePath, refreshGitData, onRefreshWorkspace, t]
+  )
+
   // Unavailable / Not repository view
   if (!isLoading && repoInfo && !repoInfo.isGitAvailable) {
     return (
@@ -459,13 +572,43 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
       {/* Top Source Control Toolbar */}
       <header className="git-toolbar">
         <div className="git-toolbar-left">
-          <div className="git-repo-badge" title={repoInfo?.rootPath || workspacePath}>
-            <span className="git-icon">🌿</span>
-            <span className="git-branch-name">
-              {repoInfo?.isDetachedHead
-                ? t('git.detachedHead', { branch: repoInfo.currentBranch || 'HEAD' })
-                : repoInfo?.currentBranch || 'main'}
-            </span>
+          {/* Branch Selector Dropdown Container */}
+          <div className="git-branch-selector-container">
+            <button
+              type="button"
+              className={`git-branch-selector-btn ${repoInfo?.isDetachedHead ? 'is-detached' : ''}`}
+              onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
+              title={
+                repoInfo?.isDetachedHead
+                  ? t('git.detachedHeadTooltip')
+                  : `${t('git.currentBranch')}: ${repoInfo?.currentBranch || 'main'}`
+              }
+              aria-haspopup="dialog"
+              aria-expanded={isBranchDropdownOpen}
+              data-testid="git-branch-selector-btn"
+            >
+              <span className="git-icon">🌿</span>
+              <span className="git-branch-name" data-testid="git-current-branch-display">
+                {repoInfo?.isDetachedHead
+                  ? t('git.detachedHeadTitle')
+                  : repoInfo?.currentBranch || 'main'}
+              </span>
+              <span className="git-branch-chevron">▾</span>
+            </button>
+
+            <BranchSelectorDropdown
+              branches={branches}
+              currentBranch={repoInfo?.currentBranch || ''}
+              isDetachedHead={!!repoInfo?.isDetachedHead}
+              isOpen={isBranchDropdownOpen}
+              isLoading={isLoading}
+              onClose={() => setIsBranchDropdownOpen(false)}
+              onSelectBranch={handleSelectBranch}
+              onOpenCreateModal={() => {
+                setCreateBranchError(null)
+                setIsCreateModalOpen(true)
+              }}
+            />
           </div>
 
           <div className="git-subtabs" role="tablist">
@@ -544,6 +687,21 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
           </button>
         </div>
       </header>
+
+      {/* Branch Operation Success Banner */}
+      {branchSuccessBanner && (
+        <div className="git-branch-success-banner" role="status" data-testid="branch-success-banner">
+          <span className="git-branch-success-text">✓ {branchSuccessBanner}</span>
+          <button
+            type="button"
+            className="git-branch-banner-close"
+            onClick={() => setBranchSuccessBanner(null)}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="git-body">
@@ -888,6 +1046,37 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Create Branch Modal */}
+      <CreateBranchModal
+        isOpen={isCreateModalOpen}
+        isCreating={isCreatingBranch}
+        error={createBranchError}
+        onClose={() => {
+          setIsCreateModalOpen(false)
+          setCreateBranchError(null)
+        }}
+        onCreate={handleCreateBranch}
+      />
+
+      {/* Dirty Working Tree Warning Modal */}
+      <DirtyCheckoutModal
+        isOpen={isDirtyModalOpen}
+        targetBranch={pendingSwitchBranch || ''}
+        isSwitching={isSwitchingBranch}
+        error={switchBranchError}
+        onClose={() => {
+          setIsDirtyModalOpen(false)
+          setPendingSwitchBranch(null)
+          setSwitchBranchError(null)
+        }}
+        onConfirm={() => {
+          if (pendingSwitchBranch) {
+            performSwitchBranch(pendingSwitchBranch)
+          }
+        }}
+      />
     </div>
   )
 }
+

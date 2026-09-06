@@ -8,6 +8,7 @@ import type {
   GitCommitSummary,
   GitCommitDetails,
   GitFileDiff,
+  GitBranchListResult,
 } from '../../types/git'
 
 // Mock the services/git/gitService module
@@ -17,6 +18,18 @@ vi.mock('../../services/git/gitService', () => ({
   fetchGitLog: vi.fn(),
   fetchCommitDetails: vi.fn(),
   fetchFileDiff: vi.fn(),
+  fetchGitBranches: vi.fn(),
+  switchGitBranch: vi.fn(),
+  createGitBranch: vi.fn(),
+  filterBranches: vi.fn((branches: Array<{ name: string }>, query: string) => {
+    if (!query) return branches
+    return branches.filter((b) => b.name.toLowerCase().includes(query.toLowerCase()))
+  }),
+  validateBranchNameInput: vi.fn((name: string) => {
+    if (!name.trim()) return { valid: false, errorKey: 'git.errorEmpty' }
+    if (name.includes(' ')) return { valid: false, errorKey: 'git.errorSpaces' }
+    return { valid: true }
+  }),
   formatGitCommitDate: vi.fn((ts: number) => (ts ? '2026-09-06' : '')),
   parseDiffContent: vi.fn((text: string) => {
     if (!text) return []
@@ -33,6 +46,9 @@ import {
   fetchGitLog,
   fetchCommitDetails,
   fetchFileDiff,
+  fetchGitBranches,
+  switchGitBranch,
+  createGitBranch,
 } from '../../services/git/gitService'
 
 describe('GitSourceControlView', () => {
@@ -42,6 +58,16 @@ describe('GitSourceControlView', () => {
     rootPath: 'e:/MyProgs/i18nh-pc',
     currentBranch: 'main',
     isDetachedHead: false,
+  }
+
+  const mockBranchResult: GitBranchListResult = {
+    currentBranch: 'main',
+    isDetachedHead: false,
+    branches: [
+      { name: 'main', isCurrent: true },
+      { name: 'develop', isCurrent: false },
+      { name: 'feature/loc-fr', isCurrent: false },
+    ],
   }
 
   const mockStatus: GitStatusSummary = {
@@ -58,8 +84,8 @@ describe('GitSourceControlView', () => {
         statusCode: 'M ',
         hasStagedChanges: true,
         hasUnstagedChanges: false,
-        additions: 3,
-        deletions: 1,
+        additions: 5,
+        deletions: 2,
         isLocalization: true,
         languageCode: 'en',
       },
@@ -84,8 +110,8 @@ describe('GitSourceControlView', () => {
         statusCode: ' M',
         hasStagedChanges: false,
         hasUnstagedChanges: true,
-        additions: 5,
-        deletions: 2,
+        additions: 10,
+        deletions: 5,
         isLocalization: false,
       },
     ],
@@ -104,12 +130,12 @@ describe('GitSourceControlView', () => {
 
   const mockLog: GitCommitSummary[] = [
     {
-      hash: 'abcdef1234567890abcdef1234567890abcdef12',
+      hash: 'abcdef1234567890',
       shortHash: 'abcdef1',
-      authorName: 'Test Dev',
-      authorEmail: 'dev@test.com',
-      timestamp: 1700000000000,
       subject: 'feat: add german strings',
+      authorName: 'Developer',
+      authorEmail: 'dev@example.com',
+      timestamp: 1788700000,
       isLocalizationCommit: true,
       localizationFilesCount: 1,
       totalFilesCount: 2,
@@ -119,13 +145,13 @@ describe('GitSourceControlView', () => {
   ]
 
   const mockDetails: GitCommitDetails = {
-    hash: 'abcdef1234567890abcdef1234567890abcdef12',
+    hash: 'abcdef1234567890',
     shortHash: 'abcdef1',
-    authorName: 'Test Dev',
-    authorEmail: 'dev@test.com',
-    timestamp: 1700000000000,
     subject: 'feat: add german strings',
     body: 'Detailed commit message',
+    authorName: 'Developer',
+    authorEmail: 'dev@example.com',
+    timestamp: 1788700000,
     isLocalizationCommit: true,
     localizationFilesCount: 1,
     totalFilesCount: 2,
@@ -135,6 +161,7 @@ describe('GitSourceControlView', () => {
       {
         path: 'locales/de.json',
         filename: 'de.json',
+        status: 'modified',
         additions: 10,
         deletions: 2,
         isLocalization: true,
@@ -154,10 +181,20 @@ describe('GitSourceControlView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(fetchRepositoryInfo).mockResolvedValue(mockRepoInfo)
+    vi.mocked(fetchGitBranches).mockResolvedValue(mockBranchResult)
     vi.mocked(fetchGitStatus).mockResolvedValue(mockStatus)
     vi.mocked(fetchGitLog).mockResolvedValue(mockLog)
     vi.mocked(fetchCommitDetails).mockResolvedValue(mockDetails)
     vi.mocked(fetchFileDiff).mockResolvedValue(mockDiff)
+    vi.mocked(switchGitBranch).mockResolvedValue({
+      success: true,
+      currentBranch: 'develop',
+      isDetachedHead: false,
+    })
+    vi.mocked(createGitBranch).mockResolvedValue({
+      success: true,
+      branchName: 'feature/test-branch',
+    })
   })
 
   const renderComponent = (props = {}) => {
@@ -177,10 +214,9 @@ describe('GitSourceControlView', () => {
     renderComponent()
 
     await waitFor(() => {
-      expect(screen.getByTestId('git-source-control-view')).toBeInTheDocument()
+      expect(screen.getByText('en.json')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('en.json')).toBeInTheDocument()
     expect(screen.getByText('de.json')).toBeInTheDocument()
     expect(screen.getByText('App.tsx')).toBeInTheDocument()
 
@@ -262,6 +298,142 @@ describe('GitSourceControlView', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Git is not installed/i)).toBeInTheDocument()
+    })
+  })
+
+  /* ================= Branch Management UI Tests ================= */
+
+  it('displays current branch in toolbar and allows opening branch selector dropdown', async () => {
+    renderComponent()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('git-current-branch-display')).toHaveTextContent('main')
+    })
+
+    const branchBtn = screen.getByTestId('git-branch-selector-btn')
+    fireEvent.click(branchBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('git-branch-dropdown')).toBeInTheDocument()
+      expect(screen.getByTestId('branch-item-main')).toBeInTheDocument()
+      expect(screen.getByTestId('branch-item-develop')).toBeInTheDocument()
+      expect(screen.getByTestId('branch-item-feature/loc-fr')).toBeInTheDocument()
+    })
+  })
+
+  it('opens dirty checkout warning modal when switching with uncommitted changes', async () => {
+    renderComponent()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('git-branch-selector-btn')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('git-branch-selector-btn'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('branch-item-develop')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('branch-item-develop'))
+
+    // Dirty modal appears because mockStatus has totalChanges = 3
+    await waitFor(() => {
+      expect(screen.getByTestId('dirty-checkout-modal')).toBeInTheDocument()
+    })
+
+    const confirmBtn = screen.getByTestId('dirty-switch-confirm-btn')
+    fireEvent.click(confirmBtn)
+
+    await waitFor(() => {
+      expect(switchGitBranch).toHaveBeenCalledWith('e:/MyProgs/i18nh-pc', 'develop')
+    })
+  })
+
+  it('switches branch directly when working tree is clean', async () => {
+    vi.mocked(fetchGitStatus).mockResolvedValue({
+      ...mockStatus,
+      files: [],
+      totalChanges: 0,
+      localizationFilesCount: 0,
+      allFilesCount: 0,
+    })
+
+    renderComponent()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('git-branch-selector-btn')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('git-branch-selector-btn'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('branch-item-develop')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('branch-item-develop'))
+
+    await waitFor(() => {
+      expect(switchGitBranch).toHaveBeenCalledWith('e:/MyProgs/i18nh-pc', 'develop')
+      expect(screen.queryByTestId('dirty-checkout-modal')).not.toBeInTheDocument()
+    })
+  })
+
+  it('opens create branch modal, validates input, and creates branch', async () => {
+    renderComponent()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('git-branch-selector-btn')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('git-branch-selector-btn'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('open-create-branch-modal-btn')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('open-create-branch-modal-btn'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('create-branch-modal')).toBeInTheDocument()
+    })
+
+    const input = screen.getByTestId('create-branch-name-input')
+    const submitBtn = screen.getByTestId('create-branch-submit-btn')
+
+    // Invalid input (spaces)
+    fireEvent.change(input, { target: { value: 'invalid branch' } })
+    expect(screen.getByTestId('branch-input-validation-error')).toBeInTheDocument()
+    expect(submitBtn).toBeDisabled()
+
+    // Valid input
+    fireEvent.change(input, { target: { value: 'feature/new-languages' } })
+    expect(screen.queryByTestId('branch-input-validation-error')).not.toBeInTheDocument()
+    expect(submitBtn).not.toBeDisabled()
+
+    fireEvent.click(submitBtn)
+
+    await waitFor(() => {
+      expect(createGitBranch).toHaveBeenCalledWith('e:/MyProgs/i18nh-pc', 'feature/new-languages')
+    })
+  })
+
+  it('displays detached HEAD badge when HEAD is detached', async () => {
+    vi.mocked(fetchRepositoryInfo).mockResolvedValue({
+      ...mockRepoInfo,
+      isDetachedHead: true,
+      currentBranch: 'HEAD (abcdef1)',
+    })
+    vi.mocked(fetchGitBranches).mockResolvedValue({
+      ...mockBranchResult,
+      isDetachedHead: true,
+      currentBranch: 'HEAD (abcdef1)',
+    })
+
+    renderComponent()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('git-branch-selector-btn')).toHaveClass('is-detached')
+      expect(screen.getByTestId('git-current-branch-display')).toHaveTextContent(/HEAD detached/i)
     })
   })
 })

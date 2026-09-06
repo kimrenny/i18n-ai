@@ -59,6 +59,17 @@ export interface ElectronAPI {
     commitHash?: string,
     staged?: boolean
   ) => Promise<import('./git').GitFileDiff>
+  gitGetBranches?: (
+    directoryPath: string
+  ) => Promise<import('./git').GitBranchListResult>
+  gitSwitchBranch?: (
+    directoryPath: string,
+    branchName: string
+  ) => Promise<import('./git').GitBranchSwitchResult>
+  gitCreateBranch?: (
+    directoryPath: string,
+    branchName: string
+  ) => Promise<import('./git').GitBranchCreateResult>
 }
 
 declare global {

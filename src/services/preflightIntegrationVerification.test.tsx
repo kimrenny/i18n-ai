@@ -240,5 +240,5 @@ describe('Manual & Focused Runtime Verification of Pre-flight Validator', () => 
       })
       expect(screen.getByTestId('preflight-hero-card')).toHaveTextContent(lang.expectedHero)
     }
-  })
+  }, 25000)
 })

@@ -6,16 +6,115 @@ import {
   parsePorcelainStatus,
   parseNumstatOutput,
   parseGitLogOutput,
+  validateBranchName,
+  parseBranchOutput,
   checkGitAvailable,
   getRepositoryInfo,
   getGitStatus,
   getGitLog,
   getCommitDetails,
   getFileDiff,
+  getGitBranches,
+  switchGitBranch,
+  createGitBranch,
   runGit,
 } from './gitService'
 
 describe('gitService pure parsers', () => {
+  describe('validateBranchName', () => {
+    it('rejects empty input', () => {
+      expect(validateBranchName('').valid).toBe(false)
+      expect(validateBranchName('   ').valid).toBe(false)
+    })
+
+    it('rejects spaces', () => {
+      expect(validateBranchName('my branch').valid).toBe(false)
+    })
+
+    it('rejects leading/trailing slashes and trailing dots', () => {
+      expect(validateBranchName('/branch').valid).toBe(false)
+      expect(validateBranchName('branch/').valid).toBe(false)
+      expect(validateBranchName('branch.').valid).toBe(false)
+    })
+
+    it('rejects consecutive slashes, dots, and @{', () => {
+      expect(validateBranchName('branch..name').valid).toBe(false)
+      expect(validateBranchName('branch//name').valid).toBe(false)
+      expect(validateBranchName('branch@{1}').valid).toBe(false)
+    })
+
+    it('rejects invalid characters (~, ^, :, ?, *, [, \\)', () => {
+      expect(validateBranchName('feat~1').valid).toBe(false)
+      expect(validateBranchName('feat^').valid).toBe(false)
+      expect(validateBranchName('feat:main').valid).toBe(false)
+      expect(validateBranchName('feat?').valid).toBe(false)
+      expect(validateBranchName('feat*').valid).toBe(false)
+      expect(validateBranchName('feat[1]').valid).toBe(false)
+      expect(validateBranchName('feat\\test').valid).toBe(false)
+    })
+
+    it('rejects names ending with .lock', () => {
+      expect(validateBranchName('main.lock').valid).toBe(false)
+    })
+
+    it('accepts valid branch names', () => {
+      expect(validateBranchName('main').valid).toBe(true)
+      expect(validateBranchName('feature/my-branch').valid).toBe(true)
+      expect(validateBranchName('v1.0.0-rc1').valid).toBe(true)
+      expect(validateBranchName('ветка-перевода').valid).toBe(true)
+    })
+  })
+
+  describe('parseBranchOutput', () => {
+    it('parses branch output and orders current branch first then alphabetically', () => {
+      const output = [
+        ' \x00feature/loc-fr\x00abc1234\x00origin/feature/loc-fr',
+        '*\x00main\x00def5678\x00origin/main',
+        ' \x00develop\x007890abc\x00',
+        ' \x00feature/loc-de\x001234def\x00',
+      ].join('\n')
+
+      const result = parseBranchOutput(output)
+      expect(result.currentBranch).toBe('main')
+      expect(result.isDetachedHead).toBe(false)
+      expect(result.branches).toHaveLength(4)
+
+      // Current branch first
+      expect(result.branches[0].name).toBe('main')
+      expect(result.branches[0].isCurrent).toBe(true)
+      expect(result.branches[0].upstream).toBe('origin/main')
+
+      // Rest alphabetically
+      expect(result.branches[1].name).toBe('develop')
+      expect(result.branches[1].isCurrent).toBe(false)
+      expect(result.branches[2].name).toBe('feature/loc-de')
+      expect(result.branches[3].name).toBe('feature/loc-fr')
+    })
+
+    it('correctly detects detached HEAD', () => {
+      const output = [
+        '*\x00(HEAD detached at a1b2c3d)\x00a1b2c3d\x00',
+        ' \x00main\x00def5678\x00',
+        ' \x00develop\x007890abc\x00',
+      ].join('\n')
+
+      const result = parseBranchOutput(output)
+      expect(result.isDetachedHead).toBe(true)
+      expect(result.currentBranch).toBe('HEAD (a1b2c3d)')
+      expect(result.branches).toHaveLength(2)
+      expect(result.branches[0].name).toBe('develop')
+      expect(result.branches[1].name).toBe('main')
+    })
+
+    it('handles single branch repository', () => {
+      const output = '*\x00main\x00def5678\x00'
+      const result = parseBranchOutput(output)
+      expect(result.currentBranch).toBe('main')
+      expect(result.isDetachedHead).toBe(false)
+      expect(result.branches).toHaveLength(1)
+      expect(result.branches[0].name).toBe('main')
+    })
+  })
   describe('parsePorcelainStatus', () => {
     it('correctly distinguishes staged, unstaged, partially staged, and untracked files', () => {
       const porcelain = [
@@ -304,17 +403,174 @@ describe('gitService real repository integration', () => {
     expect(diff.additions).toBeGreaterThan(0)
   })
 
-  it('handles non-git directory gracefully', async () => {
-    const nonGitDir = await fs.mkdtemp(path.join(os.tmpdir(), 'non-git-dir-'))
-    try {
-      const info = await getRepositoryInfo(nonGitDir)
-      expect(info.isRepository).toBe(false)
+  describe('Real Git Repository Branch Management', () => {
+    let branchRepoDir: string | null = null
 
-      const status = await getGitStatus(nonGitDir)
-      expect(status.isRepository).toBe(false)
-      expect(status.files).toHaveLength(0)
-    } finally {
-      await fs.rm(nonGitDir, { recursive: true, force: true })
-    }
+    beforeAll(async () => {
+      if (!isGitAvailable) return
+      branchRepoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'git-branch-verification-'))
+      await runGit(branchRepoDir, ['init'])
+      await runGit(branchRepoDir, ['config', 'user.name', 'Branch Tester'])
+      await runGit(branchRepoDir, ['config', 'user.email', 'branch@test.local'])
+      await runGit(branchRepoDir, ['config', 'commit.gpgSign', 'false'])
+
+      const locales = path.join(branchRepoDir, 'locales')
+      await fs.mkdir(locales, { recursive: true })
+      await fs.writeFile(
+        path.join(locales, 'en.json'),
+        JSON.stringify({ greeting: 'Hello' }, null, 2),
+        'utf8'
+      )
+      await runGit(branchRepoDir, ['add', '.'])
+      await runGit(branchRepoDir, ['commit', '-m', 'initial commit on main'])
+    })
+
+    afterAll(async () => {
+      if (branchRepoDir) {
+        try {
+          await fs.rm(branchRepoDir, { recursive: true, force: true })
+        } catch {
+          // ignore
+        }
+      }
+    })
+
+    it('lists initial branch correctly', async () => {
+      if (!isGitAvailable || !branchRepoDir) return
+      const res = await getGitBranches(branchRepoDir)
+      expect(res.error).toBeUndefined()
+      expect(res.isDetachedHead).toBe(false)
+      expect(res.branches.length).toBeGreaterThanOrEqual(1)
+      expect(res.branches[0].isCurrent).toBe(true)
+      expect(res.currentBranch).toBe(res.branches[0].name)
+    })
+
+    it('creates new branch and switches to it', async () => {
+      if (!isGitAvailable || !branchRepoDir) return
+      const createRes = await createGitBranch(branchRepoDir, 'feature/new-locale')
+      expect(createRes.success).toBe(true)
+      expect(createRes.branchName).toBe('feature/new-locale')
+
+      const listRes = await getGitBranches(branchRepoDir)
+      expect(listRes.currentBranch).toBe('feature/new-locale')
+      expect(listRes.branches[0].name).toBe('feature/new-locale')
+      expect(listRes.branches[0].isCurrent).toBe(true)
+    })
+
+    it('creates and lists unicode branch names', async () => {
+      if (!isGitAvailable || !branchRepoDir) return
+      const createRes = await createGitBranch(branchRepoDir, 'ветка-локализации')
+      expect(createRes.success).toBe(true)
+
+      const listRes = await getGitBranches(branchRepoDir)
+      expect(listRes.currentBranch).toBe('ветка-локализации')
+      expect(listRes.branches.some((b) => b.name === 'ветка-локализации')).toBe(true)
+    })
+
+    it('switches between clean branches and verifies file content updates', async () => {
+      if (!isGitAvailable || !branchRepoDir) return
+      const initialBranch = (await getGitBranches(branchRepoDir)).branches.find((b) => b.name !== 'ветка-локализации')!.name
+
+      // Add a file in current branch and commit
+      const locales = path.join(branchRepoDir, 'locales')
+      await fs.writeFile(
+        path.join(locales, 'ru.json'),
+        JSON.stringify({ greeting: 'Привет' }, null, 2),
+        'utf8'
+      )
+      await runGit(branchRepoDir, ['add', '.'])
+      await runGit(branchRepoDir, ['commit', '-m', 'add ru.json on unicode branch'])
+
+      // Switch to initial branch
+      const switchRes = await switchGitBranch(branchRepoDir, initialBranch)
+      expect(switchRes.success).toBe(true)
+      expect(switchRes.currentBranch).toBe(initialBranch)
+
+      // ru.json should not exist on initialBranch
+      let fileExists = true
+      try {
+        await fs.access(path.join(locales, 'ru.json'))
+      } catch {
+        fileExists = false
+      }
+      expect(fileExists).toBe(false)
+
+      // Switch back to unicode branch
+      const switchBackRes = await switchGitBranch(branchRepoDir, 'ветка-локализации')
+      expect(switchBackRes.success).toBe(true)
+      expect(switchBackRes.currentBranch).toBe('ветка-локализации')
+
+      // ru.json should now exist
+      const ruContent = await fs.readFile(path.join(locales, 'ru.json'), 'utf8')
+      expect(ruContent).toContain('Привет')
+    })
+
+    it('refuses to switch and preserves local changes when uncommitted modifications conflict', async () => {
+      if (!isGitAvailable || !branchRepoDir) return
+      const locales = path.join(branchRepoDir, 'locales')
+
+      // 1. In ветка-локализации, modify en.json and commit
+      await fs.writeFile(
+        path.join(locales, 'en.json'),
+        JSON.stringify({ greeting: 'Hello Branch A Modification' }, null, 2),
+        'utf8'
+      )
+      await runGit(branchRepoDir, ['add', 'locales/en.json'])
+      await runGit(branchRepoDir, ['commit', '-m', 'update en.json on branch A'])
+
+      // 2. Create another branch 'branch-b'
+      await createGitBranch(branchRepoDir, 'branch-b')
+
+      // In branch-b, commit a different change to en.json
+      await fs.writeFile(
+        path.join(locales, 'en.json'),
+        JSON.stringify({ greeting: 'Hello Branch B Baseline' }, null, 2),
+        'utf8'
+      )
+      await runGit(branchRepoDir, ['add', 'locales/en.json'])
+      await runGit(branchRepoDir, ['commit', '-m', 'update en.json on branch B'])
+
+      // Now create an uncommitted dirty local modification on branch-b
+      const dirtyContent = JSON.stringify({ greeting: 'CRITICAL UNCOMMITTED WORK' }, null, 2)
+      await fs.writeFile(path.join(locales, 'en.json'), dirtyContent, 'utf8')
+
+      // 3. Attempt switching to ветка-локализации (where en.json differs)
+      const switchRes = await switchGitBranch(branchRepoDir, 'ветка-локализации')
+
+      // Git must reject checkout and application flags blockedByWorkingChanges
+      expect(switchRes.success).toBe(false)
+      expect(switchRes.blockedByWorkingChanges).toBe(true)
+
+      // Current branch MUST remain branch-b
+      const listRes = await getGitBranches(branchRepoDir)
+      expect(listRes.currentBranch).toBe('branch-b')
+
+      // Local dirty work MUST NOT be overwritten or lost!
+      const currentContent = await fs.readFile(path.join(locales, 'en.json'), 'utf8')
+      expect(currentContent).toBe(dirtyContent)
+
+      // Revert dirty content for subsequent clean tests
+      await runGit(branchRepoDir, ['checkout', '--', 'locales/en.json'])
+    })
+
+    it('handles detached HEAD state and allows switching back to named branch', async () => {
+      if (!isGitAvailable || !branchRepoDir) return
+      const log = await getGitLog(branchRepoDir, 2)
+      const targetHash = log[1].hash
+
+      // Detach HEAD to target commit
+      await runGit(branchRepoDir, ['checkout', targetHash])
+
+      const listRes = await getGitBranches(branchRepoDir)
+      expect(listRes.isDetachedHead).toBe(true)
+      expect(listRes.currentBranch).toContain('HEAD')
+
+      // Switch back to named branch
+      const switchRes = await switchGitBranch(branchRepoDir, 'branch-b')
+      expect(switchRes.success).toBe(true)
+      expect(switchRes.isDetachedHead).toBe(false)
+      expect(switchRes.currentBranch).toBe('branch-b')
+    })
   })
 })
+

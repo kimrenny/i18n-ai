@@ -69,6 +69,12 @@ export const electronAPI = {
       hash,
       staged,
     }),
+  gitGetBranches: (directoryPath: string): Promise<unknown> =>
+    ipcRenderer.invoke('git:getBranches', directoryPath),
+  gitSwitchBranch: (directoryPath: string, branchName: string): Promise<unknown> =>
+    ipcRenderer.invoke('git:switchBranch', { directoryPath, branchName }),
+  gitCreateBranch: (directoryPath: string, branchName: string): Promise<unknown> =>
+    ipcRenderer.invoke('git:createBranch', { directoryPath, branchName }),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

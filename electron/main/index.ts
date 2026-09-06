@@ -19,6 +19,9 @@ import {
   getGitLog,
   getCommitDetails,
   getFileDiff,
+  getGitBranches,
+  switchGitBranch,
+  createGitBranch,
 } from './gitService'
 import {
   migrateAppSettings,
@@ -569,6 +572,24 @@ app.whenReady().then(() => {
         payload.hash,
         payload.staged
       )
+    }
+  )
+
+  ipcMain.handle('git:getBranches', async (_, directoryPath: string) => {
+    return await getGitBranches(directoryPath)
+  })
+
+  ipcMain.handle(
+    'git:switchBranch',
+    async (_, payload: { directoryPath: string; branchName: string }) => {
+      return await switchGitBranch(payload.directoryPath, payload.branchName)
+    }
+  )
+
+  ipcMain.handle(
+    'git:createBranch',
+    async (_, payload: { directoryPath: string; branchName: string }) => {
+      return await createGitBranch(payload.directoryPath, payload.branchName)
     }
   )
 
