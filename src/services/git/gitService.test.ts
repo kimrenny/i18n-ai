@@ -11,6 +11,11 @@ import {
   createGitBranch,
   commitGitSelected,
   validateCommitMessage,
+  fetchGitRemotes,
+  fetchGitSyncStatus,
+  executeGitFetch,
+  executeGitPull,
+  executeGitPush,
 } from './gitService'
 import type { GitFileStatus, GitCommitSummary, GitBranchInfo } from '../../types/git'
 
@@ -278,6 +283,72 @@ describe('renderer gitService helpers', () => {
         ['locales/en.json'],
         'feat: test commit'
       )
+    })
+
+    it('calls gitGetRemotes and fetchGitRemotes safely', async () => {
+      window.electronAPI!.gitGetRemotes = vi.fn().mockResolvedValue([
+        { name: 'origin', fetchUrl: 'https://github.com/org/repo.git' },
+      ])
+
+      const remotes = await fetchGitRemotes('/repo')
+      expect(remotes).toHaveLength(1)
+      expect(remotes[0].name).toBe('origin')
+    })
+
+    it('calls gitGetSyncStatus and fetchGitSyncStatus safely', async () => {
+      window.electronAPI!.gitGetSyncStatus = vi.fn().mockResolvedValue({
+        hasRemote: true,
+        remotes: [{ name: 'origin' }],
+        currentBranch: 'main',
+        isDetachedHead: false,
+        hasUpstream: true,
+        ahead: 2,
+        behind: 1,
+        isDiverged: true,
+        isSynchronized: false,
+      })
+
+      const sync = await fetchGitSyncStatus('/repo')
+      expect(sync.hasRemote).toBe(true)
+      expect(sync.ahead).toBe(2)
+      expect(sync.behind).toBe(1)
+      expect(sync.isDiverged).toBe(true)
+    })
+
+    it('calls executeGitFetch safely', async () => {
+      window.electronAPI!.gitFetch = vi.fn().mockResolvedValue({
+        success: true,
+        remote: 'origin',
+      })
+
+      const res = await executeGitFetch('/repo', 'origin')
+      expect(res.success).toBe(true)
+      expect(res.remote).toBe('origin')
+      expect(window.electronAPI!.gitFetch).toHaveBeenCalledWith('/repo', 'origin')
+    })
+
+    it('calls executeGitPull safely', async () => {
+      window.electronAPI!.gitPull = vi.fn().mockResolvedValue({
+        success: true,
+        remote: 'origin',
+        branch: 'main',
+      })
+
+      const res = await executeGitPull('/repo', 'origin', 'main')
+      expect(res.success).toBe(true)
+      expect(res.branch).toBe('main')
+    })
+
+    it('calls executeGitPush safely with setUpstream', async () => {
+      window.electronAPI!.gitPush = vi.fn().mockResolvedValue({
+        success: true,
+        remote: 'origin',
+        branch: 'feature/test',
+      })
+
+      const res = await executeGitPush('/repo', 'origin', 'feature/test', true)
+      expect(res.success).toBe(true)
+      expect(window.electronAPI!.gitPush).toHaveBeenCalledWith('/repo', 'origin', 'feature/test', true)
     })
   })
 })

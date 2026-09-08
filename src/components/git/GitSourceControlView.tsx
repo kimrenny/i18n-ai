@@ -8,6 +8,7 @@ import type {
   GitCommitFileChange,
   GitFileDiff,
   GitBranchInfo,
+  GitSyncStatus,
 } from '../../types/git'
 import {
   fetchRepositoryInfo,
@@ -21,11 +22,17 @@ import {
   switchGitBranch,
   createGitBranch,
   commitGitSelected,
+  fetchGitSyncStatus,
+  executeGitFetch,
+  executeGitPull,
+  executeGitPush,
 } from '../../services/git/gitService'
 import { BranchSelectorDropdown } from './BranchSelectorDropdown'
 import { CreateBranchModal } from './CreateBranchModal'
 import { DirtyCheckoutModal } from './DirtyCheckoutModal'
 import { CommitSelectedModal } from './CommitSelectedModal'
+import { SetUpstreamModal } from './SetUpstreamModal'
+import { DirtyPullModal } from './DirtyPullModal'
 import { ResizeHandle } from '../common/ResizeHandle'
 import { useResizablePanel } from '../../hooks/useResizablePanel'
 import type { WorkspacePreflightReport } from '../../types/localizationValidation'
@@ -61,6 +68,20 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [branchSuccessBanner, setBranchSuccessBanner] = useState<string | null>(null)
+
+  // Remote Sync State
+  const [syncStatus, setSyncStatus] = useState<GitSyncStatus | null>(null)
+  const [selectedRemote, setSelectedRemote] = useState<string>('')
+  const [isFetching, setIsFetching] = useState<boolean>(false)
+  const [isPulling, setIsPulling] = useState<boolean>(false)
+  const [isPushing, setIsPushing] = useState<boolean>(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncSuccessBanner, setSyncSuccessBanner] = useState<string | null>(null)
+  const [isDirtyPullModalOpen, setIsDirtyPullModalOpen] = useState<boolean>(false)
+  const [isSetUpstreamModalOpen, setIsSetUpstreamModalOpen] = useState<boolean>(false)
+  const [setUpstreamError, setSetUpstreamError] = useState<string | null>(null)
+
+  const isSyncing = isFetching || isPulling || isPushing
 
   // Commit Workflow State
   const [isCommitModalOpen, setIsCommitModalOpen] = useState(false)
@@ -143,14 +164,31 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
         return
       }
 
-      const [status, branchResult, log] = await Promise.all([
+      const [status, branchResult, log, sync] = await Promise.all([
         fetchGitStatus(workspacePath),
         fetchGitBranches(workspacePath),
         fetchGitLog(workspacePath, 50),
+        fetchGitSyncStatus(workspacePath),
       ])
 
       setStatusSummary(status)
       setBranches(branchResult.branches)
+      setSyncStatus(sync)
+
+      if (sync.remotes.length > 0) {
+        setSelectedRemote((prev) => {
+          if (prev && sync.remotes.some((r) => r.name === prev)) {
+            return prev
+          }
+          if (sync.upstreamRemote && sync.remotes.some((r) => r.name === sync.upstreamRemote)) {
+            return sync.upstreamRemote
+          }
+          return sync.remotes.some((r) => r.name === 'origin') ? 'origin' : sync.remotes[0].name
+        })
+      } else {
+        setSelectedRemote('')
+      }
+
       if (branchResult.currentBranch) {
         setRepoInfo((prev) =>
           prev
@@ -617,6 +655,172 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
     [workspacePath, selectedFilesForCommit, refreshGitData, onRefreshWorkspace, t]
   )
 
+  // Handle Fetch
+  const handleFetch = useCallback(async () => {
+    if (!workspacePath || isSyncing) return
+    setIsFetching(true)
+    setSyncError(null)
+
+    try {
+      const res = await executeGitFetch(workspacePath, selectedRemote || undefined)
+      if (res.success) {
+        setSyncSuccessBanner(t('git.fetchSuccess', { remote: res.remote || selectedRemote || 'origin' }))
+        setTimeout(() => setSyncSuccessBanner(null), 4000)
+        const [updatedSync, updatedBranches, updatedLog] = await Promise.all([
+          fetchGitSyncStatus(workspacePath),
+          fetchGitBranches(workspacePath),
+          fetchGitLog(workspacePath, 50),
+        ])
+        setSyncStatus(updatedSync)
+        setBranches(updatedBranches.branches)
+        setCommits(updatedLog)
+      } else {
+        if (res.errorCode === 'auth_failed') {
+          setSyncError(t('git.errorAuthFailed'))
+        } else if (res.errorCode === 'network_failed') {
+          setSyncError(t('git.errorNetworkFailed'))
+        } else if (res.errorCode === 'no_remote') {
+          setSyncError(t('git.errorNoRemoteConfigured'))
+        } else {
+          setSyncError(res.error ? t('git.errorFetchFailed', { error: res.error }) : t('git.errorFetchFailed', { error: '' }))
+        }
+      }
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsFetching(false)
+    }
+  }, [workspacePath, isSyncing, selectedRemote, t])
+
+  // Perform Pull execution
+  const performPull = useCallback(async () => {
+    if (!workspacePath) return
+    setIsPulling(true)
+    setSyncError(null)
+
+    try {
+      const res = await executeGitPull(workspacePath, selectedRemote || undefined)
+      if (res.success) {
+        setIsDirtyPullModalOpen(false)
+        setSyncSuccessBanner(
+          t('git.pullSuccess', {
+            remote: res.remote || selectedRemote || 'origin',
+            branch: res.branch || syncStatus?.upstreamBranch || repoInfo?.currentBranch || 'main',
+          })
+        )
+        setTimeout(() => setSyncSuccessBanner(null), 4000)
+        await refreshGitData()
+        onRefreshWorkspace?.()
+      } else {
+        setIsDirtyPullModalOpen(false)
+        if (res.hasConflicts) {
+          setSyncError(t('git.errorPullConflict', { count: res.conflictFiles?.length || 1 }))
+        } else if (res.errorCode === 'unfinished_operation') {
+          setSyncError(t('git.errorUnfinishedOperation', { type: res.unfinishedOperation?.type || 'merge' }))
+        } else if (res.errorCode === 'auth_failed') {
+          setSyncError(t('git.errorAuthFailed'))
+        } else if (res.errorCode === 'network_failed') {
+          setSyncError(t('git.errorNetworkFailed'))
+        } else if (res.errorCode === 'no_upstream') {
+          setSyncError(t('git.errorNoUpstreamConfigured'))
+        } else if (res.blockedByWorkingChanges) {
+          setSyncError(t('git.errorBlockedByChanges'))
+        } else {
+          setSyncError(res.error ? t('git.errorPullFailed', { error: res.error }) : t('git.errorPullFailed', { error: '' }))
+        }
+        await refreshGitData()
+      }
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsPulling(false)
+    }
+  }, [workspacePath, selectedRemote, syncStatus, repoInfo, refreshGitData, onRefreshWorkspace, t])
+
+  // Handle Pull button click
+  const handlePullClick = useCallback(async () => {
+    if (!workspacePath || isSyncing) return
+    const freshStatus = await fetchGitStatus(workspacePath)
+    setStatusSummary(freshStatus)
+
+    if (freshStatus.totalChanges > 0) {
+      setIsDirtyPullModalOpen(true)
+    } else {
+      performPull()
+    }
+  }, [workspacePath, isSyncing, performPull])
+
+  // Perform Push execution
+  const performPush = useCallback(
+    async (targetRemote?: string, targetBranch?: string, setUpstream = false) => {
+      if (!workspacePath) return
+      setIsPushing(true)
+      setSyncError(null)
+      setSetUpstreamError(null)
+
+      try {
+        const res = await executeGitPush(
+          workspacePath,
+          targetRemote || selectedRemote || undefined,
+          targetBranch || undefined,
+          setUpstream
+        )
+
+        if (res.success) {
+          setIsSetUpstreamModalOpen(false)
+          setSyncSuccessBanner(
+            t('git.pushSuccess', {
+              remote: res.remote || targetRemote || selectedRemote || 'origin',
+              branch: res.branch || targetBranch || repoInfo?.currentBranch || 'main',
+            })
+          )
+          setTimeout(() => setSyncSuccessBanner(null), 4000)
+          await refreshGitData()
+        } else {
+          const errMsg = res.rejected
+            ? t('git.errorPushRejected')
+            : res.errorCode === 'auth_failed'
+            ? t('git.errorAuthFailed')
+            : res.errorCode === 'network_failed'
+            ? t('git.errorNetworkFailed')
+            : res.errorCode === 'unfinished_operation'
+            ? t('git.errorUnfinishedOperation', { type: 'operation' })
+            : res.error
+            ? t('git.errorPushFailed', { error: res.error })
+            : t('git.errorPushFailed', { error: '' })
+
+          if (isSetUpstreamModalOpen) {
+            setSetUpstreamError(errMsg)
+          } else {
+            setSyncError(errMsg)
+          }
+          await refreshGitData()
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (isSetUpstreamModalOpen) {
+          setSetUpstreamError(msg)
+        } else {
+          setSyncError(msg)
+        }
+      } finally {
+        setIsPushing(false)
+      }
+    },
+    [workspacePath, selectedRemote, repoInfo, isSetUpstreamModalOpen, refreshGitData, t]
+  )
+
+  // Handle Push button click
+  const handlePushClick = useCallback(() => {
+    if (!workspacePath || isSyncing) return
+    if (!syncStatus?.hasUpstream) {
+      setSetUpstreamError(null)
+      setIsSetUpstreamModalOpen(true)
+    } else {
+      performPush()
+    }
+  }, [workspacePath, isSyncing, syncStatus, performPush])
+
   // Unavailable / Not repository view
   if (!isLoading && repoInfo && !repoInfo.isGitAvailable) {
     return (
@@ -741,6 +945,136 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
         </div>
 
         <div className="git-toolbar-right">
+          {/* Sync Status Badge */}
+          {syncStatus && (
+            <div
+              className={`git-sync-status-badge ${
+                repoInfo?.isDetachedHead
+                  ? 'is-detached'
+                  : !syncStatus.hasRemote
+                  ? 'is-no-remote'
+                  : !syncStatus.hasUpstream
+                  ? 'is-no-upstream'
+                  : syncStatus.isDiverged
+                  ? 'is-diverged'
+                  : syncStatus.ahead > 0
+                  ? 'is-ahead'
+                  : syncStatus.behind > 0
+                  ? 'is-behind'
+                  : 'is-synced'
+              }`}
+              title={
+                repoInfo?.isDetachedHead
+                  ? t('git.errorDetachedHeadSync')
+                  : !syncStatus.hasRemote
+                  ? t('git.errorNoRemoteConfigured')
+                  : !syncStatus.hasUpstream
+                  ? t('git.errorNoUpstreamConfigured')
+                  : `${syncStatus.upstream || ''} (${syncStatus.ahead} ahead, ${syncStatus.behind} behind)`
+              }
+              data-testid="git-sync-status-badge"
+            >
+              <span className="git-sync-status-icon">
+                {repoInfo?.isDetachedHead
+                  ? '⚠️'
+                  : !syncStatus.hasRemote
+                  ? '☁️'
+                  : !syncStatus.hasUpstream
+                  ? '☁️'
+                  : syncStatus.isDiverged
+                  ? '↕️'
+                  : syncStatus.ahead > 0
+                  ? '⬆️'
+                  : syncStatus.behind > 0
+                  ? '⬇️'
+                  : '✓'}
+              </span>
+              <span className="git-sync-status-text" data-testid="git-sync-status-text">
+                {repoInfo?.isDetachedHead
+                  ? t('git.detachedHeadTitle')
+                  : !syncStatus.hasRemote
+                  ? t('git.noRemotes')
+                  : !syncStatus.hasUpstream
+                  ? t('git.noUpstream')
+                  : syncStatus.isDiverged
+                  ? t('git.divergedCount', { ahead: syncStatus.ahead, behind: syncStatus.behind })
+                  : syncStatus.ahead > 0
+                  ? t('git.aheadCount', { count: syncStatus.ahead })
+                  : syncStatus.behind > 0
+                  ? t('git.behindCount', { count: syncStatus.behind })
+                  : t('git.upToDate')}
+              </span>
+            </div>
+          )}
+          {/* Remote Sync Actions */}
+          <div className="git-sync-actions">
+            {syncStatus && syncStatus.remotes.length > 1 && (
+              <select
+                className="app-select git-remote-select-btn"
+                value={selectedRemote}
+                onChange={(e) => setSelectedRemote(e.target.value)}
+                disabled={isSyncing || isLoading}
+                title={t('git.selectRemote')}
+                data-testid="git-remote-selector"
+              >
+                {syncStatus.remotes.map((r) => (
+                  <option key={r.name} value={r.name}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              type="button"
+              className="app-btn app-btn-sm git-sync-btn git-fetch-btn"
+              onClick={handleFetch}
+              disabled={isSyncing || isLoading || !syncStatus?.hasRemote || !!repoInfo?.isDetachedHead}
+              title={t('git.fetch')}
+              data-testid="git-fetch-btn"
+            >
+              {isFetching ? '⏳' : '⬇️'} {isFetching ? t('git.fetching') : t('git.fetch')}
+            </button>
+
+            <button
+              type="button"
+              className="app-btn app-btn-sm git-sync-btn git-pull-btn"
+              onClick={handlePullClick}
+              disabled={
+                isSyncing ||
+                isLoading ||
+                !syncStatus?.hasRemote ||
+                !!repoInfo?.isDetachedHead ||
+                !syncStatus?.hasUpstream
+              }
+              title={t('git.pull')}
+              data-testid="git-pull-btn"
+            >
+              {isPulling ? '⏳' : '⏬'} {isPulling ? t('git.pulling') : t('git.pull')}
+              {syncStatus && syncStatus.behind > 0 && (
+                <span className="git-sync-count-badge" data-testid="git-pull-count-badge">
+                  {syncStatus.behind}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              className="app-btn app-btn-sm git-sync-btn git-push-btn"
+              onClick={handlePushClick}
+              disabled={isSyncing || isLoading || !syncStatus?.hasRemote || !!repoInfo?.isDetachedHead}
+              title={syncStatus?.hasUpstream ? t('git.push') : t('git.setUpstream')}
+              data-testid="git-push-btn"
+            >
+              {isPushing ? '⏳' : '🚀'} {isPushing ? t('git.pushing') : t('git.push')}
+              {syncStatus && syncStatus.ahead > 0 && (
+                <span className="git-sync-count-badge" data-testid="git-push-count-badge">
+                  {syncStatus.ahead}
+                </span>
+              )}
+            </button>
+          </div>
+
           {subTab === 'working' ? (
             <label className="git-filter-checkbox" title={t('git.localizationOnlyTooltip')}>
               <input
@@ -775,7 +1109,7 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
               refreshGitData()
               onRefreshWorkspace?.()
             }}
-            disabled={isLoading}
+            disabled={isLoading || isSyncing}
             title={t('git.refreshTooltip')}
             data-testid="git-refresh-btn"
           >
@@ -792,6 +1126,36 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
             type="button"
             className="git-branch-banner-close"
             onClick={() => setBranchSuccessBanner(null)}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Sync Success Banner */}
+      {syncSuccessBanner && (
+        <div className="git-branch-success-banner" role="status" data-testid="sync-success-banner">
+          <span className="git-branch-success-text">✓ {syncSuccessBanner}</span>
+          <button
+            type="button"
+            className="git-branch-banner-close"
+            onClick={() => setSyncSuccessBanner(null)}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Sync Error Banner */}
+      {syncError && (
+        <div className="git-error-banner git-sync-error-banner" role="alert" data-testid="sync-error-banner">
+          <span className="git-error-text">⚠️ {syncError}</span>
+          <button
+            type="button"
+            className="git-branch-banner-close"
+            onClick={() => setSyncError(null)}
             aria-label="Close"
           >
             ✕
@@ -1259,6 +1623,37 @@ export const GitSourceControlView: React.FC<GitSourceControlViewProps> = ({
         }}
         onCommit={handleExecuteCommit}
         onNavigateToIssue={onNavigateToIssue}
+      />
+
+      {/* Set Upstream Modal */}
+      <SetUpstreamModal
+        isOpen={isSetUpstreamModalOpen}
+        isPushing={isPushing}
+        currentBranch={repoInfo?.currentBranch || 'main'}
+        remotes={syncStatus?.remotes || []}
+        selectedRemote={selectedRemote}
+        error={setUpstreamError}
+        onClose={() => {
+          setIsSetUpstreamModalOpen(false)
+          setSetUpstreamError(null)
+        }}
+        onConfirm={(targetRemote, targetBranch) => {
+          performPush(targetRemote, targetBranch, true)
+        }}
+      />
+
+      {/* Dirty Pull Confirmation Modal */}
+      <DirtyPullModal
+        isOpen={isDirtyPullModalOpen}
+        isPulling={isPulling}
+        uncommittedCount={statusSummary?.totalChanges || 0}
+        error={syncError}
+        onClose={() => {
+          setIsDirtyPullModalOpen(false)
+        }}
+        onConfirm={() => {
+          performPull()
+        }}
       />
     </div>
   )

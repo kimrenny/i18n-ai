@@ -22,6 +22,11 @@ vi.mock('../../services/git/gitService', () => ({
   switchGitBranch: vi.fn(),
   createGitBranch: vi.fn(),
   commitGitSelected: vi.fn(),
+  fetchGitSyncStatus: vi.fn(),
+  fetchGitRemotes: vi.fn(),
+  executeGitFetch: vi.fn(),
+  executeGitPull: vi.fn(),
+  executeGitPush: vi.fn(),
   validateCommitMessage: vi.fn((msg: string) => {
     if (!msg.trim()) return { valid: false, errorKey: 'git.commit.errorEmptyMessage' }
     return { valid: true }
@@ -55,6 +60,10 @@ import {
   switchGitBranch,
   createGitBranch,
   commitGitSelected,
+  fetchGitSyncStatus,
+  executeGitFetch,
+  executeGitPull,
+  executeGitPush,
 } from '../../services/git/gitService'
 
 describe('GitSourceControlView', () => {
@@ -186,12 +195,27 @@ describe('GitSourceControlView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+
     vi.mocked(fetchRepositoryInfo).mockResolvedValue(mockRepoInfo)
     vi.mocked(fetchGitBranches).mockResolvedValue(mockBranchResult)
     vi.mocked(fetchGitStatus).mockResolvedValue(mockStatus)
     vi.mocked(fetchGitLog).mockResolvedValue(mockLog)
     vi.mocked(fetchCommitDetails).mockResolvedValue(mockDetails)
     vi.mocked(fetchFileDiff).mockResolvedValue(mockDiff)
+    vi.mocked(fetchGitSyncStatus).mockResolvedValue({
+      hasRemote: true,
+      remotes: [{ name: 'origin', fetchUrl: 'https://github.com/org/repo.git' }],
+      currentBranch: 'main',
+      isDetachedHead: false,
+      hasUpstream: true,
+      upstream: 'origin/main',
+      upstreamRemote: 'origin',
+      upstreamBranch: 'main',
+      ahead: 0,
+      behind: 0,
+      isDiverged: false,
+      isSynchronized: true,
+    })
     vi.mocked(switchGitBranch).mockResolvedValue({
       success: true,
       currentBranch: 'develop',
@@ -719,6 +743,239 @@ describe('GitSourceControlView', () => {
       })
 
       expect(screen.getByTestId('git-open-editor-btn')).toHaveTextContent(/open in editor/i)
+    })
+  })
+
+  describe('Git Remote Synchronization UI', () => {
+    it('renders synchronized status badge when up to date', async () => {
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-sync-status-badge')).toBeInTheDocument()
+        expect(screen.getByTestId('git-sync-status-text')).toHaveTextContent(/up to date/i)
+      })
+    })
+
+    it('renders ahead and behind badges correctly', async () => {
+      vi.mocked(fetchGitSyncStatus).mockResolvedValueOnce({
+        hasRemote: true,
+        remotes: [{ name: 'origin' }],
+        currentBranch: 'main',
+        isDetachedHead: false,
+        hasUpstream: true,
+        upstream: 'origin/main',
+        upstreamRemote: 'origin',
+        upstreamBranch: 'main',
+        ahead: 3,
+        behind: 0,
+        isDiverged: false,
+        isSynchronized: false,
+      })
+
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-sync-status-text')).toHaveTextContent(/3 ahead/i)
+        expect(screen.getByTestId('git-push-count-badge')).toHaveTextContent('3')
+      })
+    })
+
+    it('renders behind badge and count on pull button', async () => {
+      vi.mocked(fetchGitSyncStatus).mockResolvedValueOnce({
+        hasRemote: true,
+        remotes: [{ name: 'origin' }],
+        currentBranch: 'main',
+        isDetachedHead: false,
+        hasUpstream: true,
+        upstream: 'origin/main',
+        upstreamRemote: 'origin',
+        upstreamBranch: 'main',
+        ahead: 0,
+        behind: 2,
+        isDiverged: false,
+        isSynchronized: false,
+      })
+
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-sync-status-text')).toHaveTextContent(/2 behind/i)
+        expect(screen.getByTestId('git-pull-count-badge')).toHaveTextContent('2')
+      })
+    })
+
+    it('renders diverged status badge', async () => {
+      vi.mocked(fetchGitSyncStatus).mockResolvedValueOnce({
+        hasRemote: true,
+        remotes: [{ name: 'origin' }],
+        currentBranch: 'main',
+        isDetachedHead: false,
+        hasUpstream: true,
+        upstream: 'origin/main',
+        upstreamRemote: 'origin',
+        upstreamBranch: 'main',
+        ahead: 2,
+        behind: 4,
+        isDiverged: true,
+        isSynchronized: false,
+      })
+
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-sync-status-text')).toHaveTextContent(/2/i)
+        expect(screen.getByTestId('git-sync-status-text')).toHaveTextContent(/4/i)
+      })
+    })
+
+    it('renders no upstream status and opens SetUpstreamModal on Push', async () => {
+      vi.mocked(fetchGitSyncStatus).mockResolvedValueOnce({
+        hasRemote: true,
+        remotes: [{ name: 'origin' }],
+        currentBranch: 'feature/new',
+        isDetachedHead: false,
+        hasUpstream: false,
+        ahead: 0,
+        behind: 0,
+        isDiverged: false,
+        isSynchronized: false,
+      })
+
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-sync-status-text')).toHaveTextContent(/no upstream/i)
+      })
+
+      // Clicking Push should open Set Upstream modal
+      fireEvent.click(screen.getByTestId('git-push-btn'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('set-upstream-modal')).toBeInTheDocument()
+      })
+
+      // Target branch input default to feature/new
+      expect(screen.getByTestId('set-upstream-branch-input')).toHaveValue('main')
+
+      // Submit set upstream
+      vi.mocked(executeGitPush).mockResolvedValueOnce({
+        success: true,
+        remote: 'origin',
+        branch: 'main',
+      })
+
+      fireEvent.click(screen.getByTestId('set-upstream-submit-btn'))
+
+      await waitFor(() => {
+        expect(executeGitPush).toHaveBeenCalledWith('e:/MyProgs/i18nh-pc', 'origin', 'main', true)
+      })
+    })
+
+    it('executes Fetch on click and displays success banner', async () => {
+      vi.mocked(executeGitFetch).mockResolvedValueOnce({
+        success: true,
+        remote: 'origin',
+      })
+
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-fetch-btn')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('git-fetch-btn'))
+
+      await waitFor(() => {
+        expect(executeGitFetch).toHaveBeenCalledWith('e:/MyProgs/i18nh-pc', 'origin')
+        expect(screen.getByTestId('sync-success-banner')).toBeInTheDocument()
+      })
+    })
+
+    it('opens DirtyPullModal when Pull is clicked on dirty working tree', async () => {
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-pull-btn')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('git-pull-btn'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('dirty-pull-modal')).toBeInTheDocument()
+      })
+
+      // Confirming dirty pull executes pull
+      vi.mocked(executeGitPull).mockResolvedValueOnce({
+        success: true,
+        remote: 'origin',
+        branch: 'main',
+      })
+
+      fireEvent.click(screen.getByTestId('dirty-pull-confirm-btn'))
+
+      await waitFor(() => {
+        expect(executeGitPull).toHaveBeenCalledWith('e:/MyProgs/i18nh-pc', 'origin')
+      })
+    })
+
+    it('renders multiple remotes dropdown selector when >1 remotes exist', async () => {
+      vi.mocked(fetchGitSyncStatus).mockResolvedValueOnce({
+        hasRemote: true,
+        remotes: [
+          { name: 'origin', fetchUrl: 'https://github.com/my/repo.git' },
+          { name: 'upstream', fetchUrl: 'https://github.com/upstream/repo.git' },
+        ],
+        currentBranch: 'main',
+        isDetachedHead: false,
+        hasUpstream: true,
+        upstream: 'origin/main',
+        upstreamRemote: 'origin',
+        upstreamBranch: 'main',
+        ahead: 0,
+        behind: 0,
+        isDiverged: false,
+        isSynchronized: true,
+      })
+
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-remote-selector')).toBeInTheDocument()
+      })
+    })
+
+    it('displays error banner when push is rejected', async () => {
+      vi.mocked(fetchGitSyncStatus).mockResolvedValueOnce({
+        hasRemote: true,
+        remotes: [{ name: 'origin' }],
+        currentBranch: 'main',
+        isDetachedHead: false,
+        hasUpstream: true,
+        upstream: 'origin/main',
+        upstreamRemote: 'origin',
+        upstreamBranch: 'main',
+        ahead: 1,
+        behind: 1,
+        isDiverged: true,
+        isSynchronized: false,
+      })
+      vi.mocked(executeGitPush).mockResolvedValueOnce({
+        success: false,
+        rejected: true,
+        error: 'rejected non-fast-forward',
+      })
+
+      renderComponent()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('git-push-btn')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('git-push-btn'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sync-error-banner')).toBeInTheDocument()
+      })
     })
   })
 })

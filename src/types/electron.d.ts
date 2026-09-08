@@ -75,6 +75,27 @@ export interface ElectronAPI {
     filePaths: string[],
     message: string
   ) => Promise<import('./git').GitCommitSelectedResult>
+  gitGetRemotes?: (
+    directoryPath: string
+  ) => Promise<import('./git').GitRemoteInfo[]>
+  gitGetSyncStatus?: (
+    directoryPath: string
+  ) => Promise<import('./git').GitSyncStatus>
+  gitFetch?: (
+    directoryPath: string,
+    remote?: string
+  ) => Promise<import('./git').GitFetchResult>
+  gitPull?: (
+    directoryPath: string,
+    remote?: string,
+    branch?: string
+  ) => Promise<import('./git').GitPullResult>
+  gitPush?: (
+    directoryPath: string,
+    remote?: string,
+    branch?: string,
+    setUpstream?: boolean
+  ) => Promise<import('./git').GitPushResult>
 }
 
 declare global {

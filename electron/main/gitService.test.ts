@@ -18,6 +18,16 @@ import {
   switchGitBranch,
   createGitBranch,
   commitGitSelected,
+  sanitizeGitUrl,
+  parseGitRemoteOutput,
+  parseAheadBehindOutput,
+  classifyGitError,
+  checkUnfinishedOperation,
+  getGitRemotes,
+  getGitSyncStatus,
+  fetchGit,
+  pullGit,
+  pushGit,
   runGit,
 } from './gitService'
 
@@ -875,6 +885,449 @@ describe('gitService real repository integration', () => {
 
       expect(staleRes.success).toBe(false)
       expect(staleRes.staleSelection).toBe(true)
+    })
+  })
+
+  describe('Git Remote Sync Pure Unit Tests', () => {
+    describe('sanitizeGitUrl', () => {
+      it('redacts password from HTTPS URLs', () => {
+        expect(sanitizeGitUrl('https://user:secret123@github.com/org/repo.git')).toBe(
+          'https://***@github.com/org/repo.git'
+        )
+      })
+
+      it('redacts access tokens from HTTPS URLs', () => {
+        expect(sanitizeGitUrl('https://ghp_abcdef1234567890@github.com/org/repo.git')).toBe(
+          'https://***@github.com/org/repo.git'
+        )
+      })
+
+      it('redacts password from SSH/SCP URLs with embedded password', () => {
+        expect(sanitizeGitUrl('user:password123@git.example.com:group/project.git')).toBe(
+          '***@git.example.com:group/project.git'
+        )
+      })
+
+      it('preserves clean HTTPS and SSH key URLs', () => {
+        expect(sanitizeGitUrl('https://github.com/org/repo.git')).toBe('https://github.com/org/repo.git')
+        expect(sanitizeGitUrl('git@github.com:org/repo.git')).toBe('git@github.com:org/repo.git')
+      })
+
+      it('handles empty and null safely', () => {
+        expect(sanitizeGitUrl('')).toBe('')
+      })
+    })
+
+    describe('parseGitRemoteOutput', () => {
+      it('returns empty array when output is empty', () => {
+        expect(parseGitRemoteOutput('')).toEqual([])
+      })
+
+      it('parses single remote with fetch and push URLs', () => {
+        const output = [
+          'origin\thttps://user:pass@github.com/org/repo.git (fetch)',
+          'origin\thttps://user:pass@github.com/org/repo.git (push)',
+        ].join('\n')
+
+        const remotes = parseGitRemoteOutput(output)
+        expect(remotes).toHaveLength(1)
+        expect(remotes[0].name).toBe('origin')
+        expect(remotes[0].fetchUrl).toBe('https://***@github.com/org/repo.git')
+        expect(remotes[0].pushUrl).toBe('https://***@github.com/org/repo.git')
+      })
+
+      it('parses multiple remotes and sorts origin first then alphabetically', () => {
+        const output = [
+          'upstream\thttps://github.com/original/repo.git (fetch)',
+          'upstream\thttps://github.com/original/repo.git (push)',
+          'backup\thttps://backup.example.com/repo.git (fetch)',
+          'backup\thttps://backup.example.com/repo.git (push)',
+          'origin\thttps://github.com/myfork/repo.git (fetch)',
+          'origin\thttps://github.com/myfork/repo.git (push)',
+        ].join('\n')
+
+        const remotes = parseGitRemoteOutput(output)
+        expect(remotes).toHaveLength(3)
+        expect(remotes[0].name).toBe('origin')
+        expect(remotes[1].name).toBe('backup')
+        expect(remotes[2].name).toBe('upstream')
+      })
+    })
+
+    describe('parseAheadBehindOutput', () => {
+      it('parses 0/0, N/0, 0/N, and N/M correctly', () => {
+        expect(parseAheadBehindOutput('0\t0')).toEqual({ ahead: 0, behind: 0 })
+        expect(parseAheadBehindOutput('3\t0')).toEqual({ ahead: 3, behind: 0 })
+        expect(parseAheadBehindOutput('0\t5')).toEqual({ ahead: 0, behind: 5 })
+        expect(parseAheadBehindOutput('2\t4')).toEqual({ ahead: 2, behind: 4 })
+        expect(parseAheadBehindOutput('  12   8  ')).toEqual({ ahead: 12, behind: 8 })
+      })
+
+      it('handles empty or malformed output gracefully', () => {
+        expect(parseAheadBehindOutput('')).toEqual({ ahead: 0, behind: 0 })
+        expect(parseAheadBehindOutput('invalid')).toEqual({ ahead: 0, behind: 0 })
+      })
+    })
+
+    describe('classifyGitError', () => {
+      it('identifies authentication errors', () => {
+        expect(classifyGitError('fatal: Authentication failed for https://github.com/...')).toBe(
+          'auth_failed'
+        )
+        expect(classifyGitError('Permission denied (publickey).')).toBe('auth_failed')
+        expect(classifyGitError('fatal: could not read Username for https://...')).toBe('auth_failed')
+      })
+
+      it('identifies network errors', () => {
+        expect(classifyGitError('fatal: unable to access: Could not resolve host: github.com')).toBe(
+          'network_failed'
+        )
+        expect(classifyGitError('fatal: Failed to connect to server: Connection timed out')).toBe(
+          'network_failed'
+        )
+      })
+
+      it('identifies push rejected errors', () => {
+        expect(
+          classifyGitError(
+            'To https://github.com/org/repo.git\n ! [rejected] main -> main (non-fast-forward)\nerror: failed to push some refs'
+          )
+        ).toBe('push_rejected')
+      })
+
+      it('identifies conflict errors', () => {
+        expect(
+          classifyGitError(
+            'CONFLICT (content): Merge conflict in locales/en.json\nAutomatic merge failed; fix conflicts and then commit the result.'
+          )
+        ).toBe('conflict')
+      })
+
+      it('identifies blocked by uncommitted changes errors', () => {
+        expect(
+          classifyGitError(
+            'error: Your local changes to the following files would be overwritten by merge:\n  locales/en.json\nPlease commit your changes or stash them before you merge.'
+          )
+        ).toBe('blocked_by_changes')
+      })
+
+      it('identifies unfinished operations', () => {
+        expect(classifyGitError('fatal: You have not concluded your merge (MERGE_HEAD exists).')).toBe(
+          'unfinished_operation'
+        )
+      })
+
+      it('identifies no upstream error', () => {
+        expect(
+          classifyGitError(
+            'fatal: The current branch main has no upstream branch.\nTo push the current branch and set the remote as upstream, use\n  git push --set-upstream origin main'
+          )
+        ).toBe('no_upstream')
+      })
+    })
+  })
+
+  describe('Real Git Repository Remote Synchronization Integration Tests', { timeout: 25000 }, () => {
+    let localRepoDir: string | null = null
+    let bareRemoteDir: string | null = null
+    let peerRepoDir: string | null = null
+
+    beforeAll(async () => {
+      if (!isGitAvailable) return
+
+      // 1. Create a bare remote repository (serves as the remote origin)
+      bareRemoteDir = await fs.mkdtemp(path.join(os.tmpdir(), 'git-bare-remote-'))
+      await runGit(bareRemoteDir, ['init', '--bare'])
+
+      // 2. Create the primary local repository
+      localRepoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'git-local-repo-'))
+      await runGit(localRepoDir, ['init'])
+      await runGit(localRepoDir, ['config', 'user.name', 'Local Tester'])
+      await runGit(localRepoDir, ['config', 'user.email', 'local@test.com'])
+      await runGit(localRepoDir, ['config', 'commit.gpgSign', 'false'])
+      await runGit(localRepoDir, ['config', 'pull.rebase', 'false'])
+
+      // Initial commit in local repo
+      await fs.mkdir(path.join(localRepoDir, 'locales'), { recursive: true })
+      await fs.writeFile(
+        path.join(localRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ greeting: 'Hello' }, null, 2),
+        'utf8'
+      )
+      await runGit(localRepoDir, ['add', 'locales/en.json'])
+      await runGit(localRepoDir, ['commit', '-m', 'initial local commit'])
+    })
+
+    afterAll(async () => {
+      if (localRepoDir) {
+        try {
+          await fs.rm(localRepoDir, { recursive: true, force: true })
+        } catch {
+          // ignore
+        }
+      }
+      if (bareRemoteDir) {
+        try {
+          await fs.rm(bareRemoteDir, { recursive: true, force: true })
+        } catch {
+          // ignore
+        }
+      }
+      if (peerRepoDir) {
+        try {
+          await fs.rm(peerRepoDir, { recursive: true, force: true })
+        } catch {
+          // ignore
+        }
+      }
+    })
+
+    it('Scenario 1: reports no remotes when repository has no remotes configured', async () => {
+      if (!isGitAvailable || !localRepoDir) return
+
+      const remotes = await getGitRemotes(localRepoDir)
+      expect(remotes).toEqual([])
+
+      const sync = await getGitSyncStatus(localRepoDir)
+      expect(sync.hasRemote).toBe(false)
+      expect(sync.hasUpstream).toBe(false)
+      expect(sync.ahead).toBe(0)
+      expect(sync.behind).toBe(0)
+
+      // Fetch without remote fails gracefully
+      const fetchRes = await fetchGit(localRepoDir)
+      expect(fetchRes.success).toBe(false)
+      expect(fetchRes.errorCode).toBe('no_remote')
+
+      // Pull without remote fails gracefully
+      const pullRes = await pullGit(localRepoDir)
+      expect(pullRes.success).toBe(false)
+      expect(pullRes.errorCode).toBe('no_remote')
+    })
+
+    it('Scenario 2: configures remote and detects branch with no upstream', async () => {
+      if (!isGitAvailable || !localRepoDir || !bareRemoteDir) return
+
+      // Add bare remote as 'origin'
+      const bareUrl = bareRemoteDir.replace(/\\/g, '/')
+      await runGit(localRepoDir, ['remote', 'add', 'origin', bareUrl])
+
+      const remotes = await getGitRemotes(localRepoDir)
+      expect(remotes).toHaveLength(1)
+      expect(remotes[0].name).toBe('origin')
+
+      const sync = await getGitSyncStatus(localRepoDir)
+      expect(sync.hasRemote).toBe(true)
+      expect(sync.hasUpstream).toBe(false)
+      expect(sync.isSynchronized).toBe(false)
+    })
+
+    it('Scenario 3: sets upstream on push and verifies up-to-date tracking', async () => {
+      if (!isGitAvailable || !localRepoDir) return
+
+      const branches = await getGitBranches(localRepoDir)
+      const currentBranch = branches.currentBranch || 'main'
+
+      // Push with set-upstream
+      const pushRes = await pushGit(localRepoDir, 'origin', currentBranch, true)
+      expect(pushRes.success).toBe(true)
+      expect(pushRes.remote).toBe('origin')
+
+      // Now sync status should be up-to-date
+      const sync = await getGitSyncStatus(localRepoDir)
+      expect(sync.hasUpstream).toBe(true)
+      expect(sync.upstreamRemote).toBe('origin')
+      expect(sync.ahead).toBe(0)
+      expect(sync.behind).toBe(0)
+      expect(sync.isSynchronized).toBe(true)
+      expect(sync.isDiverged).toBe(false)
+    })
+
+    it('Scenario 4: detects ahead state when new local commit is made, pushes successfully', async () => {
+      if (!isGitAvailable || !localRepoDir) return
+
+      // Create a new local commit
+      await fs.writeFile(
+        path.join(localRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ greeting: 'Hello Local Advance' }, null, 2),
+        'utf8'
+      )
+      await runGit(localRepoDir, ['add', 'locales/en.json'])
+      await runGit(localRepoDir, ['commit', '-m', 'local commit ahead'])
+
+      // Check sync status -> should be 1 ahead, 0 behind
+      const syncAhead = await getGitSyncStatus(localRepoDir)
+      expect(syncAhead.ahead).toBe(1)
+      expect(syncAhead.behind).toBe(0)
+      expect(syncAhead.isSynchronized).toBe(false)
+
+      // Push to origin
+      const pushRes = await pushGit(localRepoDir)
+      expect(pushRes.success).toBe(true)
+
+      // Post-push sync status -> 0 ahead, 0 behind
+      const syncAfter = await getGitSyncStatus(localRepoDir)
+      expect(syncAfter.ahead).toBe(0)
+      expect(syncAfter.behind).toBe(0)
+      expect(syncAfter.isSynchronized).toBe(true)
+    })
+
+    it('Scenario 5: detects behind state after Fetch, verifies working tree is NOT modified by Fetch', async () => {
+      if (!isGitAvailable || !localRepoDir || !bareRemoteDir) return
+
+      // Clone peer repo from bare remote
+      peerRepoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'git-peer-repo-'))
+      const bareUrl = bareRemoteDir.replace(/\\/g, '/')
+      await runGit(peerRepoDir, ['clone', bareUrl, '.'])
+      await runGit(peerRepoDir, ['config', 'user.name', 'Peer Tester'])
+      await runGit(peerRepoDir, ['config', 'user.email', 'peer@test.com'])
+      await runGit(peerRepoDir, ['config', 'commit.gpgSign', 'false'])
+      await runGit(peerRepoDir, ['config', 'pull.rebase', 'false'])
+
+      // In peer repo, commit and push a new remote change
+      await fs.writeFile(
+        path.join(peerRepoDir, 'locales', 'de.json'),
+        JSON.stringify({ greeting: 'Hallo von Peer' }, null, 2),
+        'utf8'
+      )
+      await runGit(peerRepoDir, ['add', 'locales/de.json'])
+      await runGit(peerRepoDir, ['commit', '-m', 'peer remote commit'])
+      await runGit(peerRepoDir, ['push', 'origin', 'HEAD'])
+
+      // Local repo working tree should NOT have de.json yet
+      const deExistsBefore = await fs.access(path.join(localRepoDir, 'locales', 'de.json')).then(() => true).catch(() => false)
+      expect(deExistsBefore).toBe(false)
+
+      // Execute Fetch in local repo
+      const fetchRes = await fetchGit(localRepoDir, 'origin')
+      expect(fetchRes.success).toBe(true)
+
+      // Working tree MUST still remain untouched after Fetch!
+      const deExistsAfterFetch = await fs.access(path.join(localRepoDir, 'locales', 'de.json')).then(() => true).catch(() => false)
+      expect(deExistsAfterFetch).toBe(false)
+
+      // Sync status should now report 0 ahead, 1 behind
+      const syncBehind = await getGitSyncStatus(localRepoDir)
+      expect(syncBehind.ahead).toBe(0)
+      expect(syncBehind.behind).toBe(1)
+      expect(syncBehind.isSynchronized).toBe(false)
+
+      // Execute Pull in local repo
+      const pullRes = await pullGit(localRepoDir)
+      expect(pullRes.success).toBe(true)
+
+      // Working tree should now have de.json
+      const deContent = await fs.readFile(path.join(localRepoDir, 'locales', 'de.json'), 'utf8')
+      expect(deContent).toContain('Hallo von Peer')
+
+      // Sync status is synchronized again
+      const syncAfterPull = await getGitSyncStatus(localRepoDir)
+      expect(syncAfterPull.ahead).toBe(0)
+      expect(syncAfterPull.behind).toBe(0)
+      expect(syncAfterPull.isSynchronized).toBe(true)
+    })
+
+    it('Scenario 6: detects diverged state, rejects push safely without force-pushing', async () => {
+      if (!isGitAvailable || !localRepoDir || !peerRepoDir) return
+
+      // In peer repo, commit and push change A
+      await fs.writeFile(
+        path.join(peerRepoDir, 'locales', 'de.json'),
+        JSON.stringify({ greeting: 'Peer Divergence 1' }, null, 2),
+        'utf8'
+      )
+      await runGit(peerRepoDir, ['add', 'locales/de.json'])
+      await runGit(peerRepoDir, ['commit', '-m', 'peer divergence commit'])
+      await runGit(peerRepoDir, ['push', 'origin', 'HEAD'])
+
+      // In local repo, commit local change B (diverging history)
+      await fs.writeFile(
+        path.join(localRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ greeting: 'Local Divergence 2' }, null, 2),
+        'utf8'
+      )
+      await runGit(localRepoDir, ['add', 'locales/en.json'])
+      await runGit(localRepoDir, ['commit', '-m', 'local divergence commit'])
+
+      // Fetch remote state
+      await fetchGit(localRepoDir)
+
+      // Sync status should be diverged: 1 ahead, 1 behind
+      const syncDiverged = await getGitSyncStatus(localRepoDir)
+      expect(syncDiverged.ahead).toBe(1)
+      expect(syncDiverged.behind).toBe(1)
+      expect(syncDiverged.isDiverged).toBe(true)
+
+      // Attempt Push -> Git MUST reject push and return rejected flag (never force push!)
+      const pushRes = await pushGit(localRepoDir)
+      expect(pushRes.success).toBe(false)
+      expect(pushRes.rejected).toBe(true)
+    })
+
+    it('Scenario 7: detects merge conflicts during Pull, preserves working tree without data loss', async () => {
+      if (!isGitAvailable || !localRepoDir || !peerRepoDir) return
+
+      // In peer repo, modify en.json and push
+      await fs.writeFile(
+        path.join(peerRepoDir, 'locales', 'en.json'),
+        JSON.stringify({ greeting: 'Conflicting remote content' }, null, 2),
+        'utf8'
+      )
+      await runGit(peerRepoDir, ['add', 'locales/en.json'])
+      await runGit(peerRepoDir, ['commit', '-m', 'peer conflict commit'])
+      await runGit(peerRepoDir, ['push', 'origin', 'HEAD'])
+
+      // In local repo, en.json has conflicting content 'Local Divergence 2'
+      // Execute Pull -> Git will produce a merge conflict
+      const pullRes = await pullGit(localRepoDir)
+      expect(pullRes.success).toBe(false)
+      expect(pullRes.hasConflicts).toBe(true)
+
+      // Verify that unfinished operation guard recognizes MERGE_HEAD
+      const unfinished = await checkUnfinishedOperation(localRepoDir)
+      expect(unfinished.inProgress).toBe(true)
+      expect(unfinished.type).toBe('merge')
+
+      // Subsequent pull or push must be safely blocked by unfinished operation guard
+      const blockedPull = await pullGit(localRepoDir)
+      expect(blockedPull.success).toBe(false)
+      expect(blockedPull.errorCode).toBe('unfinished_operation')
+
+      const blockedPush = await pushGit(localRepoDir)
+      expect(blockedPush.success).toBe(false)
+      expect(blockedPush.errorCode).toBe('unfinished_operation')
+
+      // Clean up merge state for subsequent tests
+      await runGit(localRepoDir, ['merge', '--abort'])
+    })
+
+    it('Scenario 8: handles detached HEAD state safely', async () => {
+      if (!isGitAvailable || !localRepoDir) return
+
+      const log = await getGitLog(localRepoDir, 2)
+      const commitHash = log[1].hash
+
+      // Checkout commit hash directly (detached HEAD)
+      await runGit(localRepoDir, ['checkout', commitHash])
+
+      const sync = await getGitSyncStatus(localRepoDir)
+      expect(sync.isDetachedHead).toBe(true)
+      expect(sync.hasUpstream).toBe(false)
+
+      // Pull on detached HEAD is rejected safely
+      const pullRes = await pullGit(localRepoDir)
+      expect(pullRes.success).toBe(false)
+      expect(pullRes.errorCode).toBe('detached_head')
+
+      // Push on detached HEAD is rejected safely
+      const pushRes = await pushGit(localRepoDir)
+      expect(pushRes.success).toBe(false)
+      expect(pushRes.errorCode).toBe('detached_head')
+
+      // Switch back to named branch
+      const branches = await getGitBranches(localRepoDir)
+      const namedBranch = branches.branches[0]?.name || 'main'
+      await switchGitBranch(localRepoDir, namedBranch)
     })
   })
 })

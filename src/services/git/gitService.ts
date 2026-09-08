@@ -10,6 +10,11 @@ import type {
   GitBranchSwitchResult,
   GitBranchCreateResult,
   GitCommitSelectedResult,
+  GitRemoteInfo,
+  GitSyncStatus,
+  GitFetchResult,
+  GitPullResult,
+  GitPushResult,
 } from '../../types/git'
 
 export interface ParsedDiffLine {
@@ -424,6 +429,144 @@ export function validateCommitMessage(message: string): { valid: boolean; errorK
     return { valid: false, errorKey: 'git.commit.errorEmptyMessage' }
   }
   return { valid: true }
+}
+
+/**
+ * Invokes preload API to fetch list of configured Git remotes.
+ */
+export async function fetchGitRemotes(dirPath: string): Promise<GitRemoteInfo[]> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitGetRemotes) {
+    return []
+  }
+
+  try {
+    const res = await window.electronAPI.gitGetRemotes(dirPath)
+    return (res as GitRemoteInfo[]) || []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Invokes preload API to fetch remote synchronization status.
+ */
+export async function fetchGitSyncStatus(dirPath: string): Promise<GitSyncStatus> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitGetSyncStatus) {
+    return {
+      hasRemote: false,
+      remotes: [],
+      currentBranch: '',
+      isDetachedHead: false,
+      hasUpstream: false,
+      ahead: 0,
+      behind: 0,
+      isDiverged: false,
+      isSynchronized: false,
+      error: 'Git integration requires Electron runtime environment.',
+    }
+  }
+
+  try {
+    const res = await window.electronAPI.gitGetSyncStatus(dirPath)
+    return res as GitSyncStatus
+  } catch (err) {
+    return {
+      hasRemote: false,
+      remotes: [],
+      currentBranch: '',
+      isDetachedHead: false,
+      hasUpstream: false,
+      ahead: 0,
+      behind: 0,
+      isDiverged: false,
+      isSynchronized: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+/**
+ * Invokes preload API to fetch remote references safely.
+ */
+export async function executeGitFetch(
+  dirPath: string,
+  remote?: string
+): Promise<GitFetchResult> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitFetch) {
+    return {
+      success: false,
+      error: 'Git integration requires Electron runtime environment.',
+      errorCode: 'generic',
+    }
+  }
+
+  try {
+    const res = await window.electronAPI.gitFetch(dirPath, remote)
+    return res as GitFetchResult
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+      errorCode: 'generic',
+    }
+  }
+}
+
+/**
+ * Invokes preload API to pull remote changes into current branch.
+ */
+export async function executeGitPull(
+  dirPath: string,
+  remote?: string,
+  branch?: string
+): Promise<GitPullResult> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitPull) {
+    return {
+      success: false,
+      error: 'Git integration requires Electron runtime environment.',
+      errorCode: 'generic',
+    }
+  }
+
+  try {
+    const res = await window.electronAPI.gitPull(dirPath, remote, branch)
+    return res as GitPullResult
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+      errorCode: 'generic',
+    }
+  }
+}
+
+/**
+ * Invokes preload API to push local commits to remote repository.
+ */
+export async function executeGitPush(
+  dirPath: string,
+  remote?: string,
+  branch?: string,
+  setUpstream?: boolean
+): Promise<GitPushResult> {
+  if (typeof window === 'undefined' || !window.electronAPI?.gitPush) {
+    return {
+      success: false,
+      error: 'Git integration requires Electron runtime environment.',
+      errorCode: 'generic',
+    }
+  }
+
+  try {
+    const res = await window.electronAPI.gitPush(dirPath, remote, branch, setUpstream)
+    return res as GitPushResult
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+      errorCode: 'generic',
+    }
+  }
 }
 
 

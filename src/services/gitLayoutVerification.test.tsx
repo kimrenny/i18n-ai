@@ -22,6 +22,21 @@ vi.mock('./git/gitService', () => ({
   switchGitBranch: vi.fn(),
   createGitBranch: vi.fn(),
   commitGitSelected: vi.fn(),
+  fetchGitSyncStatus: vi.fn().mockResolvedValue({
+    hasRemote: true,
+    remotes: [{ name: 'origin' }],
+    currentBranch: 'main',
+    isDetachedHead: false,
+    hasUpstream: true,
+    ahead: 0,
+    behind: 0,
+    isSynchronized: true,
+    isDiverged: false,
+  }),
+  fetchGitRemotes: vi.fn().mockResolvedValue([{ name: 'origin' }]),
+  executeGitFetch: vi.fn().mockResolvedValue({ success: true }),
+  executeGitPull: vi.fn().mockResolvedValue({ success: true }),
+  executeGitPush: vi.fn().mockResolvedValue({ success: true }),
   validateCommitMessage: vi.fn(() => ({ valid: true })),
   filterBranches: vi.fn((branches) => branches),
   validateBranchNameInput: vi.fn(() => ({ valid: true })),
@@ -39,6 +54,7 @@ import {
   fetchCommitDetails,
   fetchFileDiff,
   fetchGitBranches,
+  fetchGitSyncStatus,
 } from './git/gitService'
 
 describe('Git Source Control Resizable Diff Viewer and Layout Verification', () => {
@@ -153,6 +169,20 @@ describe('Git Source Control Resizable Diff Viewer and Layout Verification', () 
     vi.mocked(fetchGitLog).mockResolvedValue(mockLog)
     vi.mocked(fetchCommitDetails).mockResolvedValue(mockDetails)
     vi.mocked(fetchFileDiff).mockResolvedValue(mockDiff)
+    vi.mocked(fetchGitSyncStatus).mockResolvedValue({
+      hasRemote: true,
+      remotes: [{ name: 'origin' }],
+      currentBranch: longBranchName,
+      isDetachedHead: false,
+      hasUpstream: true,
+      upstream: `origin/${longBranchName}`,
+      upstreamRemote: 'origin',
+      upstreamBranch: longBranchName,
+      ahead: 0,
+      behind: 0,
+      isSynchronized: true,
+      isDiverged: false,
+    })
   })
 
   it('verifies Git Source Control renders with long branch names and controls without clipping', async () => {
@@ -250,5 +280,67 @@ describe('Git Source Control Resizable Diff Viewer and Layout Verification', () 
     // Keyboard resize left (decrease width)
     fireEvent.keyDown(filesHandle, { key: 'ArrowLeft' })
     expect(filesHandle).toHaveAttribute('aria-valuenow', '360')
+  })
+
+  it('verifies toolbar layout preserves Working Changes, History, and Sync actions simultaneously without clipping or overlap', async () => {
+    vi.mocked(fetchGitSyncStatus).mockResolvedValue({
+      hasRemote: true,
+      remotes: [{ name: 'origin' }, { name: 'upstream' }],
+      currentBranch: longBranchName,
+      isDetachedHead: false,
+      hasUpstream: true,
+      upstream: `origin/${longBranchName}`,
+      upstreamRemote: 'origin',
+      upstreamBranch: longBranchName,
+      ahead: 2,
+      behind: 1,
+      isSynchronized: false,
+      isDiverged: true,
+    })
+
+    render(
+      <I18nProvider language="en">
+        <GitSourceControlView
+          workspacePath="e:/MyProgs/i18nh-pc"
+          onNavigateToLocalizationFile={vi.fn()}
+          onRefreshWorkspace={vi.fn()}
+        />
+      </I18nProvider>
+    )
+
+    // 1. Navigation controls are fully rendered and clickable
+    await waitFor(() => {
+      expect(screen.getByTestId('git-branch-selector-btn')).toBeInTheDocument()
+      expect(screen.getByTestId('git-working-tab-btn')).toBeInTheDocument()
+      expect(screen.getByTestId('git-history-tab-btn')).toBeInTheDocument()
+    })
+
+    const workingBtn = screen.getByTestId('git-working-tab-btn')
+    const historyBtn = screen.getByTestId('git-history-tab-btn')
+    expect(workingBtn).toBeVisible()
+    expect(historyBtn).toBeVisible()
+
+    // 2. Sync status and Sync action buttons are fully rendered and clickable
+    expect(screen.getByTestId('git-sync-status-badge')).toBeInTheDocument()
+    expect(screen.getByTestId('git-fetch-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('git-pull-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('git-push-btn')).toBeInTheDocument()
+
+    const fetchBtn = screen.getByTestId('git-fetch-btn')
+    const pullBtn = screen.getByTestId('git-pull-btn')
+    const pushBtn = screen.getByTestId('git-push-btn')
+
+    expect(fetchBtn).toBeVisible()
+    expect(pullBtn).toBeVisible()
+    expect(pushBtn).toBeVisible()
+
+    // 3. Tab switching works smoothly without interference
+    fireEvent.click(historyBtn)
+    expect(historyBtn).toHaveClass('is-active')
+    expect(workingBtn).not.toHaveClass('is-active')
+
+    fireEvent.click(workingBtn)
+    expect(workingBtn).toHaveClass('is-active')
+    expect(historyBtn).not.toHaveClass('is-active')
   })
 })
