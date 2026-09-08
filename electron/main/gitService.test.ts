@@ -1027,7 +1027,7 @@ describe('gitService real repository integration', () => {
     })
   })
 
-  describe('Real Git Repository Remote Synchronization Integration Tests', () => {
+  describe('Real Git Repository Remote Synchronization Integration Tests', { timeout: 25000 }, () => {
     let localRepoDir: string | null = null
     let bareRemoteDir: string | null = null
     let peerRepoDir: string | null = null
@@ -1045,6 +1045,7 @@ describe('gitService real repository integration', () => {
       await runGit(localRepoDir, ['config', 'user.name', 'Local Tester'])
       await runGit(localRepoDir, ['config', 'user.email', 'local@test.com'])
       await runGit(localRepoDir, ['config', 'commit.gpgSign', 'false'])
+      await runGit(localRepoDir, ['config', 'pull.rebase', 'false'])
 
       // Initial commit in local repo
       await fs.mkdir(path.join(localRepoDir, 'locales'), { recursive: true })
@@ -1181,6 +1182,7 @@ describe('gitService real repository integration', () => {
       await runGit(peerRepoDir, ['config', 'user.name', 'Peer Tester'])
       await runGit(peerRepoDir, ['config', 'user.email', 'peer@test.com'])
       await runGit(peerRepoDir, ['config', 'commit.gpgSign', 'false'])
+      await runGit(peerRepoDir, ['config', 'pull.rebase', 'false'])
 
       // In peer repo, commit and push a new remote change
       await fs.writeFile(

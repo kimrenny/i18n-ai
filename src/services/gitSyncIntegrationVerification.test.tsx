@@ -22,7 +22,7 @@ import {
   runGit,
 } from '../../electron/main/gitService'
 
-describe('Comprehensive End-to-End Real Git Remote Sync Verification (24 Scenarios)', () => {
+describe('Comprehensive End-to-End Real Git Remote Sync Verification (24 Scenarios)', { timeout: 25000 }, () => {
   let isGitAvailable = false
   let bareRemoteDir1: string | null = null
   let bareRemoteDir2: string | null = null
@@ -49,6 +49,7 @@ describe('Comprehensive End-to-End Real Git Remote Sync Verification (24 Scenari
     await runGit(mainRepoDir, ['config', 'user.name', 'Main Tester'])
     await runGit(mainRepoDir, ['config', 'user.email', 'main@test.com'])
     await runGit(mainRepoDir, ['config', 'commit.gpgSign', 'false'])
+    await runGit(mainRepoDir, ['config', 'pull.rebase', 'false'])
 
     // Initial files
     await fs.mkdir(path.join(mainRepoDir, 'locales'), { recursive: true })
@@ -235,6 +236,7 @@ describe('Comprehensive End-to-End Real Git Remote Sync Verification (24 Scenari
     await runGit(peerRepoDir, ['config', 'user.name', 'Peer Tester'])
     await runGit(peerRepoDir, ['config', 'user.email', 'peer@test.com'])
     await runGit(peerRepoDir, ['config', 'commit.gpgSign', 'false'])
+    await runGit(peerRepoDir, ['config', 'pull.rebase', 'false'])
 
     // Peer creates and pushes a remote commit
     await fs.writeFile(

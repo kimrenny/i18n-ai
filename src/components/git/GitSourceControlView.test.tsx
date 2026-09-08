@@ -829,7 +829,7 @@ describe('GitSourceControlView', () => {
     })
 
     it('renders no upstream status and opens SetUpstreamModal on Push', async () => {
-      vi.mocked(fetchGitSyncStatus).mockResolvedValue({
+      vi.mocked(fetchGitSyncStatus).mockResolvedValueOnce({
         hasRemote: true,
         remotes: [{ name: 'origin' }],
         currentBranch: 'feature/new',
@@ -945,6 +945,20 @@ describe('GitSourceControlView', () => {
     })
 
     it('displays error banner when push is rejected', async () => {
+      vi.mocked(fetchGitSyncStatus).mockResolvedValueOnce({
+        hasRemote: true,
+        remotes: [{ name: 'origin' }],
+        currentBranch: 'main',
+        isDetachedHead: false,
+        hasUpstream: true,
+        upstream: 'origin/main',
+        upstreamRemote: 'origin',
+        upstreamBranch: 'main',
+        ahead: 1,
+        behind: 1,
+        isDiverged: true,
+        isSynchronized: false,
+      })
       vi.mocked(executeGitPush).mockResolvedValueOnce({
         success: false,
         rejected: true,

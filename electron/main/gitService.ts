@@ -45,6 +45,8 @@ export async function runGit(
         ...process.env,
         LC_ALL: 'C',
         LANG: 'C',
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_MERGE_AUTOEDIT: 'no',
       },
       maxBuffer: 20 * 1024 * 1024,
     })
@@ -1229,6 +1231,57 @@ export async function checkUnfinishedOperation(
 }
 
 /**
+ * Retrieves unmerged/conflicted file paths directly from Git's machine-readable status/diff.
+ */
+export async function getUnmergedFiles(rootPath: string): Promise<string[]> {
+  try {
+    // 1. Query git diff --name-only --diff-filter=U (machine-readable unmerged files)
+    const diffRes = await runGit(rootPath, ['diff', '--name-only', '--diff-filter=U'])
+    if (diffRes.exitCode === 0 && diffRes.stdout.trim()) {
+      const paths = diffRes.stdout
+        .split('\n')
+        .map((s) => path.normalize(s.trim()).replace(/\\/g, '/'))
+        .filter(Boolean)
+      if (paths.length > 0) {
+        return Array.from(new Set(paths))
+      }
+    }
+
+    // 2. Query git status --porcelain=v1 -uall
+    const statusRes = await runGit(rootPath, ['status', '--porcelain=v1', '-uall'])
+    if (statusRes.exitCode === 0 && statusRes.stdout) {
+      const conflictList: string[] = []
+      const lines = statusRes.stdout.split('\n')
+      for (const line of lines) {
+        if (!line || line.length < 3) continue
+        const code = line.substring(0, 2)
+        // Standard porcelain unmerged status codes: UU, AA, DD, AU, UD, UA, DU
+        if (
+          code === 'UU' ||
+          code === 'AA' ||
+          code === 'DD' ||
+          code === 'AU' ||
+          code === 'UD' ||
+          code === 'UA' ||
+          code === 'DU' ||
+          code[0] === 'U' ||
+          code[1] === 'U'
+        ) {
+          const filePath = line.substring(3).trim().replace(/^"|"$/g, '')
+          conflictList.push(path.normalize(filePath).replace(/\\/g, '/'))
+        }
+      }
+      if (conflictList.length > 0) {
+        return Array.from(new Set(conflictList))
+      }
+    }
+  } catch {
+    // Graceful fallback
+  }
+  return []
+}
+
+/**
  * Parses machine-readable ahead/behind counts from `git rev-list --left-right --count HEAD...@{upstream}`.
  */
 export function parseAheadBehindOutput(output: string): { ahead: number; behind: number } {
@@ -1542,16 +1595,16 @@ export async function pullGit(
     }
   }
 
-  let pullArgs = ['pull']
+  const pullArgs = ['-c', 'pull.rebase=false', 'pull', '--no-rebase', '--no-edit']
   let effectiveRemote = remote?.trim()
   let effectiveBranch = branch?.trim()
 
   if (effectiveRemote && effectiveBranch) {
-    pullArgs = ['pull', effectiveRemote, effectiveBranch]
+    pullArgs.push(effectiveRemote, effectiveBranch)
   } else if (syncStatus.hasUpstream && syncStatus.upstreamRemote && syncStatus.upstreamBranch) {
     effectiveRemote = syncStatus.upstreamRemote
     effectiveBranch = syncStatus.upstreamBranch
-    pullArgs = ['pull', effectiveRemote, effectiveBranch]
+    pullArgs.push(effectiveRemote, effectiveBranch)
   } else if (!syncStatus.hasUpstream) {
     return {
       success: false,
@@ -1571,20 +1624,24 @@ export async function pullGit(
     }
   }
 
-  const errorCode = classifyGitError(pullRes.stderr, pullRes.stdout)
-  const combinedOutput = `${pullRes.stdout}\n${pullRes.stderr}`
+  // 1. Machine-readable conflict detection directly on repository state (diff-filter=U, porcelain, MERGE_HEAD)
+  const unmergedFiles = await getUnmergedFiles(rootPath)
+  const postUnfinished = await checkUnfinishedOperation(rootPath)
+  const isMergeConflict = unmergedFiles.length > 0 || (postUnfinished.inProgress && postUnfinished.type === 'merge')
 
-  // Parse conflict files if present
-  let conflictFiles: string[] | undefined
-  if (errorCode === 'conflict') {
-    const conflictMatches = combinedOutput.match(/CONFLICT \([^)]+\): Merge conflict in (.+)/g)
-    if (conflictMatches) {
-      conflictFiles = conflictMatches.map((m) => {
-        const fileMatch = m.match(/Merge conflict in (.+)$/)
-        return fileMatch ? fileMatch[1].trim() : m
-      })
+  if (isMergeConflict) {
+    return {
+      success: false,
+      remote: effectiveRemote,
+      branch: effectiveBranch,
+      error: pullRes.stderr || pullRes.stdout || 'Merge conflict encountered during pull.',
+      errorCode: 'conflict',
+      hasConflicts: true,
+      conflictFiles: unmergedFiles.length > 0 ? unmergedFiles : undefined,
     }
   }
+
+  const errorCode = classifyGitError(pullRes.stderr, pullRes.stdout)
 
   return {
     success: false,
@@ -1592,8 +1649,7 @@ export async function pullGit(
     branch: effectiveBranch,
     error: pullRes.stderr || pullRes.stdout || 'Git pull failed.',
     errorCode,
-    hasConflicts: errorCode === 'conflict',
-    conflictFiles,
+    hasConflicts: false,
     blockedByWorkingChanges: errorCode === 'blocked_by_changes',
   }
 }
