@@ -139,3 +139,72 @@ export interface GitCommitSelectedResult {
   hookFailed?: boolean
   staleSelection?: boolean
 }
+
+export type GitSyncErrorCode =
+  | 'auth_failed'
+  | 'network_failed'
+  | 'no_remote'
+  | 'no_upstream'
+  | 'detached_head'
+  | 'unfinished_operation'
+  | 'conflict'
+  | 'push_rejected'
+  | 'blocked_by_changes'
+  | 'generic'
+
+export interface GitRemoteInfo {
+  name: string
+  fetchUrl?: string
+  pushUrl?: string
+}
+
+export interface GitSyncStatus {
+  hasRemote: boolean
+  remotes: GitRemoteInfo[]
+  currentBranch: string
+  isDetachedHead: boolean
+  hasUpstream: boolean
+  upstream?: string
+  upstreamRemote?: string
+  upstreamBranch?: string
+  ahead: number
+  behind: number
+  isDiverged: boolean
+  isSynchronized: boolean
+  unfinishedOperation?: {
+    type: 'merge' | 'rebase' | 'cherry-pick' | 'revert'
+  }
+  error?: string
+}
+
+export interface GitFetchResult {
+  success: boolean
+  remote?: string
+  error?: string
+  errorCode?: GitSyncErrorCode
+}
+
+export interface GitPullResult {
+  success: boolean
+  remote?: string
+  branch?: string
+  error?: string
+  errorCode?: GitSyncErrorCode
+  hasConflicts?: boolean
+  conflictFiles?: string[]
+  noUpstream?: boolean
+  blockedByWorkingChanges?: boolean
+  unfinishedOperation?: {
+    type: 'merge' | 'rebase' | 'cherry-pick' | 'revert'
+  }
+}
+
+export interface GitPushResult {
+  success: boolean
+  remote?: string
+  branch?: string
+  error?: string
+  errorCode?: GitSyncErrorCode
+  rejected?: boolean
+  noUpstream?: boolean
+}

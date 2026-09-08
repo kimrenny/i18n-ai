@@ -23,6 +23,11 @@ import {
   switchGitBranch,
   createGitBranch,
   commitGitSelected,
+  getGitRemotes,
+  getGitSyncStatus,
+  fetchGit,
+  pullGit,
+  pushGit,
 } from './gitService'
 import {
   migrateAppSettings,
@@ -608,6 +613,51 @@ app.whenReady().then(() => {
         payload.directoryPath,
         payload.filePaths,
         payload.message
+      )
+    }
+  )
+
+  ipcMain.handle('git:getRemotes', async (_, directoryPath: string) => {
+    return await getGitRemotes(directoryPath)
+  })
+
+  ipcMain.handle('git:getSyncStatus', async (_, directoryPath: string) => {
+    return await getGitSyncStatus(directoryPath)
+  })
+
+  ipcMain.handle(
+    'git:fetch',
+    async (_, payload: { directoryPath: string; remote?: string }) => {
+      return await fetchGit(payload.directoryPath, payload.remote)
+    }
+  )
+
+  ipcMain.handle(
+    'git:pull',
+    async (
+      _,
+      payload: { directoryPath: string; remote?: string; branch?: string }
+    ) => {
+      return await pullGit(payload.directoryPath, payload.remote, payload.branch)
+    }
+  )
+
+  ipcMain.handle(
+    'git:push',
+    async (
+      _,
+      payload: {
+        directoryPath: string
+        remote?: string
+        branch?: string
+        setUpstream?: boolean
+      }
+    ) => {
+      return await pushGit(
+        payload.directoryPath,
+        payload.remote,
+        payload.branch,
+        payload.setUpstream
       )
     }
   )

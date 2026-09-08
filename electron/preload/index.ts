@@ -85,6 +85,30 @@ export const electronAPI = {
       filePaths,
       message,
     }),
+  gitGetRemotes: (directoryPath: string): Promise<unknown> =>
+    ipcRenderer.invoke('git:getRemotes', directoryPath),
+  gitGetSyncStatus: (directoryPath: string): Promise<unknown> =>
+    ipcRenderer.invoke('git:getSyncStatus', directoryPath),
+  gitFetch: (directoryPath: string, remote?: string): Promise<unknown> =>
+    ipcRenderer.invoke('git:fetch', { directoryPath, remote }),
+  gitPull: (
+    directoryPath: string,
+    remote?: string,
+    branch?: string
+  ): Promise<unknown> =>
+    ipcRenderer.invoke('git:pull', { directoryPath, remote, branch }),
+  gitPush: (
+    directoryPath: string,
+    remote?: string,
+    branch?: string,
+    setUpstream?: boolean
+  ): Promise<unknown> =>
+    ipcRenderer.invoke('git:push', {
+      directoryPath,
+      remote,
+      branch,
+      setUpstream,
+    }),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

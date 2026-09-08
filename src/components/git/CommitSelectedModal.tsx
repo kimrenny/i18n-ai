@@ -172,9 +172,12 @@ export const CommitSelectedModal: React.FC<CommitSelectedModalProps> = ({
           <div className="modal-body git-commit-modal-body">
             {/* Commit Message Section */}
             <div className="git-commit-form-group">
-              <label htmlFor="git-commit-message-input" className="git-commit-label">
-                {t('git.commitMessage')} <span className="git-required">*</span>
-              </label>
+              <div className="git-commit-label-row">
+                <label htmlFor="git-commit-message-input" className="git-commit-label">
+                  {t('git.commitMessage')} <span className="git-required">*</span>
+                </label>
+                <span className="git-commit-hint-shortcut">Ctrl+Enter</span>
+              </div>
               <textarea
                 id="git-commit-message-input"
                 className={`app-input git-commit-textarea ${hasInteracted && !isMessageValid ? 'is-invalid' : ''}`}
