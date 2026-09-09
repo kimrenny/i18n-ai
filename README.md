@@ -1,359 +1,380 @@
 # Localization AI
 
-**Localization AI** is a fast, safe, and intuitive desktop application for managing, comparing, and translating JSON localization files. It automatically identifies missing and empty translation keys across multiple languages, provides direct problem navigation, and allows you to complete translations using **Generative AI** or **Free Machine Translation** services—with full placeholder safety and manual review controls.
+Localization AI is a desktop developer tool for maintaining JSON localization dictionaries. It helps developers compare language files, find missing and extra keys, edit translations, validate localization consistency, and analyze whether localization keys are referenced by application source code.
 
----
-
-## Quick Start
-
-1. **Launch the Application**: Open Localization AI.
-2. **Select Folder**: Click **"Select Folder"** and choose the directory containing your project's JSON localization files (e.g. `en.json`, `de.json`, `es.json`, `ru.json`).
-3. **Compare Files**: Select the files you want to inspect and click **"Compare Selected Files"**.
-4. **Identify Gaps**: Review the summary dashboard to immediately see missing keys and empty translation strings.
-5. **Translate**:
-   - Edit keys **manually** in-place,
-   - Click **"✨ Translate with AI"** on any key, or
-   - Click **"✨ Translate All"** to automatically translate all untranslated keys in optimized batches.
-6. **Review & Save**: Review generated translations in the review modal and apply them safely to disk.
+Repository: [https://github.com/kimrenny/i18n-ai](https://github.com/kimrenny/i18n-ai)
 
 ---
 
 ## What Problem Does It Solve?
 
-Software localization often involves maintaining separate JSON files for each supported language:
+Software applications that support multiple languages store translations across multiple localization files:
 
 ```text
-src/assets/i18n/
-├── en.json      # Complete English source
-├── de.json      # German (missing some new features)
-├── fr.json      # French (contains empty "" strings)
-└── ja.json      # Japanese (missing newly added keys)
+my-app/
+├── src/
+│   ├── App.tsx
+│   └── components/
+└── locales/
+    ├── en.json
+    ├── uk.json
+    ├── de.json
+    └── fr.json
 ```
 
-As applications evolve, new keys are frequently added, renamed, or left blank across different language files. Keeping dozens of localization files synchronized manually is tedious and error-prone:
-- Keys can be physically missing from one file (`[ MISSING ]`).
-- Keys might exist in a file but hold an empty string value `""` (`[ EMPTY ]`).
-- Placeholders like `{user_name}`, `{{count}}`, `%s`, or HTML tags `<b>...</b>` can easily get corrupted or translated incorrectly when edited manually or run through basic web translators.
-- Paid AI APIs can become expensive or hit rate limits if you translate hundreds of keys one-by-one.
+As an application evolves:
 
-**Localization AI** solves these problems by comparing all files against each other using a union-of-keys model, providing instant navigation to every problem, batching translations efficiently, and strictly protecting all placeholders and markup.
+* New translation keys added to one language file are often missing from others (`[ MISSING ]`).
+* Translators or developers may leave empty strings (`""`) that go unnoticed (`[ EMPTY ]`).
+* Deleted features leave behind dead keys in localization dictionaries.
+* Interpolation placeholders like `{name}` or `{{count}}` can be corrupted, mistranslated, or omitted in target languages.
+* A key path may be defined as a string in one file and as a nested object in another, causing runtime conflicts.
+
+Localization AI compares your localization dictionaries in a unified matrix, highlights discrepancies, validates placeholder consistency, and statically scans your codebase to connect translation keys with source code references.
+
+---
+
+## Visual Overview
+
+### 1. Localization Comparison
+Compare multiple localization files side-by-side. The view displays a unified key hierarchy with real-time status indicators for every language.
+
+![Localization Comparison](docs/screenshots/01-localization-diff.jpg)
+
+### 2. Missing Translation Navigation
+Step through missing and empty translations across files using previous/next controls, with automatic scrolling and cell highlighting.
+
+![Missing Translation Navigation](docs/screenshots/02-missing-navigation.jpg)
+
+### 3. Source-Code Key Usage Scanner
+Analyze application source files to identify verified used keys, confirmed unused keys, and unresolvable dynamic expressions.
+
+![Key Usage Scanner](docs/screenshots/03-key-usage-scanner.jpg)
+
+### 4. Localization Quality Checks
+Detect placeholder mismatches, empty values, tag differences, and structural JSON conflicts before deployment.
+
+![Localization Quality](docs/screenshots/04-quality-checks.jpg)
+
+### 5. Translation Key Inspector
+Inspect all language variants, extracted parameter chips, quality warnings, and source code references for a selected key.
+
+![Translation Key Inspector](docs/screenshots/05-key-inspector.jpg)
 
 ---
 
 ## How It Works
 
-Localization AI follows a safe, non-destructive workflow:
-
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ 1. Load & Discover JSON files from selected project folder   │
-└──────────────────────────────┬───────────────────────────────┘
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│ 2. Compare Keys: Union-of-keys model across all files        │
-└──────────────────────────────┬───────────────────────────────┘
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│ 3. Summary Dashboard & Problem Navigation                    │
-│    • Interactive counters: Missing Keys & Empty Keys         │
-│    • VS Code-style hierarchical key tree                     │
-└──────────────────────────────┬───────────────────────────────┘
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│ 4. Choose Translation Method:                                │
-│    [ Manual Inline Edit ]  [ Single-Key ]  [ Translate All ] │
-└──────────────────────────────┬───────────────────────────────┘
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│ 5. Translation Engine Processing:                            │
-│    • AI Engine (OpenAI, Gemini, Claude, Mistral, Ollama)     │
-│    • Free Engine (LibreTranslate, MyMemory)                  │
-│    • Strict response validation (Placeholders & HTML tags)   │
-└──────────────────────────────┬───────────────────────────────┘
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│ 6. Review Modal (when Confirmation is enabled)               │
-│    • Inspect, edit, and approve proposals                    │
-└──────────────────────────────┬───────────────────────────────┘
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│ 7. Atomic Disk Write & Automatic Comparison Refresh          │
-└──────────────────────────────────────────────────────────────┘
+Your Project
+└── locales/
+    ├── en.json
+    ├── uk.json
+    ├── de.json
+    └── fr.json
+        │
+        ▼
+Localization AI
+        │
+        ├── 1. Select Folder — Choose your project's localization directory
+        ├── 2. Discover Files — Available JSON localization files are listed
+        ├── 3. Select Files — Pick the files you want to inspect and compare
+        ├── 4. Compare Keys — Compares key structures in a unified matrix
+        ├── 5. Navigate Problems — Jump between missing, empty, or conflicting keys
+        ├── 6. Edit & Validate — Edit text inline, add missing keys, and check quality
+        └── 7. Save Changes — Writes updates directly back to your local JSON files
 ```
 
 ---
 
-## Understanding the Localization Summary
+## Localization Files
 
-When you compare localization files, the top dashboard presents five key metrics:
+Localization AI currently works with **JSON (`.json`) localization files**.
 
-| Metric | What It Means | Interactivity |
-| :--- | :--- | :--- |
-| **Files compared** | The total number of JSON files currently analyzed. | Read-only |
-| **Unique keys** | The total number of unique key paths discovered across all selected files combined. | Read-only |
-| **Complete keys** | Keys that exist and contain a valid, non-empty translation in *every* compared file. | Read-only |
-| **Missing keys** | Keys that exist in at least one file but are physically absent from one or more target files. | **Interactive**: Click to filter and jump directly to missing keys. |
-| **Empty keys** | Keys that are present in the JSON file but have an empty string value `""`. | **Interactive**: Click to jump directly to untranslated empty keys. |
+### Directory Structure
 
-### Missing Keys vs. Empty Keys
-- **Missing Key (`[ MISSING ]`)**: The key does not exist in the file's JSON tree. You can click **"Add Missing Keys"** to safely create the structure and insert the key as an empty string `""` without modifying existing keys.
-- **Empty Key (`[ EMPTY ]`)**: The key exists in the file structure, but its value is empty `""`. It is ready to be translated manually or via an automated engine.
-
----
-
-## Working with Translations
-
-### 1. Manual Inline Editing
-- Locate any key in the hierarchical tree.
-- Click the **"Edit"** button (or click on an empty value).
-- Enter your translation text directly in the input field.
-- Click **"Save"** (or press `Enter`). The translation is immediately written to disk using atomic filesystem writes, and the comparison statistics refresh automatically.
-
-### 2. Single-Key Translation ("Translate with AI / Free")
-- Select any missing or empty localization key.
-- The application automatically identifies the best source reference (preferring English `en.json` or any other available file with a non-empty translation).
-- Click **"✨ Translate with AI"** (or **"✨ Translate with Free"**).
-- When confirmation is enabled, a review modal appears showing the source language, source text, target language, selected engine, and proposed translation.
-- You can review or edit the translation before clicking **"Apply Translation"**.
-
-### 3. Batch Translation ("Translate All")
-When a localization file has dozens or hundreds of missing or empty keys, translating them one-by-one is slow and prone to API rate limits. Clicking **"✨ Translate All"** runs the optimized batch translation workflow:
-
-- **Smart Batch Planner**: Untranslated keys are grouped by language pair and file into optimized chunks (e.g. 50 items per request).
-- **Significant Request Reduction**: 500 keys are processed in ~10 batch requests instead of 500 individual requests, dramatically increasing speed and reducing rate-limit pressure.
-- **Dual Progress Display**: Live progress indicators show both individual key progress (`Translated: 45 / 120`) and batch progress (`Batches: 2 / 3`), along with the number of keys in the active batch.
-- **Automatic Batch Splitting**: If a model returns a token limit or request size error, the batch planner automatically halves the chunk into smaller sub-batches and retries seamlessly.
-- **Automatic Rate-Limit Backoff**: If an API returns HTTP 429, the application automatically pauses, displays a countdown banner (e.g. `Rate limit reached — retrying in 3.5s`), and safely retries.
-- **Unified Review Modal**: Once batch translation completes, a single modal presents all proposals. You can filter by status (`All`, `Translated`, `Errors`), edit individual items, retry failed items with **"↻ Retry Failed"**, or click **"Apply All"** to write all approved translations to disk at once.
-
----
-
-## Translation Engines & Providers
-
-Localization AI supports two distinct translation engines configured in **Settings**:
+Place your translation files in a dedicated folder in your project:
 
 ```text
-Settings → Translation Engine
-┌────────────────────────────┐
-│ ○ AI Translation           │
-│ ○ Free Translator          │
-└────────────────────────────┘
-```
-
-### Engine 1: AI Translation (Generative AI)
-Uses modern large language models for high-quality, context-aware translations:
-
-| Provider | Description | API Key Required? | Local / Offline Option? |
-| :--- | :--- | :---: | :---: |
-| **OpenAI** | GPT-4o, GPT-4o-mini, o3-mini models. | **Yes** | No (Cloud API) |
-| **Google Gemini** | Gemini 3.6 Flash, Gemini 3.6 Pro, Gemini 2.5 Flash. | **Yes** | No (Cloud API) |
-| **Anthropic Claude** | Claude 3.5 Sonnet, Claude 3.5 Haiku. | **Yes** | No (Cloud API) |
-| **Mistral AI** | Mistral Large, Mistral Small, Codestral. | **Yes** | No (Cloud API) |
-| **xAI Grok** | Grok 2, Grok 2 Vision. | **Yes** | No (Cloud API) |
-| **DeepSeek** | DeepSeek-V3, DeepSeek-R1. | **Yes** | No (Cloud API) |
-| **Ollama (Local)** | Self-hosted models running on your machine (e.g. `llama3.1`, `mistral`, `qwen2.5`). Default base URL: `http://localhost:11434`. | **No** | **Yes (100% Offline)** |
-| **Mock / Offline** | Built-in deterministic mock provider for testing and offline development without API keys. | **No** | **Yes (100% Offline)** |
-
----
-
-### Engine 2: Free Translation (Zero API Cost)
-For projects where you do not wish to use paid AI subscriptions, Localization AI includes dedicated free machine translation backends:
-
-#### 1. LibreTranslate
-- **Open-Source & Self-Hostable**: Connect to your own local Docker container or any LibreTranslate-compatible public server.
-- **No API Key Required**: Fully functional without credentials on local instances.
-- **Native Batching**: Translates arrays of strings in a single network call.
-- **Configurable Server URL**: Set custom URLs (e.g. `http://localhost:5000` or an internal company server).
-- *Running a local LibreTranslate instance with Docker*:
-  ```bash
-  docker run -ti -p 5000:5000 libretranslate/libretranslate
-  ```
-
-#### 2. MyMemory
-- **Public Collaborative Translation Memory**: Translates text using the MyMemory public service.
-- **Daily Quota**: 5,000 characters/day by default (providing an optional email address in Settings increases the daily limit to 10,000 characters/day).
-- **Controlled Queue**: Automatically paces requests to stay within public API usage limits.
-
-> [!NOTE]
-> Public translation endpoints may experience rate limits or temporary downtime. For guaranteed privacy and unlimited free translation, running a local LibreTranslate or Ollama instance is recommended.
-
----
-
-## Settings Reference
-
-Access the **Settings** modal via the gear icon in the top header:
-
-- **Translation Engine**: Switch between `AI Translation` and `Free Translator`. Switching engines never deletes your saved API keys or custom endpoints.
-- **AI Provider & Model**: Select your preferred AI provider and model identifier (or choose from popular presets).
-- **API Key**: Enter the API key for your chosen provider. Keys are securely stored locally on your machine and are never transmitted elsewhere.
-- **Server URL**: Configure the endpoint URL for local Ollama (`http://localhost:11434`) or LibreTranslate (`http://localhost:5000`).
-- **Confirmation Policy ("Ask for confirmation before applying generated translations")**:
-  - **Enabled (Default - Recommended)**: Generated translations open in a review modal where you can inspect, edit, or reject them before they touch your disk files.
-  - **Disabled**: Generated translations are automatically validated for placeholder safety and written directly to your localization files upon completion.
-
----
-
-## Translation Safety & Markup Protection
-
-Localization strings frequently contain dynamic variables, interpolation tokens, and formatting tags. A broken placeholder can crash your production app.
-
-Localization AI runs **strict safety validation** on every single translation returned by any AI or free engine before it can be applied:
-
-### Protected Syntax Patterns
-- **Standard Placeholders**: `{name}`, `{user_name}`, `{0}`, `{1}`
-- **Double-Brace Variables**: `{{count}}`, `{{value}}`
-- **Printf Format Specifiers**: `%s`, `%d`, `%1$s`, `%.2f`
-- **i18next References**: `$t(common.cancel)`
-- **Vue i18n Linked Messages**: `@:errors.notFound`
-- **Named Variable Syntax**: `:variable`, `#tag#`
-- **HTML/XML Formatting Tags**: `<b>`, `</b>`, `<span class="...">`, `</span>`, `<a href="...">`, `<br/>`, etc.
-- **Escape Sequences**: `\n`, `\t`
-
-### Example
-| Source English String | Valid Translation | Rejected Translation (Validation Error) |
-| :--- | :--- | :--- |
-| `"Hello, {name}! You have {{count}} unread messages."` | `"Hallo, {name}! Sie haben {{count}} ungelesene Nachrichten."` | `"Hallo, Name! Sie haben 0 ungelesene Nachrichten."` *(Placeholders corrupted/missing)* |
-| `"Click <b>here</b> to reset your password."` | `"Cliquez <b>ici</b> pour réinitialiser votre mot de passe."` | `"Cliquez ici pour réinitialiser votre mot de passe."` *(HTML tag stripped)* |
-
-If any placeholder or HTML tag is modified, missing, or corrupted in the translation, the application **rejects the item**, marks it as an error, and prevents corrupted data from being written to your files.
-
----
-
-## Rate Limits, Retries & Error Handling
-
-When communicating with external AI or free translation APIs, unexpected errors can occur. Localization AI handles these gracefully:
-
-- **HTTP 429 (Rate Limits / Too Many Requests)**: Automatically captures `Retry-After` headers and executes bounded exponential backoff with jitter (retrying after ~1s, ~2s, ~4s, ~8s). The UI shows a live countdown banner.
-- **HTTP 500 / 502 / 503 / 504 & Network Timeouts**: Automatically retries transient server errors up to the configured retry limit.
-- **HTTP 401 / 403 (Invalid API Key)**: Stops retries immediately and displays a clear message instructing you to check your API key in Settings.
-- **Connection Refused (Local Ollama / LibreTranslate)**: Provides actionable guidance (e.g. `Unable to connect to LibreTranslate at http://localhost:5000. Ensure your local server is running.`).
-- **Partial Batch Failures**: If 2 out of 50 keys fail in a batch, the 48 successful translations are preserved. You can click **"↻ Retry Failed"** to retry only the 2 failed entries without re-translating the rest.
-
----
-
-## File Safety & Atomic Writes
-
-- **Safe Atomic Writes**: When applying translations, the application writes to a temporary file (`.tmp`) first and replaces the original file only after the write succeeds. If writing fails, your original file remains completely untouched.
-- **No Unintended Changes**: Localization files remain 100% read-only until you explicitly click **"Save"**, **"Apply Translation"**, or **"Apply All"**.
-- **Formatted JSON**: Output JSON files are formatted with clean indentation (2 spaces) and standard UTF-8 encoding.
-
----
-
-## Privacy & Security
-
-- **Local File Processing**: Localization files are parsed and compared entirely on your local machine.
-- **Zero Startup Network Calls**: Launching the application or opening settings makes zero network requests. Network calls occur **only** when you explicitly initiate a translation.
-- **Secure Electron Architecture**: All file operations and network requests run strictly in Electron's main process with `contextIsolation: true`, `nodeIntegration: false`, and sandboxing enabled. API keys are never exposed in DOM or browser environments.
-- **Private Offline Mode**: By selecting **Ollama** or **LibreTranslate (localhost)**, all translation processing remains 100% on your local machine without sending data to third-party cloud servers.
-
----
-
-## Troubleshooting
-
-### "My translation request returned HTTP 429"
-- **Cause**: You have hit the rate limit or free tier quota of your chosen provider (e.g. Gemini free tier allows 20 requests/minute).
-- **Solution**: Localization AI will automatically retry after the backoff countdown. Alternatively, use batch **"Translate All"** (which drastically reduces request count) or switch to a local provider (Ollama/LibreTranslate).
-
-### "Gemini model is no longer available"
-- **Cause**: Google occasionally retires older model identifiers (e.g. `gemini-2.0-flash`).
-- **Solution**: Open **Settings** and set the model to `gemini-3.6-flash` (or `gemini-3.6-pro`). Localization AI automatically upgrades deprecated model names upon loading.
-
-### "LibreTranslate connection refused"
-- **Cause**: The application is configured to connect to `http://localhost:5000`, but no local LibreTranslate server is running.
-- **Solution**: Start your local LibreTranslate container (`docker run -p 5000:5000 libretranslate/libretranslate`) or update the Server URL in Settings to a reachable endpoint.
-
-### "My translation was not applied to the file"
-- **Cause**: The confirmation policy is enabled (`requireEditConfirmation = true`), which requires approving the translation in the review modal before saving.
-- **Solution**: In the review modal, click **"Apply Translation"** (for single keys) or **"Apply All"** (for batch translations).
-
-### "Some batch translations failed"
-- **Cause**: A temporary network glitch or strict placeholder validation failure occurred on specific keys.
-- **Solution**: Filter by `Errors` in the batch modal to inspect the error messages, then click **"↻ Retry Failed"**.
-
----
-
-## Frequently Asked Questions (FAQ)
-
-#### Can I use Localization AI completely free without an AI API key?
-Yes! Select **Free Translator** in Settings to use **LibreTranslate** (self-hosted or public) or **MyMemory**. You can also use **Ollama** to run local AI models completely free offline.
-
-#### Does "Translate All" send a separate API request for every key?
-No. Localization AI groups keys into optimized batch chunks (up to 50 keys / 4,000 characters per request), reducing hundreds of network requests to just a few batch calls.
-
-#### Can I review translations before they are written to my files?
-Yes. By default, the confirmation policy is enabled. You can inspect, edit, or discard any proposed translation before it is written to disk.
-
-#### Can I automatically apply translations without reviewing them?
-Yes. In **Settings**, uncheck *"Ask for confirmation before applying generated translations"*. Batch and single-key translations will be validated and applied directly to files.
-
-#### Are placeholders and HTML tags protected?
-Yes. The application strictly validates that `{name}`, `{{count}}`, `%s`, `%d`, `<b>`, `<a>`, and custom placeholders are present and intact in every translation. Corrupted translations are rejected automatically.
-
-#### Are my settings preserved when switching translation engines?
-Yes. Switching between AI Translation and Free Translation retains all your configured API keys, model choices, and custom URLs in local settings.
-
----
-
-## Developer / Technical Reference
-
-For developers contributing to or building Localization AI from source:
-
-### Tech Stack
-- **Desktop Framework**: Electron (Sandbox: true, Context Isolation: true)
-- **Frontend**: React 19, TypeScript 5, Vite 6
-- **Testing**: Vitest, React Testing Library, jsdom
-- **Linting & Quality**: ESLint, TypeScript Strict Typechecking
-
-### Project Structure
-```text
-├── electron/
-│   ├── main/
-│   │   ├── index.ts                  # Main Electron entry, IPC handlers, window lifecycle
-│   │   ├── aiService.ts              # AI translation provider integrations & prompts
-│   │   └── freeTranslationService.ts # LibreTranslate & MyMemory services
-│   └── preload/
-│       └── index.ts                  # Secure typed context bridge (window.electronAPI)
+my-app/
 ├── src/
-│   ├── components/
-│   │   ├── localization/             # Tree view, Diff viewer, Batch modal, Confirm modal
-│   │   └── settings/                 # Multi-engine settings modal
-│   ├── services/
-│   │   ├── aiBatchPlanner.ts         # Dynamic chunking & auto-splitting logic
-│   │   ├── aiBatchTranslation.ts     # Batch execution, retries & backoff
-│   │   ├── aiResponseValidator.ts    # Placeholder, HTML tag & token validation
-│   │   ├── localizationComparator.ts # Union-of-keys multi-file comparison engine
-│   │   ├── localizationParser.ts     # JSON parsing and flattened key mapping
-│   │   ├── localizationWriter.ts     # Safe atomic JSON file writer
-│   │   ├── languageNormalizer.ts     # Dialect and locale tag normalizer
-│   │   ├── aiProviderRegistry.ts     # AI provider definitions & presets
-│   │   └── freeProviderRegistry.ts   # Free provider definitions
-│   ├── types/
-│   │   ├── localization.ts           # Localization domain models
-│   │   ├── settings.ts               # Settings schema & migration functions
-│   │   └── electron.d.ts             # IPC bridge interfaces
-│   ├── App.tsx                       # Root React application
-│   └── main.tsx                      # Renderer entry point
+│   ├── App.tsx
+│   └── components/
+├── locales/
+│   ├── en.json
+│   ├── uk.json
+│   ├── de.json
+│   └── fr.json
 └── package.json
 ```
 
-### Build & Test Scripts
+In Localization AI, click **Select Folder** and choose the `locales/` directory.
+
+### JSON Structure and Nested Keys
+
+Both flat and nested JSON structures are supported. Nested structures are flattened into dot-notation paths:
+
+```json
+{
+  "common": {
+    "buttons": {
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "messages": {
+      "welcome": "Welcome, {name}!"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in"
+    }
+  }
+}
+```
+
+The application parses this into individual key paths:
+
+* `common.buttons.save`
+* `common.buttons.cancel`
+* `common.messages.welcome`
+* `auth.login.title`
+
+The user interface displays these paths as a hierarchical tree. When saving, the application preserves the original nested JSON structure.
+
+### Filenames and Language Recognition
+
+* **Filenames as Identifiers**: Filenames like `en.json`, `uk.json`, `de.json`, or `fr.json` identify each language file.
+* **Arbitrary Filenames**: Any valid `.json` file in the selected directory can be selected for comparison (excluding standard project configuration files like `package.json` or `tsconfig.json`). Files do not have to follow a strict naming convention to be compared.
+* **Language Detection**: When filenames match standard language codes or aliases (e.g. `en.json`, `de.json`, `uk.json`, `ua.json`, `pt-BR.json`, `zh-CN.json`), the application maps them to readable language names for display and translation services.
+
+### Base Language Behavior
+
+* **Comparison does not require a base language**: The comparison matrix is computed from the union of all keys across all selected files. Any two or more JSON files can be compared directly without assuming one file is the universal master schema.
+* **Reference selection**: For features that compare translations against a source string (such as placeholder consistency checks or automated translation), English (`en.json`) is used as the reference if present. If `en.json` is not selected, the file containing the most keys is used as the reference.
+
+---
+
+## Missing, Empty, and Extra Keys
+
+When comparing localization files, keys are categorized into four states:
+
+```text
+en.json:
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  }
+}
+
+de.json:
+{
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen"
+  }
+}
+```
+
+| Status | Meaning | Example |
+| :--- | :--- | :--- |
+| **Missing** | Key does not exist in this localization file. | `common.delete` is missing in `de.json` |
+| **Empty** | Key exists in the file, but its value is an empty string `""`. | `"delete": ""` in `de.json` |
+| **Extra** | Key exists in this file but not in the compared reference file. | `admin.legacy` present only in `de.json` |
+| **Structural Conflict** | Incompatible JSON structures share the same key path. | `user.name` string vs `user.name.first` object |
+
+### What to Do After Finding a Problem
+
+* **Navigate**: Use the Next/Previous problem controls or `Alt+N` / `Alt+P` keyboard shortcuts to step between missing and empty keys.
+* **Inspect**: Open the Translation Key Inspector to view the key across all languages, check extracted variables, and view code references.
+* **Edit Inline**: Click any cell in the comparison view to update translation text directly.
+* **Add Missing Keys**: Click **Add Missing Keys** to insert missing keys as empty strings. The application creates intermediate parent objects (e.g. `common -> buttons -> save`) while preserving existing keys and sibling values.
+* **Rename Keys**: Use the Rename Key modal to update a key path across all localization files simultaneously.
+* **Validate**: Run Quality checks or the Pre-flight Validator to verify placeholder and markup consistency.
+* **Save**: Changes are saved directly to your local JSON files.
+
+---
+
+## Key Usage Scanner (Source Code Analysis)
+
+The Key Usage Scanner searches your application source code for references to localization keys and compares those references with the keys defined in your JSON dictionaries.
+
+### Key Classification Statuses
+
+* **Used**: The key exists in localization files and has at least one confirmed static reference in scanned source code.
+* **Confirmed Unused**: The key exists in localization files but has zero references in source files and does not match any dynamic expression pattern.
+* **Missing in Dictionary**: The key is called in source code (e.g. `t('errors.notFound')`) but does not exist in any localization file.
+* **Possible Dynamic Usage**: The key is not directly referenced, but matches the static prefix or suffix of an unresolvable dynamic expression in code.
+* **Dynamic Expressions**: A source-code translation call whose key argument cannot be resolved to a single static string.
+
+### Static Resolution vs. Runtime Keys
+
+The scanner resolves common static key patterns:
+
+```ts
+// Direct static call -> 'common.save'
+t('common.save');
+
+// Constant propagation -> 'common.save'
+const SAVE_KEY = 'common.save';
+t(SAVE_KEY);
+
+// Static concatenation -> 'dashboard.metrics.uptime'
+const prefix = 'dashboard.metrics.';
+t(prefix + 'uptime');
+
+// Finite ternary union -> 'users.status.active', 'users.status.inactive'
+t(isActive ? 'users.status.active' : 'users.status.inactive');
+```
+
+### Static Analysis Limitation
+
+> **Static analysis can resolve what is statically knowable, but it cannot guarantee discovery of localization keys generated entirely at runtime.**
+
+When key names depend on runtime data (such as API responses, database records, or user input), static analysis cannot determine the final key string:
+
+```ts
+// Runtime dynamic key:
+const key = 'ADMIN.USER.' + section;
+t(key);
+```
+
+If `section` is only known at runtime, the scanner cannot determine whether the application will request `ADMIN.USER.PROFILE`, `ADMIN.USER.SETTINGS`, or `ADMIN.USER.PERMISSIONS`.
+
+In this scenario:
+1. `ADMIN.USER.${section}` is reported under **Dynamic Expressions**.
+2. Dictionary keys matching `ADMIN.USER.*` are categorized as **Possible Dynamic Usage** rather than marked as confirmed unused.
+
+### Supported Technologies & Detectors
+
+Source scanning is performed via static pattern detectors:
+
+| Technology | Supported File Extensions | Patterns Detected |
+| :--- | :--- | :--- |
+| **TypeScript / JavaScript** | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` | `t('key')`, `i18n.t('key')`, `translate('key')`, `formatMessage({ id: 'key' })` |
+| **React** | `.tsx`, `.jsx` | `useTranslation()`, `<Trans i18nKey="key" />`, `t('key')` |
+| **Angular HTML** | `.html` | `{{ 'key' \| translate }}`, `[translate]="'key'"`, `translate="key"` |
+| **Vue SFC** | `.vue` | `$t('key')`, `v-t="'key'"`, `<i18n-t keypath="key">`, script translations |
+| **Svelte SFC** | `.svelte` | `$t('key')`, `t('key')`, `$_('key')` |
+| **.NET / C# / Razor** | `.cs`, `.razor` | `_localizer["key"]`, `IStringLocalizer["key"]`, `@Localizer["key"]` |
+
+---
+
+## Other Features
+
+### Editing and Inspection
+* **Inline Editing**: Edit translation values directly in the comparison matrix.
+* **Add Translation Key**: Add a new key path across selected or all localization files with validation preventing empty segments or leading/trailing dots.
+* **Rename Key**: Rename key paths across all localization files while preserving existing translated values.
+* **Translation Key Inspector**: Panel showing language variants, parameter chips (`{name}`, `{{count}}`), quality issues, and source code references.
+* **Translation History**: Action log of recent edits, additions, and deletions with undo and revert capabilities.
+
+### Quality and Validation
+* **Placeholder Validation**: Checks for missing, extra, or modified parameters (`{name}`, `{{count}}`, `%s`, `:param`).
+* **HTML/XML Tag Validation**: Detects missing, extra, or corrupted markup (`<b>`, `</b>`, `<a href="...">`).
+* **Empty Value Detection**: Flags keys present in JSON with empty string values.
+* **Whitespace Validation**: Identifies leading or trailing spaces not present in reference strings.
+* **Structural Conflict Detection**: Identifies keys used as both direct string values and parent object sections.
+* **Pre-flight Validator**: Summary panel aggregating blocking errors and non-blocking warnings before release or commit.
+
+### Git Version Control Integration
+* **Working Changes**: View modified, added, deleted, and untracked localization files.
+* **Visual Diff**: Side-by-side diff view of uncommitted changes.
+* **Selective Commit**: Stage and commit specific localization files with pre-flight validation checks.
+* **Branch Management**: Switch branches or create new branches with uncommitted change conflict safeguards.
+* **Remote Sync**: Fetch, Pull, and Push with upstream branch configuration and merge conflict detection.
+
+### Assisted Translation (Optional)
+* **AI Providers**: OpenAI, Google Gemini, Anthropic Claude, Mistral AI, xAI Grok, DeepSeek, and local Ollama.
+* **Free Providers**: LibreTranslate (local Docker or public URL) and MyMemory.
+* **Batch Optimization**: Batches untranslated keys into chunked requests with automatic rate-limit retry handling.
+* **Placeholder Safety**: Validates translations before acceptance; responses that alter variables or tags are rejected.
+* **Review Modal**: Review and edit proposed translations before applying changes to disk.
+
+---
+
+## Technical Architecture
+
+```text
+React UI
+  │
+  ▼ Electron IPC
+  ├── Workspace & File operations
+  ├── Localization parsing & comparison
+  ├── Key Usage Scanner & Detectors
+  ├── Git service
+  └── Translation services
+```
+
+* **Frontend**: React, TypeScript, and CSS.
+* **Desktop Runtime**: Electron main process with IPC communication.
+* **Core Services**: TypeScript modules for parsing, comparison, AST detection, and validation.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+* [Node.js](https://nodejs.org/) (version 18.0 or higher)
+* [npm](https://www.npmjs.com/) (version 9.0 or higher)
+* [Git](https://git-scm.com/) installed and available in system PATH (for Git features)
+
+### Installation & Run
 
 ```bash
-# Run unit and integration tests
-npm run test
+# 1. Clone the repository
+git clone https://github.com/kimrenny/i18n-ai.git
+cd i18n-ai
 
-# Run TypeScript type check
-npm run typecheck
+# 2. Install dependencies
+npm install
 
-# Run ESLint
-npm run lint
-
-# Build production bundles
-npm run build
-
-# Start local development server with Electron
+# 3. Start development server and launch Electron
 npm run dev
 ```
 
-### Continuous Integration (CI)
-GitHub Actions workflow (`.github/workflows/ci.yml`) runs on all PRs and pushes to `main`, validating tests, TypeScript type checking, ESLint, and production builds.
+### Basic Usage
+
+1. Click **Select Folder** and choose the folder containing your JSON translation files (e.g. `my-app/locales/`).
+2. Select the JSON files you want to compare from the discovered list.
+3. Click **Compare Selected Files**.
+
+---
+
+## Development & Testing
+
+### Available Scripts
+
+| Command | Purpose |
+| :--- | :--- |
+| `npm run dev` | Starts Vite dev server and launches Electron app with hot reload. |
+| `npm run build` | Compiles TypeScript and builds production bundles for frontend and Electron main process. |
+| `npm run typecheck` | Runs TypeScript type checking without emitting files (`tsc --noEmit`). |
+| `npm run lint` | Runs ESLint across all source files. |
+| `npm test -- --run` | Runs the Vitest test suite once across all test files. |
+
+---
+
+## Known Limitations
+
+1. **Static Analysis of Runtime Keys**: As described in the Key Usage Scanner section, dynamically constructed keys whose names are determined at runtime cannot be resolved by static analysis.
+2. **JSON Format Scope**: The application currently works with JSON (`.json`) localization dictionaries. Other formats (such as `.yaml`, `.properties`, `.po`, or `.xliff`) are not currently supported.
+3. **Large Repository Git Scanning**: In repositories with tens of thousands of uncommitted non-localization files, full Git status refreshes may experience brief processing delays.
+
+---
+
+## Contributing
+
+1. Fork the repository: [https://github.com/kimrenny/i18n-ai](https://github.com/kimrenny/i18n-ai)
+2. Create a feature branch (`git checkout -b feature/my-feature`).
+3. Ensure all tests and checks pass (`npm test -- --run`, `npm run typecheck`, `npm run lint`).
+4. Submit a Pull Request.
+
+---
+
+## License
+
+This project is licensed under a permissive custom license that permits commercial and non-commercial use, modification, and redistribution, provided that the original author copyright and attribution notice are retained. See the [LICENSE](LICENSE) file for the full text.

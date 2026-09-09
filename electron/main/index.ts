@@ -34,6 +34,7 @@ import {
   DEFAULT_APP_SETTINGS,
   type AppSettings,
 } from '../../src/types/settings'
+import { scanWorkspaceSourceFiles } from './keyUsageService'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -659,6 +660,20 @@ app.whenReady().then(() => {
         payload.branch,
         payload.setUpstream
       )
+    }
+  )
+
+  // Key Usage Scanner IPC Handler
+  ipcMain.handle(
+    'keyUsage:scanWorkspace',
+    async (
+      _,
+      payload: { directoryPath: string; maxDepth?: number; maxFileSize?: number }
+    ) => {
+      return await scanWorkspaceSourceFiles(payload.directoryPath, {
+        maxDepth: payload.maxDepth,
+        maxFileSize: payload.maxFileSize,
+      })
     }
   )
 

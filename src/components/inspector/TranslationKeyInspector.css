@@ -492,3 +492,66 @@
   flex: 1;
 }
 
+/* Key Usage Card */
+.inspector-usage-card {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.inspector-usage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inspector-usage-nav-btn {
+  background: none;
+  border: none;
+  color: #38bdf8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.inspector-usage-nav-btn:hover {
+  color: #7dd3fc;
+  text-decoration: underline;
+}
+
+.inspector-usage-val {
+  font-size: 0.78rem;
+}
+
+.stat-usage-badge {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.stat-usage-badge.used {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.stat-usage-badge.unused {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.stat-usage-badge.unknown {
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+}
+
+

@@ -197,6 +197,21 @@
   -webkit-user-select: text !important;
 }
 
+.preview-code-row.is-target-line {
+  background: rgba(234, 179, 8, 0.15) !important;
+  border-left: 3px solid #eab308;
+}
+
+.preview-code-row.is-target-line .preview-line-number {
+  color: #eab308;
+  font-weight: 700;
+}
+
+.preview-code-row.is-target-line .preview-pre-text {
+  color: #fef08a;
+  font-weight: 500;
+}
+
 .preview-pre-text {
   margin: 0;
   padding: 0;

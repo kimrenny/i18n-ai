@@ -165,5 +165,43 @@ describe('TranslationKeyInspector Component', () => {
     fireEvent.click(issueItem)
     expect(onNavigateLanguage).toHaveBeenCalledWith('uk.json', 'ADMIN.TITLE')
   })
+
+  it('renders translated copy button in English and German without raw key fallback', () => {
+    // English
+    const { unmount } = render(
+      <I18nProvider language="en">
+        <TranslationKeyInspector
+          selectedKey="ADMIN.TITLE"
+          parsedFiles={mockFiles}
+          onNavigateLanguage={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </I18nProvider>
+    )
+
+    const copyBtnEn = screen.getByRole('button', { name: 'Copy' })
+    expect(copyBtnEn).toBeInTheDocument()
+    expect(copyBtnEn).toHaveTextContent('Copy')
+    expect(copyBtnEn).not.toHaveTextContent('common.copy')
+    unmount()
+
+    // German
+    render(
+      <I18nProvider language="de">
+        <TranslationKeyInspector
+          selectedKey="ADMIN.TITLE"
+          parsedFiles={mockFiles}
+          onNavigateLanguage={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </I18nProvider>
+    )
+
+    const copyBtnDe = screen.getByRole('button', { name: 'Kopieren' })
+    expect(copyBtnDe).toBeInTheDocument()
+    expect(copyBtnDe).toHaveTextContent('Kopieren')
+    expect(copyBtnDe).not.toHaveTextContent('common.copy')
+  })
 })
+
 

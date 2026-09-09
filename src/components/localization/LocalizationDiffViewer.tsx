@@ -80,6 +80,8 @@ interface LocalizationDiffViewerProps {
   initialActiveFilename?: string
   initialProblem?: ProblemNavigationTarget | null
   qualityIssues?: readonly LocalizationQualityIssue[]
+  keyUsageResult?: import('../../types/keyUsage').KeyUsageScanResult | null
+  onOpenKeyUsage?: (key: string) => void
 }
 
 function collectFolderIds(nodes: TreeNodeType[]): string[] {
@@ -101,6 +103,8 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
   initialActiveFilename,
   initialProblem,
   qualityIssues,
+  keyUsageResult,
+  onOpenKeyUsage,
 }) => {
   const { t } = useTranslation()
   const initialFilename = initialActiveFilename || comparisonResult.comparedFiles[0]?.filename || ''
@@ -1715,7 +1719,13 @@ export const LocalizationDiffViewer: React.FC<LocalizationDiffViewerProps> = ({
                   selectedKey={selectedKey}
                   parsedFiles={parsedFiles}
                   qualityIssues={effectiveQualityIssues}
+                  keyUsageItem={
+                    selectedKey && keyUsageResult
+                      ? keyUsageResult.items.find((i) => i.key === selectedKey) || null
+                      : null
+                  }
                   onNavigateLanguage={handleNavigateFromInspector}
+                  onOpenKeyUsage={onOpenKeyUsage}
                   onClose={() => setIsInspectorOpen(false)}
                 />
               </div>

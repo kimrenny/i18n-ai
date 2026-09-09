@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from '../../i18n/useTranslation'
 import './FilePreview.css'
 
@@ -11,6 +11,7 @@ export interface FilePreviewProps {
   errorMessage?: string | null
   isLocalizationCandidate?: boolean
   isCheckedForComparison?: boolean
+  targetLine?: number
   onToggleCheckFile?: (filePath: string) => void
   onClosePreview?: () => void
 }
@@ -38,10 +39,12 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   errorMessage = null,
   isLocalizationCandidate = false,
   isCheckedForComparison = false,
+  targetLine,
   onToggleCheckFile,
   onClosePreview,
 }) => {
   const { t } = useTranslation()
+  const targetRowRef = useRef<HTMLTableRowElement | null>(null)
 
   // Format JSON content if possible for clean readability
   const formattedContent = useMemo(() => {
@@ -61,6 +64,14 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
     if (!formattedContent) return []
     return formattedContent.split('\n')
   }, [formattedContent])
+
+  useEffect(() => {
+    if (targetLine && targetRowRef.current) {
+      if (typeof targetRowRef.current.scrollIntoView === 'function') {
+        targetRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+  }, [targetLine, formattedContent])
 
   const langBadge = getFileLanguageBadge(fileName)
 
@@ -134,16 +145,25 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           <div className="preview-code-view" data-testid="preview-code-view">
             <table className="preview-code-table">
               <tbody>
-                {lines.map((line, idx) => (
-                  <tr key={idx} className="preview-code-row">
-                    <td className="preview-line-number" aria-hidden="true">
-                      {idx + 1}
-                    </td>
-                    <td className="preview-line-content">
-                      <pre className="preview-pre-text">{line || ' '}</pre>
-                    </td>
-                  </tr>
-                ))}
+                {lines.map((line, idx) => {
+                  const lineNum = idx + 1
+                  const isTarget = targetLine === lineNum
+                  return (
+                    <tr
+                      key={idx}
+                      ref={isTarget ? targetRowRef : undefined}
+                      className={`preview-code-row ${isTarget ? 'is-target-line' : ''}`}
+                      data-testid={isTarget ? 'preview-target-line' : undefined}
+                    >
+                      <td className={`preview-line-number ${isTarget ? 'is-target' : ''}`} aria-hidden="true">
+                        {lineNum}
+                      </td>
+                      <td className="preview-line-content">
+                        <pre className="preview-pre-text">{line || ' '}</pre>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
