@@ -66,4 +66,22 @@ describe('Locale Completeness and Consistency across all 14 languages', () => {
       ).toBeGreaterThan(0)
     }
   })
+
+  it('verifies common.copy and common.copied exist with localized text across all 14 languages', () => {
+    for (const { code, englishName } of SUPPORTED_LANGUAGES) {
+      const targetLocale = LOCALES[code as AppLanguage]
+      const copyVal = getValueAtPath(targetLocale, 'common.copy')
+      const copiedVal = getValueAtPath(targetLocale, 'common.copied')
+
+      expect(
+        typeof copyVal === 'string' && copyVal.length > 0,
+        `common.copy must be defined in ${code} (${englishName})`
+      ).toBe(true)
+
+      expect(
+        typeof copiedVal === 'string' && copiedVal.length > 0,
+        `common.copied must be defined in ${code} (${englishName})`
+      ).toBe(true)
+    }
+  })
 })

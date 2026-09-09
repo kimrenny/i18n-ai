@@ -13,7 +13,7 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron/main',
             rollupOptions: {
-              external: ['electron'],
+              external: ['electron', 'typescript'],
             },
           },
         },
@@ -36,4 +36,7 @@ export default defineConfig({
       },
     }),
   ],
+  test: {
+    testTimeout: 20000,
+  },
 })

@@ -96,6 +96,16 @@ export interface ElectronAPI {
     branch?: string,
     setUpstream?: boolean
   ) => Promise<import('./git').GitPushResult>
+  keyUsageScanWorkspace?: (
+    directoryPath: string,
+    options?: { maxDepth?: number; maxFileSize?: number }
+  ) => Promise<{
+    fileScanResults: import('../services/keyUsageScanner').FileScanResult[]
+    totalSourceFiles: number
+    totalScannedFiles: number
+    totalSkippedFiles: number
+    error?: string
+  }>
 }
 
 declare global {

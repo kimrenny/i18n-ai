@@ -109,6 +109,15 @@ export const electronAPI = {
       branch,
       setUpstream,
     }),
+  keyUsageScanWorkspace: (
+    directoryPath: string,
+    options?: { maxDepth?: number; maxFileSize?: number }
+  ): Promise<unknown> =>
+    ipcRenderer.invoke('keyUsage:scanWorkspace', {
+      directoryPath,
+      maxDepth: options?.maxDepth,
+      maxFileSize: options?.maxFileSize,
+    }),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import type { ParsedLocalizationFile } from '../../types/localization'
 import type { LocalizationQualityIssue } from '../../types/localizationQuality'
+import type { KeyUsageItem } from '../../types/keyUsage'
 import { inspectTranslationKey } from '../../services/localizationKeyInspector'
 import { useTranslation } from '../../i18n/useTranslation'
 import './TranslationKeyInspector.css'
@@ -9,7 +10,9 @@ export interface TranslationKeyInspectorProps {
   selectedKey: string | null
   parsedFiles: readonly ParsedLocalizationFile[]
   qualityIssues?: readonly LocalizationQualityIssue[]
+  keyUsageItem?: KeyUsageItem | null
   onNavigateLanguage: (filename: string, key: string) => void
+  onOpenKeyUsage?: (key: string) => void
   onClose: () => void
 }
 
@@ -17,7 +20,9 @@ export const TranslationKeyInspector: React.FC<TranslationKeyInspectorProps> = (
   selectedKey,
   parsedFiles,
   qualityIssues,
+  keyUsageItem,
   onNavigateLanguage,
+  onOpenKeyUsage,
   onClose,
 }) => {
   const { t } = useTranslation()
@@ -89,10 +94,10 @@ export const TranslationKeyInspector: React.FC<TranslationKeyInspectorProps> = (
                   type="button"
                   className="inspector-copy-btn"
                   onClick={handleCopyKey}
-                  title="Copy Key Path"
-                  aria-label="Copy Key Path"
+                  title={t('common.copy')}
+                  aria-label={t('common.copy')}
                 >
-                  {isCopied ? '✓ Copied' : 'Copy'}
+                  {isCopied ? `✓ ${t('common.copied')}` : t('common.copy')}
                 </button>
               </div>
             </div>
@@ -147,6 +152,41 @@ export const TranslationKeyInspector: React.FC<TranslationKeyInspectorProps> = (
                       </span>
                     )}
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Key Usage Summary Card */}
+            <div className="inspector-usage-card" data-testid="inspector-usage-card">
+              <div className="inspector-usage-header">
+                <span className="inspector-section-label">{t('inspector.usage')}</span>
+                {onOpenKeyUsage && (
+                  <button
+                    type="button"
+                    className="inspector-usage-nav-btn"
+                    onClick={() => onOpenKeyUsage(inspectionResult.key)}
+                    title={t('keyUsage.openUsageTooltip')}
+                    data-testid="inspector-open-usage-btn"
+                  >
+                    {t('inspector.viewUsages')} →
+                  </button>
+                )}
+              </div>
+              <div className="inspector-usage-val">
+                {keyUsageItem ? (
+                  keyUsageItem.usageCount > 0 ? (
+                    <span className="stat-usage-badge used">
+                      ✓ {t('keyUsage.usagesCount', { count: keyUsageItem.usageCount })}
+                    </span>
+                  ) : (
+                    <span className="stat-usage-badge unused">
+                      ℹ {t('keyUsage.statusUnused')} ({t('keyUsage.noStaticUsages')})
+                    </span>
+                  )
+                ) : (
+                  <span className="stat-usage-badge unknown">
+                    {t('keyUsage.notScanned')}
+                  </span>
                 )}
               </div>
             </div>

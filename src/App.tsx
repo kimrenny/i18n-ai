@@ -23,8 +23,11 @@ import { ProblemsPanel } from './components/problems/ProblemsPanel'
 import { QualityPanel } from './components/quality/QualityPanel'
 import { PreflightValidatorPanel } from './components/preflight/PreflightValidatorPanel'
 import { GitSourceControlView } from './components/git/GitSourceControlView'
+import { KeyUsagePanel } from './components/keyUsage/KeyUsagePanel'
 import { fetchRepositoryInfo, fetchGitStatus } from './services/git/gitService'
+import { performWorkspaceKeyUsageScan } from './services/keyUsageService'
 import type { GitRepositoryInfo, GitStatusSummary } from './types/git'
+import type { KeyUsageScanResult } from './types/keyUsage'
 import { calculateWorkspaceQuality } from './services/localizationQuality'
 import { validateWorkspacePreflight } from './services/localizationValidation'
 import type { LocalizationQualityIssue } from './types/localizationQuality'
@@ -143,10 +146,16 @@ const AppContent: React.FC<AppContentProps> = ({
     onExpand: () => setIsPreflightOpen(true),
   })
 
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'dashboard' | 'diff' | 'preview' | 'git'>('dashboard')
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<
+    'dashboard' | 'diff' | 'preview' | 'git' | 'keyUsage'
+  >('dashboard')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [gitRepoInfo, setGitRepoInfo] = useState<GitRepositoryInfo | null>(null)
   const [gitStatus, setGitStatus] = useState<GitStatusSummary | null>(null)
+  const [keyUsageResult, setKeyUsageResult] = useState<KeyUsageScanResult | null>(null)
+  const [isScanningKeyUsage, setIsScanningKeyUsage] = useState(false)
+  const [selectedKeyUsagePath, setSelectedKeyUsagePath] = useState<string | null>(null)
+  const [targetPreviewLine, setTargetPreviewLine] = useState<number | undefined>(undefined)
   const [selectedLanguageTarget, setSelectedLanguageTarget] = useState<{
     filename: string
     problem: ProblemNavigationTarget | null
@@ -400,19 +409,31 @@ const AppContent: React.FC<AppContentProps> = ({
     }
   }, [selectedDirectory])
 
-  const handleSelectFile = useCallback(async (filePath: string, fileName?: string, isLocCandidate?: boolean) => {
-    const name = fileName || filePath.split(/[/|\\]/).pop() || filePath
-    const isCandidate = isLocCandidate !== undefined
-      ? Boolean(isLocCandidate)
-      : isLocalizationFile(name)
+  const handleSelectFile = useCallback(
+    async (
+      filePath: string,
+      fileName?: string,
+      isLocCandidate?: boolean,
+      targetLine?: number
+    ) => {
+      const name = fileName || filePath.split(/[/|\\]/).pop() || filePath
+      const isCandidate =
+        isLocCandidate !== undefined
+          ? Boolean(isLocCandidate)
+          : isLocalizationFile(name)
 
-    setActiveFilePath(filePath)
-    setSelectedPreviewFile({ path: filePath, name, isLocalizationCandidate: isCandidate })
-    setActiveWorkspaceTab('preview')
-    setPreviewLoading(true)
-    setPreviewError(null)
-    setPreviewIsBinary(false)
-    setPreviewContent(null)
+      setActiveFilePath(filePath)
+      setSelectedPreviewFile({
+        path: filePath,
+        name,
+        isLocalizationCandidate: isCandidate,
+      })
+      setTargetPreviewLine(targetLine)
+      setActiveWorkspaceTab('preview')
+      setPreviewLoading(true)
+      setPreviewError(null)
+      setPreviewIsBinary(false)
+      setPreviewContent(null)
 
     try {
       if (window.electronAPI?.readFileText) {
@@ -603,6 +624,91 @@ const AppContent: React.FC<AppContentProps> = ({
     [comparisonResult, successfulParsedFiles, handleSelectFile]
   )
 
+  const refreshKeyUsage = useCallback(
+    async (dir?: string | null, files?: ParsedLocalizationFile[]) => {
+      const targetDir = dir !== undefined ? dir : selectedDirectory
+      const targetFiles = files !== undefined ? files : successfulParsedFiles
+      if (!targetDir) {
+        setKeyUsageResult(null)
+        return
+      }
+      setIsScanningKeyUsage(true)
+      try {
+        const result = await performWorkspaceKeyUsageScan(targetDir, targetFiles)
+        setKeyUsageResult(result)
+      } catch (err) {
+        console.warn('[App] Failed to scan key usage:', err)
+      } finally {
+        setIsScanningKeyUsage(false)
+      }
+    },
+    [selectedDirectory, successfulParsedFiles]
+  )
+
+  useEffect(() => {
+    if (selectedDirectory) {
+      let isCancelled = false
+      setIsScanningKeyUsage(true)
+      performWorkspaceKeyUsageScan(selectedDirectory, successfulParsedFiles)
+        .then((result) => {
+          if (!isCancelled) {
+            setKeyUsageResult(result)
+          }
+        })
+        .catch((err) => {
+          if (!isCancelled) {
+            console.warn('[App] Failed to scan key usage:', err)
+          }
+        })
+        .finally(() => {
+          if (!isCancelled) {
+            setIsScanningKeyUsage(false)
+          }
+        })
+      return () => {
+        isCancelled = true
+      }
+    } else {
+      setKeyUsageResult(null)
+    }
+  }, [selectedDirectory, successfulParsedFiles])
+
+  const handleNavigateToSource = useCallback(
+    (filePath: string, line: number) => {
+      const name = filePath.split(/[/|\\]/).pop() || filePath
+      handleSelectFile(filePath, name, isLocalizationFile(name), line)
+    },
+    [handleSelectFile]
+  )
+
+  const handleNavigateToLocalizationFromKeyUsage = useCallback(
+    (key: string) => {
+      let currentComparison = comparisonResult
+      if (!currentComparison && successfulParsedFiles.length >= 2) {
+        currentComparison = compareLocalizationFiles(successfulParsedFiles)
+        setComparisonResult(currentComparison)
+      }
+      const primaryFile = successfulParsedFiles[0]?.filename || ''
+      setSelectedLanguageTarget({
+        filename: primaryFile,
+        problem: {
+          key,
+          mode: 'missing',
+        },
+      })
+      setActiveWorkspaceTab('diff')
+    },
+    [comparisonResult, successfulParsedFiles]
+  )
+
+  const handleOpenKeyUsageFromInspector = useCallback(
+    (key: string) => {
+      setSelectedKeyUsagePath(key)
+      setActiveWorkspaceTab('keyUsage')
+    },
+    []
+  )
+
   const folderName = useMemo(() => {
     if (!selectedDirectory) return null
     return treeData?.rootName || selectedDirectory.split(/[/|\\]/).filter(Boolean).pop() || selectedDirectory
@@ -680,6 +786,26 @@ const AppContent: React.FC<AppContentProps> = ({
               {gitStatus && gitStatus.totalChanges > 0 && (
                 <span className="ide-tab-badge">{gitStatus.totalChanges}</span>
               )}
+            </button>
+          )}
+
+          {selectedDirectory && (
+            <button
+              type="button"
+              className={`app-btn app-btn-md ide-tab-toggle-btn ide-key-usage-btn ${activeWorkspaceTab === 'keyUsage' ? 'is-active-tab' : ''}`}
+              onClick={() => setActiveWorkspaceTab('keyUsage')}
+              title={t('keyUsage.title')}
+              data-testid="ide-key-usage-btn"
+            >
+              🔍 {t('keyUsage.tabTitleShort')}
+              {keyUsageResult &&
+                (keyUsageResult.missingKeysCount > 0 ||
+                  keyUsageResult.unusedKeysCount > 0) && (
+                  <span className="ide-tab-badge">
+                    {keyUsageResult.missingKeysCount +
+                      keyUsageResult.unusedKeysCount}
+                  </span>
+                )}
             </button>
           )}
 
@@ -781,9 +907,11 @@ const AppContent: React.FC<AppContentProps> = ({
                 errorMessage={previewError}
                 isLocalizationCandidate={selectedPreviewFile.isLocalizationCandidate}
                 isCheckedForComparison={checkedPaths.has(selectedPreviewFile.path)}
+                targetLine={targetPreviewLine}
                 onToggleCheckFile={() => handleToggleFile(selectedPreviewFile.path)}
                 onClosePreview={() => {
                   setSelectedPreviewFile(null)
+                  setTargetPreviewLine(undefined)
                   setActiveWorkspaceTab(selectedLanguageTarget && comparisonResult ? 'diff' : 'dashboard')
                 }}
               />
@@ -797,6 +925,8 @@ const AppContent: React.FC<AppContentProps> = ({
                 initialActiveFilename={selectedLanguageTarget?.filename}
                 initialProblem={selectedLanguageTarget?.problem}
                 qualityIssues={workspaceQuality.issues}
+                keyUsageResult={keyUsageResult}
+                onOpenKeyUsage={handleOpenKeyUsageFromInspector}
               />
             ) : activeWorkspaceTab === 'git' && selectedDirectory ? (
               /* If Source Control tab is active, render GitSourceControlView */
@@ -809,6 +939,17 @@ const AppContent: React.FC<AppContentProps> = ({
                 }}
                 preflightReport={workspacePreflight}
                 onNavigateToIssue={handleNavigateFromQuality}
+              />
+            ) : activeWorkspaceTab === 'keyUsage' && selectedDirectory ? (
+              /* If Key Usage tab is active, render KeyUsagePanel */
+              <KeyUsagePanel
+                scanResult={keyUsageResult}
+                isLoading={isScanningKeyUsage}
+                selectedKeyPath={selectedKeyUsagePath}
+                onSelectKey={(key) => setSelectedKeyUsagePath(key)}
+                onNavigateToSource={handleNavigateToSource}
+                onNavigateToLocalization={handleNavigateToLocalizationFromKeyUsage}
+                onRefreshScan={() => refreshKeyUsage()}
               />
             ) : selectedDirectory ? (
               /* If workspace is open, render Translation Coverage Dashboard as default view */
@@ -1031,6 +1172,27 @@ const AppContent: React.FC<AppContentProps> = ({
                   : gitStatus && gitStatus.totalChanges > 0
                   ? t('git.statusBarChanges', { count: gitStatus.totalChanges })
                   : t('git.statusBarClean')}
+              </button>
+              <span className="statusbar-separator">|</span>
+              <button
+                type="button"
+                className={`statusbar-btn statusbar-key-usage-btn ${
+                  keyUsageResult && keyUsageResult.missingKeysCount > 0
+                    ? 'has-missing'
+                    : ''
+                }`}
+                data-testid="statusbar-key-usage-btn"
+                onClick={() => {
+                  setActiveWorkspaceTab('keyUsage')
+                }}
+                title={t('keyUsage.title')}
+              >
+                {keyUsageResult
+                  ? t('keyUsage.statusBarItem', {
+                      missing: keyUsageResult.missingKeysCount,
+                      unused: keyUsageResult.unusedKeysCount,
+                    })
+                  : t('keyUsage.statusBarPending')}
               </button>
             </>
           )}

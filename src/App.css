@@ -3124,4 +3124,27 @@ textarea,
   color: #6c7086;
 }
 
+/* Key Usage Header & Status Bar Integration */
+.ide-key-usage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusbar-key-usage-btn {
+  font-weight: 500;
+  cursor: pointer;
+  color: #94a3b8;
+}
+
+.statusbar-key-usage-btn:hover {
+  color: #38bdf8;
+}
+
+.statusbar-key-usage-btn.has-missing {
+  color: #f87171;
+  font-weight: 600;
+}
+
+
 
