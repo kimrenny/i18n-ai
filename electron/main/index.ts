@@ -36,7 +36,7 @@ import {
 } from '../../src/types/settings'
 import { scanWorkspaceSourceFiles } from './keyUsageService'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const mainDir = import.meta.dirname || path.dirname(fileURLToPath(import.meta.url))
 
 // The built directory structure:
 //
@@ -48,7 +48,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ├─┬ dist
 // │ └── index.html
 
-process.env.APP_ROOT = path.join(__dirname, '../..')
+process.env.APP_ROOT = path.join(mainDir, '../..')
 
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
@@ -59,7 +59,7 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
 
 let win: BrowserWindow | null = null
 
-const preload = path.join(__dirname, '../preload/index.cjs')
+const preload = path.join(mainDir, '../preload/index.cjs')
 
 function getSettingsFilePath(): string {
   return path.join(app.getPath('userData'), 'settings.json')

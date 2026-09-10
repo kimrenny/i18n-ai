@@ -10,10 +10,14 @@ export default defineConfig({
       main: {
         entry: 'electron/main/index.ts',
         vite: {
+          define: {
+            __filename: 'import.meta.filename',
+            __dirname: 'import.meta.dirname',
+          },
           build: {
             outDir: 'dist-electron/main',
             rollupOptions: {
-              external: ['electron', 'typescript'],
+              external: ['electron'],
             },
           },
         },
