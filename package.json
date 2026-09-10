@@ -1,15 +1,56 @@
 {
   "name": "localization-ai",
   "version": "0.1.0",
+  "description": "Localization AI - JSON Translation & Key Management Desktop Tool",
+  "author": "kimrenny (https://github.com/kimrenny/i18n-ai)",
   "private": true,
   "type": "module",
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "dist:dir": "npm run build && electron-builder --win --dir --publish never",
+    "dist": "npm run build && electron-builder --win --publish never",
+    "dist:release": "npm run build && electron-builder --win --publish onTag",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
+  },
+  "build": {
+    "appId": "com.kimrenny.i18n-ai",
+    "productName": "Localization AI",
+    "copyright": "Copyright © 2025-2026 kimrenny",
+    "directories": {
+      "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "kimrenny",
+      "repo": "i18n-ai"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Localization AI"
+    }
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -24,6 +65,7 @@
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^34.2.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.20.1",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.19",
