@@ -98,6 +98,12 @@ export interface AiTranslationSettings {
   providers: Record<AiProviderId, AiProviderConfig>
 }
 
+import {
+  type FeatureToggleState,
+  getDefaultFeatureState,
+  migrateFeatureState,
+} from './features'
+
 export interface FreeTranslationSettings {
   provider: FreeProviderId
   providers: Record<FreeProviderId, FreeProviderConfig>
@@ -108,6 +114,7 @@ export interface AppSettings {
   engine?: TranslationEngine
   aiTranslation: AiTranslationSettings
   freeTranslation?: FreeTranslationSettings
+  features: FeatureToggleState
 }
 
 export const DEPRECATED_GEMINI_MODELS = new Set([
@@ -188,11 +195,12 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   engine: 'ai',
   aiTranslation: DEFAULT_AI_TRANSLATION_SETTINGS,
   freeTranslation: DEFAULT_FREE_TRANSLATION_SETTINGS,
+  features: getDefaultFeatureState(),
 }
 
 /**
- * Migrates loaded, partial, or legacy settings objects, ensuring all required engine
- * and provider configurations exist with safe defaults and zero undefined references.
+ * Migrates loaded, partial, or legacy settings objects, ensuring all required engine,
+ * provider configurations, and feature toggles exist with safe defaults and zero undefined references.
  */
 export function migrateAppSettings(raw: unknown): AppSettings {
   if (!raw || typeof raw !== 'object') {
@@ -209,7 +217,10 @@ export function migrateAppSettings(raw: unknown): AppSettings {
   // 2. Determine Engine
   const engine: TranslationEngine = data.engine === 'free' ? 'free' : 'ai'
 
-  // 3. Extract AI Translation Settings (support nested data.aiTranslation OR top-level legacy properties)
+  // 3. Extract Features Toggle State (safely migrated with fallback to defaults)
+  const features = migrateFeatureState(data.features)
+
+  // 4. Extract AI Translation Settings (support nested data.aiTranslation OR top-level legacy properties)
   const nestedAi = (
     data.aiTranslation && typeof data.aiTranslation === 'object' ? data.aiTranslation : {}
   ) as Record<string, unknown>
@@ -263,7 +274,7 @@ export function migrateAppSettings(raw: unknown): AppSettings {
     }
   }
 
-  // 4. Extract Free Translation Settings (support nested data.freeTranslation OR top-level legacy free keys)
+  // 5. Extract Free Translation Settings (support nested data.freeTranslation OR top-level legacy free keys)
   const nestedFree = (
     data.freeTranslation && typeof data.freeTranslation === 'object' ? data.freeTranslation : {}
   ) as Record<string, unknown>
@@ -312,5 +323,6 @@ export function migrateAppSettings(raw: unknown): AppSettings {
       provider: freeProvider,
       providers: freeProviders,
     },
+    features,
   }
 }

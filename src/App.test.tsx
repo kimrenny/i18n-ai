@@ -124,7 +124,8 @@ describe('App', () => {
     expect(apiKeyInput).toHaveAttribute('type', 'text')
 
     // 3. Switch provider to Ollama
-    fireEvent.change(providerSelect, { target: { value: 'ollama' } })
+    const select = screen.getByRole('combobox', { name: /select ai provider/i })
+    fireEvent.change(select, { target: { value: 'ollama' } })
     await waitFor(() => {
       expect(mockUpdateSettings).toHaveBeenCalledWith(
         expect.objectContaining({ provider: 'ollama' })

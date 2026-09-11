@@ -221,7 +221,13 @@
     "apiKey": "Klucz API",
     "apiKeyPlaceholder": "Wprowadź swój klucz API...",
     "showApiKey": "Pokaż",
-    "hideApiKey": "Ukryj"
+    "hideApiKey": "Ukryj",
+    "tabTranslation": "Tłumaczenie i ogólne",
+    "tabFeatures": "Funkcje",
+    "featuresHeader": "Wbudowane funkcje",
+    "featuresDescription": "Włączanie lub wyłączanie modułów funkcji aplikacji. Wszystkie funkcje są domyślnie włączone.",
+    "featureOn": "WŁ",
+    "featureOff": "WYŁ"
   },
   "providers": {
     "mock": {

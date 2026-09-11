@@ -119,18 +119,33 @@ export async function clearLastWorkspacePath(): Promise<void> {
   }
 }
 
-async function loadPersistedSettings(): Promise<AppSettings> {
+let cachedSettings: AppSettings | null = null
+let settingsMutex: Promise<unknown> = Promise.resolve()
+
+export function withSettingsLock<T>(fn: () => Promise<T>): Promise<T> {
+  const next = settingsMutex.then(fn, fn)
+  settingsMutex = next.catch(() => {})
+  return next
+}
+
+export async function loadPersistedSettings(): Promise<AppSettings> {
+  if (cachedSettings) {
+    return cachedSettings
+  }
   try {
     const settingsPath = getSettingsFilePath()
     const content = await fs.readFile(settingsPath, 'utf-8')
     const parsed = JSON.parse(content)
-    return migrateAppSettings(parsed)
+    cachedSettings = migrateAppSettings(parsed)
+    return cachedSettings
   } catch {
-    return DEFAULT_APP_SETTINGS
+    cachedSettings = { ...DEFAULT_APP_SETTINGS }
+    return cachedSettings
   }
 }
 
-async function persistSettings(settings: AppSettings): Promise<void> {
+export async function persistSettings(settings: AppSettings): Promise<void> {
+  cachedSettings = settings
   try {
     const settingsPath = getSettingsFilePath()
     await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
@@ -412,60 +427,90 @@ app.whenReady().then(() => {
 
   // IPC: Settings handlers
   ipcMain.handle('settings:get', async () => {
-    console.log('[main] settings:get invoked')
-    return await loadPersistedSettings()
+    return withSettingsLock(async () => {
+      console.log('[main] settings:get invoked')
+      return await loadPersistedSettings()
+    })
   })
 
   ipcMain.handle(
     'settings:updateAiTranslation',
     async (_, update: Partial<AppSettings['aiTranslation']>) => {
-      console.log('[main] settings:updateAiTranslation invoked with provider:', update?.provider)
-      const current = await loadPersistedSettings()
-      const merged = {
-        ...current,
-        aiTranslation: {
-          ...current.aiTranslation,
-          ...(update && typeof update === 'object' ? update : {}),
-          providers: {
-            ...current.aiTranslation.providers,
-            ...(update?.providers || {}),
+      return withSettingsLock(async () => {
+        console.log('[main] settings:updateAiTranslation invoked with provider:', update?.provider)
+        const current = await loadPersistedSettings()
+        const merged: AppSettings = {
+          ...current,
+          aiTranslation: {
+            ...current.aiTranslation,
+            ...(update && typeof update === 'object' ? update : {}),
+            providers: {
+              ...current.aiTranslation.providers,
+              ...(update?.providers || {}),
+            },
           },
-        },
-      }
-      const updated = migrateAppSettings(merged)
-      await persistSettings(updated)
-      return updated
+        }
+        const updated = migrateAppSettings(merged)
+        await persistSettings(updated)
+        return updated
+      })
     }
   )
 
   ipcMain.handle(
     'settings:updateTranslation',
     async (_, update: Partial<AppSettings>) => {
-      console.log('[main] settings:updateTranslation invoked with engine:', update?.engine)
-      const current = await loadPersistedSettings()
-      const merged = {
-        ...current,
-        ...(update && typeof update === 'object' ? update : {}),
-        aiTranslation: {
-          ...current.aiTranslation,
-          ...(update?.aiTranslation || {}),
-          providers: {
-            ...current.aiTranslation.providers,
-            ...(update?.aiTranslation?.providers || {}),
+      return withSettingsLock(async () => {
+        console.log('[main] settings:updateTranslation invoked with engine:', update?.engine)
+        const current = await loadPersistedSettings()
+        const merged: AppSettings = {
+          ...current,
+          ...(update && typeof update === 'object' ? update : {}),
+          aiTranslation: {
+            ...current.aiTranslation,
+            ...(update?.aiTranslation || {}),
+            providers: {
+              ...current.aiTranslation.providers,
+              ...(update?.aiTranslation?.providers || {}),
+            },
           },
-        },
-        freeTranslation: {
-          ...(current.freeTranslation || DEFAULT_APP_SETTINGS.freeTranslation!),
-          ...(update?.freeTranslation || {}),
-          providers: {
-            ...(current.freeTranslation?.providers || DEFAULT_APP_SETTINGS.freeTranslation!.providers),
-            ...(update?.freeTranslation?.providers || {}),
+          freeTranslation: {
+            ...(current.freeTranslation || DEFAULT_APP_SETTINGS.freeTranslation!),
+            ...(update?.freeTranslation || {}),
+            providers: {
+              ...(current.freeTranslation?.providers || DEFAULT_APP_SETTINGS.freeTranslation!.providers),
+              ...(update?.freeTranslation?.providers || {}),
+            },
           },
-        },
-      }
-      const updated = migrateAppSettings(merged)
-      await persistSettings(updated)
-      return updated
+          features: {
+            ...(current.features || DEFAULT_APP_SETTINGS.features),
+            ...(update?.features || {}),
+          },
+        }
+        const updated = migrateAppSettings(merged)
+        await persistSettings(updated)
+        return updated
+      })
+    }
+  )
+
+  ipcMain.handle(
+    'settings:updateFeatures',
+    async (_, update: Partial<AppSettings['features']>) => {
+      return withSettingsLock(async () => {
+        console.log('[main] settings:updateFeatures invoked with features:', update)
+        const current = await loadPersistedSettings()
+        const merged: AppSettings = {
+          ...current,
+          features: {
+            ...(current.features || DEFAULT_APP_SETTINGS.features),
+            ...(update && typeof update === 'object' ? update : {}),
+          },
+        }
+        const updated = migrateAppSettings(merged)
+        await persistSettings(updated)
+        return updated
+      })
     }
   )
 

@@ -30,7 +30,8 @@ import type { GitRepositoryInfo, GitStatusSummary } from './types/git'
 import type { KeyUsageScanResult } from './types/keyUsage'
 import { calculateWorkspaceQuality } from './services/localizationQuality'
 import { validateWorkspacePreflight } from './services/localizationValidation'
-import type { LocalizationQualityIssue } from './types/localizationQuality'
+import type { LocalizationQualityIssue, WorkspaceQualitySummary } from './types/localizationQuality'
+import { isFeatureEnabled } from './types/features'
 import { GlobalSearch } from './components/search/GlobalSearch'
 import { useResizablePanel } from './hooks/useResizablePanel'
 import type {
@@ -68,6 +69,33 @@ interface AppContentProps {
   settingsSaveError: string | null
   onUpdateAiSettings: (update: Partial<AiTranslationSettings>) => Promise<void>
   onUpdateTranslationSettings: (update: Partial<AppSettings>) => Promise<void>
+  onUpdateFeatureSettings: (update: Partial<import('./types/features').FeatureToggleState>) => Promise<void>
+}
+
+const EMPTY_WORKSPACE_QUALITY: WorkspaceQualitySummary = {
+  totalIssues: 0,
+  totalErrors: 0,
+  totalWarnings: 0,
+  totalInfos: 0,
+  errorCount: 0,
+  warningCount: 0,
+  infoCount: 0,
+  issues: [],
+  bySeverity: {
+    error: [],
+    warning: [],
+    info: [],
+  },
+  byType: {
+    missing_translation: [],
+    empty_translation: [],
+    placeholder_mismatch: [],
+    tag_mismatch: [],
+    same_as_reference: [],
+    whitespace_mismatch: [],
+    structural_conflict: [],
+  },
+  byFile: {},
 }
 
 const AppContent: React.FC<AppContentProps> = ({
@@ -76,8 +104,20 @@ const AppContent: React.FC<AppContentProps> = ({
   settingsSaveError,
   onUpdateAiSettings,
   onUpdateTranslationSettings,
+  onUpdateFeatureSettings,
 }) => {
   const { t } = useTranslation()
+
+  // Feature Flags
+  const isDiffViewerEnabled = isFeatureEnabled(settings.features, 'diff_viewer')
+  const isGlobalSearchEnabled = isFeatureEnabled(settings.features, 'global_search')
+  const isKeyUsageEnabled = isFeatureEnabled(settings.features, 'key_usage_scanner')
+  const isQualityEnabled = isFeatureEnabled(settings.features, 'quality_checks')
+  const isPreflightEnabled = isFeatureEnabled(settings.features, 'preflight_validator')
+  const isGitEnabled = isFeatureEnabled(settings.features, 'git_integration')
+  const isAiEnabled = isFeatureEnabled(settings.features, 'ai_translation')
+  const isFreeEnabled = isFeatureEnabled(settings.features, 'free_translation')
+
   const [selectedDirectory, setSelectedDirectory] = useState<string | null>(null)
   const [treeData, setTreeData] = useState<DirectoryTreeResult | null>(null)
   const [jsonFiles, setJsonFiles] = useState<DiscoveredFile[]>([])
@@ -86,7 +126,6 @@ const AppContent: React.FC<AppContentProps> = ({
   const [isExplorerCollapsed, setIsExplorerCollapsed] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [, setSettingsSaveError] = useState<string | null>(null)
 
   // Preview State
   const [selectedPreviewFile, setSelectedPreviewFile] = useState<PreviewFileInfo | null>(null)
@@ -161,7 +200,43 @@ const AppContent: React.FC<AppContentProps> = ({
     problem: ProblemNavigationTarget | null
   } | null>(null)
 
+  // Auto-close panels / fallbacks when features are toggled off
+  useEffect(() => {
+    if (!isGlobalSearchEnabled && isSearchOpen) {
+      setIsSearchOpen(false)
+    }
+  }, [isGlobalSearchEnabled, isSearchOpen])
+
+  useEffect(() => {
+    if (!isQualityEnabled && isQualityOpen) {
+      setIsQualityOpen(false)
+    }
+  }, [isQualityEnabled, isQualityOpen])
+
+  useEffect(() => {
+    if (!isPreflightEnabled && isPreflightOpen) {
+      setIsPreflightOpen(false)
+    }
+  }, [isPreflightEnabled, isPreflightOpen])
+
+  useEffect(() => {
+    if (!isDiffViewerEnabled && activeWorkspaceTab === 'diff') {
+      setActiveWorkspaceTab('dashboard')
+    }
+    if (!isGitEnabled && activeWorkspaceTab === 'git') {
+      setActiveWorkspaceTab(isDiffViewerEnabled ? 'diff' : 'dashboard')
+    }
+    if (!isKeyUsageEnabled && activeWorkspaceTab === 'keyUsage') {
+      setActiveWorkspaceTab(isDiffViewerEnabled ? 'diff' : 'dashboard')
+    }
+  }, [isDiffViewerEnabled, isGitEnabled, isKeyUsageEnabled, activeWorkspaceTab])
+
   const refreshGitSummary = useCallback(async (dirPath?: string | null) => {
+    if (!isGitEnabled) {
+      setGitRepoInfo(null)
+      setGitStatus(null)
+      return
+    }
     const target = dirPath !== undefined ? dirPath : selectedDirectory
     if (!target) {
       setGitRepoInfo(null)
@@ -181,10 +256,11 @@ const AppContent: React.FC<AppContentProps> = ({
       setGitRepoInfo(null)
       setGitStatus(null)
     }
-  }, [selectedDirectory])
+  }, [selectedDirectory, isGitEnabled])
 
-  // Global keyboard shortcut: Ctrl+F / Cmd+F opens/focuses Global Search
+  // Global keyboard shortcut: Ctrl+F / Cmd+F opens/focuses Global Search (when enabled)
   useEffect(() => {
+    if (!isGlobalSearchEnabled) return
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
         e.preventDefault()
@@ -193,7 +269,7 @@ const AppContent: React.FC<AppContentProps> = ({
     }
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [])
+  }, [isGlobalSearchEnabled])
 
   // Parsing & Comparison State
   const [parseResults, setParseResults] = useState<FileParseResult[] | null>(null)
@@ -522,12 +598,18 @@ const AppContent: React.FC<AppContentProps> = ({
   }, [successfulParsedFiles])
 
   const workspaceQuality = useMemo(() => {
+    if (!isQualityEnabled) {
+      return EMPTY_WORKSPACE_QUALITY
+    }
     return calculateWorkspaceQuality(successfulParsedFiles, comparisonResult)
-  }, [successfulParsedFiles, comparisonResult])
+  }, [successfulParsedFiles, comparisonResult, isQualityEnabled])
 
   const workspacePreflight = useMemo(() => {
+    if (!isPreflightEnabled) {
+      return validateWorkspacePreflight(EMPTY_WORKSPACE_QUALITY)
+    }
     return validateWorkspacePreflight(workspaceQuality)
-  }, [workspaceQuality])
+  }, [workspaceQuality, isPreflightEnabled])
 
   const handleSelectDashboardLanguage = useCallback(
     (filename: string) => {
@@ -538,9 +620,11 @@ const AppContent: React.FC<AppContentProps> = ({
       }
       const problem = getFirstProblemKeyForFile(filename, currentComparison)
       setSelectedLanguageTarget({ filename, problem })
-      setActiveWorkspaceTab('diff')
+      if (isDiffViewerEnabled) {
+        setActiveWorkspaceTab('diff')
+      }
     },
-    [comparisonResult, successfulParsedFiles]
+    [comparisonResult, successfulParsedFiles, isDiffViewerEnabled]
   )
 
   const handleNavigateFromProblem = useCallback(
@@ -557,9 +641,11 @@ const AppContent: React.FC<AppContentProps> = ({
           mode: problem.type,
         },
       })
-      setActiveWorkspaceTab('diff')
+      if (isDiffViewerEnabled) {
+        setActiveWorkspaceTab('diff')
+      }
     },
-    [comparisonResult, successfulParsedFiles]
+    [comparisonResult, successfulParsedFiles, isDiffViewerEnabled]
   )
 
   const handleNavigateFromQuality = useCallback(
@@ -576,9 +662,11 @@ const AppContent: React.FC<AppContentProps> = ({
           mode: issue.type === 'missing_translation' ? 'missing' : 'empty',
         },
       })
-      setActiveWorkspaceTab('diff')
+      if (isDiffViewerEnabled) {
+        setActiveWorkspaceTab('diff')
+      }
     },
-    [comparisonResult, successfulParsedFiles]
+    [comparisonResult, successfulParsedFiles, isDiffViewerEnabled]
   )
 
   const handleNavigateFromSearch = useCallback(
@@ -595,10 +683,12 @@ const AppContent: React.FC<AppContentProps> = ({
           mode: result.isEmpty ? 'empty' : 'missing',
         },
       })
-      setActiveWorkspaceTab('diff')
+      if (isDiffViewerEnabled) {
+        setActiveWorkspaceTab('diff')
+      }
       setIsSearchOpen(false)
     },
-    [comparisonResult, successfulParsedFiles]
+    [comparisonResult, successfulParsedFiles, isDiffViewerEnabled]
   )
 
   const handleNavigateFromGit = useCallback(
@@ -616,16 +706,23 @@ const AppContent: React.FC<AppContentProps> = ({
           filename: matchedFile.filename,
           problem: null,
         })
-        setActiveWorkspaceTab('diff')
+        if (isDiffViewerEnabled) {
+          setActiveWorkspaceTab('diff')
+        }
       } else {
         handleSelectFile(fullPath, filename, isLocalizationFile(filename))
       }
     },
-    [comparisonResult, successfulParsedFiles, handleSelectFile]
+    [comparisonResult, successfulParsedFiles, handleSelectFile, isDiffViewerEnabled]
   )
 
   const refreshKeyUsage = useCallback(
     async (dir?: string | null, files?: ParsedLocalizationFile[]) => {
+      if (!isKeyUsageEnabled) {
+        setKeyUsageResult(null)
+        setIsScanningKeyUsage(false)
+        return
+      }
       const targetDir = dir !== undefined ? dir : selectedDirectory
       const targetFiles = files !== undefined ? files : successfulParsedFiles
       if (!targetDir) {
@@ -642,10 +739,15 @@ const AppContent: React.FC<AppContentProps> = ({
         setIsScanningKeyUsage(false)
       }
     },
-    [selectedDirectory, successfulParsedFiles]
+    [selectedDirectory, successfulParsedFiles, isKeyUsageEnabled]
   )
 
   useEffect(() => {
+    if (!isKeyUsageEnabled) {
+      setKeyUsageResult(null)
+      setIsScanningKeyUsage(false)
+      return
+    }
     if (selectedDirectory) {
       let isCancelled = false
       setIsScanningKeyUsage(true)
@@ -671,7 +773,7 @@ const AppContent: React.FC<AppContentProps> = ({
     } else {
       setKeyUsageResult(null)
     }
-  }, [selectedDirectory, successfulParsedFiles])
+  }, [selectedDirectory, successfulParsedFiles, isKeyUsageEnabled])
 
   const handleNavigateToSource = useCallback(
     (filePath: string, line: number) => {
@@ -696,17 +798,21 @@ const AppContent: React.FC<AppContentProps> = ({
           mode: 'missing',
         },
       })
-      setActiveWorkspaceTab('diff')
+      if (isDiffViewerEnabled) {
+        setActiveWorkspaceTab('diff')
+      }
     },
-    [comparisonResult, successfulParsedFiles]
+    [comparisonResult, successfulParsedFiles, isDiffViewerEnabled]
   )
 
   const handleOpenKeyUsageFromInspector = useCallback(
     (key: string) => {
-      setSelectedKeyUsagePath(key)
-      setActiveWorkspaceTab('keyUsage')
+      if (isKeyUsageEnabled) {
+        setSelectedKeyUsagePath(key)
+        setActiveWorkspaceTab('keyUsage')
+      }
     },
-    []
+    [isKeyUsageEnabled]
   )
 
   const folderName = useMemo(() => {
@@ -714,14 +820,28 @@ const AppContent: React.FC<AppContentProps> = ({
     return treeData?.rootName || selectedDirectory.split(/[/|\\]/).filter(Boolean).pop() || selectedDirectory
   }, [selectedDirectory, treeData])
 
-  const engineLabel = useMemo(() => {
+  const effectiveEngine = useMemo<import('./types/settings').TranslationEngine | null>(() => {
     if (settings.engine === 'free') {
+      if (isFreeEnabled) return 'free'
+      if (isAiEnabled) return 'ai'
+      return null
+    }
+    if (isAiEnabled) return 'ai'
+    if (isFreeEnabled) return 'free'
+    return null
+  }, [settings.engine, isAiEnabled, isFreeEnabled])
+
+  const engineLabel = useMemo(() => {
+    if (effectiveEngine === 'free') {
       const provider = settings.freeTranslation?.provider || 'libretranslate'
       return t('statusbar.engineFree', { provider })
     }
-    const provider = settings.aiTranslation?.provider || 'mock'
-    return t('statusbar.engineAi', { provider })
-  }, [settings, t])
+    if (effectiveEngine === 'ai') {
+      const provider = settings.aiTranslation?.provider || 'mock'
+      return t('statusbar.engineAi', { provider })
+    }
+    return t('statusbar.engineDisabled', { defaultValue: 'Translation Off' })
+  }, [effectiveEngine, settings, t])
 
   return (
     <div className="app-container">
@@ -752,7 +872,7 @@ const AppContent: React.FC<AppContentProps> = ({
         </div>
 
         <div className="ide-header-right">
-          {comparisonResult && selectedPreviewFile && (
+          {isDiffViewerEnabled && comparisonResult && selectedPreviewFile && (
             <button
               type="button"
               className={`app-btn app-btn-md ide-tab-toggle-btn ${activeWorkspaceTab === 'diff' ? 'is-active-tab' : ''}`}
@@ -774,7 +894,7 @@ const AppContent: React.FC<AppContentProps> = ({
             </button>
           )}
 
-          {selectedDirectory && (
+          {isGitEnabled && selectedDirectory && (
             <button
               type="button"
               className={`app-btn app-btn-md ide-tab-toggle-btn ide-git-btn ${activeWorkspaceTab === 'git' ? 'is-active-tab' : ''}`}
@@ -789,7 +909,7 @@ const AppContent: React.FC<AppContentProps> = ({
             </button>
           )}
 
-          {selectedDirectory && (
+          {isKeyUsageEnabled && selectedDirectory && (
             <button
               type="button"
               className={`app-btn app-btn-md ide-tab-toggle-btn ide-key-usage-btn ${activeWorkspaceTab === 'keyUsage' ? 'is-active-tab' : ''}`}
@@ -809,16 +929,18 @@ const AppContent: React.FC<AppContentProps> = ({
             </button>
           )}
 
-          <button
-            type="button"
-            className="app-btn app-btn-md ide-search-btn"
-            data-testid="ide-search-btn"
-            onClick={() => setIsSearchOpen(true)}
-            title={t('search.openSearchTooltip')}
-            aria-label={t('search.title')}
-          >
-            🔍 {t('search.title')}
-          </button>
+          {isGlobalSearchEnabled && (
+            <button
+              type="button"
+              className="app-btn app-btn-md ide-search-btn"
+              data-testid="ide-search-btn"
+              onClick={() => setIsSearchOpen(true)}
+              title={t('search.openSearchTooltip')}
+              aria-label={t('search.title')}
+            >
+              🔍 {t('search.title')}
+            </button>
+          )}
 
           <button
             type="button"
@@ -831,10 +953,7 @@ const AppContent: React.FC<AppContentProps> = ({
           <button
             type="button"
             className="app-btn app-btn-md settings-open-btn"
-            onClick={() => {
-              setSettingsSaveError(null)
-              setIsSettingsOpen(true)
-            }}
+            onClick={() => setIsSettingsOpen(true)}
             aria-label={t('app.openSettings')}
             title={t('app.openSettings')}
           >
@@ -912,10 +1031,14 @@ const AppContent: React.FC<AppContentProps> = ({
                 onClosePreview={() => {
                   setSelectedPreviewFile(null)
                   setTargetPreviewLine(undefined)
-                  setActiveWorkspaceTab(selectedLanguageTarget && comparisonResult ? 'diff' : 'dashboard')
+                  setActiveWorkspaceTab(
+                    isDiffViewerEnabled && selectedLanguageTarget && comparisonResult
+                      ? 'diff'
+                      : 'dashboard'
+                  )
                 }}
               />
-            ) : activeWorkspaceTab === 'diff' && comparisonResult ? (
+            ) : isDiffViewerEnabled && activeWorkspaceTab === 'diff' && comparisonResult ? (
               /* If Diff Viewer is active, render Diff Viewer */
               <LocalizationDiffViewer
                 comparisonResult={comparisonResult}
@@ -928,7 +1051,7 @@ const AppContent: React.FC<AppContentProps> = ({
                 keyUsageResult={keyUsageResult}
                 onOpenKeyUsage={handleOpenKeyUsageFromInspector}
               />
-            ) : activeWorkspaceTab === 'git' && selectedDirectory ? (
+            ) : isGitEnabled && activeWorkspaceTab === 'git' && selectedDirectory ? (
               /* If Source Control tab is active, render GitSourceControlView */
               <GitSourceControlView
                 workspacePath={selectedDirectory}
@@ -937,10 +1060,10 @@ const AppContent: React.FC<AppContentProps> = ({
                   handleRefreshFiles()
                   refreshGitSummary()
                 }}
-                preflightReport={workspacePreflight}
+                preflightReport={isPreflightEnabled ? workspacePreflight : null}
                 onNavigateToIssue={handleNavigateFromQuality}
               />
-            ) : activeWorkspaceTab === 'keyUsage' && selectedDirectory ? (
+            ) : isKeyUsageEnabled && activeWorkspaceTab === 'keyUsage' && selectedDirectory ? (
               /* If Key Usage tab is active, render KeyUsagePanel */
               <KeyUsagePanel
                 scanResult={keyUsageResult}
@@ -1024,7 +1147,7 @@ const AppContent: React.FC<AppContentProps> = ({
           )}
 
           {/* Bottom Quality Panel */}
-          {selectedDirectory && (
+          {isQualityEnabled && selectedDirectory && (
             <QualityPanel
               isOpen={isQualityOpen}
               onClose={() => setIsQualityOpen(false)}
@@ -1045,7 +1168,7 @@ const AppContent: React.FC<AppContentProps> = ({
           )}
 
           {/* Bottom Pre-flight Validator Panel */}
-          {selectedDirectory && (
+          {isPreflightEnabled && selectedDirectory && (
             <PreflightValidatorPanel
               isOpen={isPreflightOpen}
               onClose={() => setIsPreflightOpen(false)}
@@ -1107,93 +1230,109 @@ const AppContent: React.FC<AppContentProps> = ({
               >
                 {t('problems.statusBarItem', { count: workspaceProblems.totalProblems })}
               </button>
-              <span className="statusbar-separator">|</span>
-              <button
-                type="button"
-                className={`statusbar-btn statusbar-quality-btn ${
-                  workspaceQuality.totalIssues > 0 ? 'has-problems' : 'no-problems'
-                }`}
-                data-testid="statusbar-quality-btn"
-                onClick={() => {
-                  if (!isQualityOpen) {
-                    qualityResize.resetToLastSize()
-                    setIsQualityOpen(true)
-                  } else {
-                    setIsQualityOpen(false)
-                  }
-                }}
-                title={t('quality.ariaLabel')}
-              >
-                {t('quality.statusBarItem', { count: workspaceQuality.totalIssues })}
-              </button>
-              <span className="statusbar-separator">|</span>
-              <button
-                type="button"
-                className={`statusbar-btn statusbar-preflight-btn statusbar-preflight-${workspacePreflight.status.toLowerCase()}`}
-                data-testid="statusbar-preflight-btn"
-                onClick={() => {
-                  if (!isPreflightOpen) {
-                    preflightResize.resetToLastSize()
-                    setIsPreflightOpen(true)
-                  } else {
-                    setIsPreflightOpen(false)
-                  }
-                }}
-                title={t('preflight.ariaLabel')}
-              >
-                {workspacePreflight.status === 'PASS'
-                  ? t('preflight.statusBarPass')
-                  : workspacePreflight.status === 'WARNINGS'
-                  ? t('preflight.statusBarWarnings', { count: workspacePreflight.totalWarnings })
-                  : t('preflight.statusBarFailed', { count: workspacePreflight.totalErrors })}
-              </button>
-              <span className="statusbar-separator">|</span>
-              <button
-                type="button"
-                className={`statusbar-btn statusbar-git-btn ${
-                  !gitRepoInfo?.isRepository
-                    ? 'git-status-not-repo'
-                    : !gitRepoInfo.isGitAvailable
-                    ? 'git-status-unavailable'
-                    : gitStatus && gitStatus.totalChanges > 0
-                    ? 'git-status-changes'
-                    : 'git-status-clean'
-                }`}
-                data-testid="statusbar-git-btn"
-                onClick={() => {
-                  setActiveWorkspaceTab('git')
-                }}
-                title={t('git.viewSourceControlTooltip')}
-              >
-                {!gitRepoInfo?.isRepository
-                  ? t('git.statusBarNotRepo')
-                  : !gitRepoInfo.isGitAvailable
-                  ? t('git.statusBarUnavailable')
-                  : gitStatus && gitStatus.totalChanges > 0
-                  ? t('git.statusBarChanges', { count: gitStatus.totalChanges })
-                  : t('git.statusBarClean')}
-              </button>
-              <span className="statusbar-separator">|</span>
-              <button
-                type="button"
-                className={`statusbar-btn statusbar-key-usage-btn ${
-                  keyUsageResult && keyUsageResult.missingKeysCount > 0
-                    ? 'has-missing'
-                    : ''
-                }`}
-                data-testid="statusbar-key-usage-btn"
-                onClick={() => {
-                  setActiveWorkspaceTab('keyUsage')
-                }}
-                title={t('keyUsage.title')}
-              >
-                {keyUsageResult
-                  ? t('keyUsage.statusBarItem', {
-                      missing: keyUsageResult.missingKeysCount,
-                      unused: keyUsageResult.unusedKeysCount,
-                    })
-                  : t('keyUsage.statusBarPending')}
-              </button>
+              {isQualityEnabled && (
+                <>
+                  <span className="statusbar-separator">|</span>
+                  <button
+                    type="button"
+                    className={`statusbar-btn statusbar-quality-btn ${
+                      workspaceQuality.totalIssues > 0 ? 'has-problems' : 'no-problems'
+                    }`}
+                    data-testid="statusbar-quality-btn"
+                    onClick={() => {
+                      if (!isQualityOpen) {
+                        qualityResize.resetToLastSize()
+                        setIsQualityOpen(true)
+                      } else {
+                        setIsQualityOpen(false)
+                      }
+                    }}
+                    title={t('quality.ariaLabel')}
+                  >
+                    {t('quality.statusBarItem', { count: workspaceQuality.totalIssues })}
+                  </button>
+                </>
+              )}
+              {isPreflightEnabled && (
+                <>
+                  <span className="statusbar-separator">|</span>
+                  <button
+                    type="button"
+                    className={`statusbar-btn statusbar-preflight-btn statusbar-preflight-${workspacePreflight.status.toLowerCase()}`}
+                    data-testid="statusbar-preflight-btn"
+                    onClick={() => {
+                      if (!isPreflightOpen) {
+                        preflightResize.resetToLastSize()
+                        setIsPreflightOpen(true)
+                      } else {
+                        setIsPreflightOpen(false)
+                      }
+                    }}
+                    title={t('preflight.ariaLabel')}
+                  >
+                    {workspacePreflight.status === 'PASS'
+                      ? t('preflight.statusBarPass')
+                      : workspacePreflight.status === 'WARNINGS'
+                      ? t('preflight.statusBarWarnings', { count: workspacePreflight.totalWarnings })
+                      : t('preflight.statusBarFailed', { count: workspacePreflight.totalErrors })}
+                  </button>
+                </>
+              )}
+              {isGitEnabled && (
+                <>
+                  <span className="statusbar-separator">|</span>
+                  <button
+                    type="button"
+                    className={`statusbar-btn statusbar-git-btn ${
+                      !gitRepoInfo?.isRepository
+                        ? 'git-status-not-repo'
+                        : !gitRepoInfo.isGitAvailable
+                        ? 'git-status-unavailable'
+                        : gitStatus && gitStatus.totalChanges > 0
+                        ? 'git-status-changes'
+                        : 'git-status-clean'
+                    }`}
+                    data-testid="statusbar-git-btn"
+                    onClick={() => {
+                      setActiveWorkspaceTab('git')
+                    }}
+                    title={t('git.viewSourceControlTooltip')}
+                  >
+                    {!gitRepoInfo?.isRepository
+                      ? t('git.statusBarNotRepo')
+                      : !gitRepoInfo.isGitAvailable
+                      ? t('git.statusBarUnavailable')
+                      : gitStatus && gitStatus.totalChanges > 0
+                      ? t('git.statusBarChanges', { count: gitStatus.totalChanges })
+                      : t('git.statusBarClean')}
+                  </button>
+                </>
+              )}
+              {isKeyUsageEnabled && (
+                <>
+                  <span className="statusbar-separator">|</span>
+                  <button
+                    type="button"
+                    className={`statusbar-btn statusbar-key-usage-btn ${
+                      keyUsageResult && keyUsageResult.missingKeysCount > 0
+                        ? 'has-missing'
+                        : ''
+                    }`}
+                    data-testid="statusbar-key-usage-btn"
+                    onClick={() => {
+                      setActiveWorkspaceTab('keyUsage')
+                    }}
+                    title={t('keyUsage.title')}
+                  >
+                    {keyUsageResult
+                      ? t('keyUsage.statusBarItem', {
+                          missing: keyUsageResult.missingKeysCount,
+                          unused: keyUsageResult.unusedKeysCount,
+                        })
+                      : t('keyUsage.statusBarPending')}
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -1214,13 +1353,15 @@ const AppContent: React.FC<AppContentProps> = ({
       </footer>
 
       {/* Global Search Dialog */}
-      <GlobalSearch
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onSelectResult={handleNavigateFromSearch}
-        files={successfulParsedFiles}
-        isWorkspaceOpen={!!selectedDirectory}
-      />
+      {isGlobalSearchEnabled && (
+        <GlobalSearch
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          onSelectResult={handleNavigateFromSearch}
+          files={successfulParsedFiles}
+          isWorkspaceOpen={!!selectedDirectory}
+        />
+      )}
 
       {/* Settings Modal */}
       {isSettingsOpen && (
@@ -1230,6 +1371,7 @@ const AppContent: React.FC<AppContentProps> = ({
           saveError={settingsSaveError}
           onUpdateAiSettings={onUpdateAiSettings}
           onUpdateTranslationSettings={onUpdateTranslationSettings}
+          onUpdateFeatureSettings={onUpdateFeatureSettings}
           onClose={() => setIsSettingsOpen(false)}
         />
       )}
@@ -1263,25 +1405,28 @@ export const App: React.FC = () => {
     setIsSettingsSaving(true)
     setSettingsSaveError(null)
 
-    if (!window.electronAPI?.updateAiTranslationSettings) {
-      setSettings((prev) => ({
-        ...prev,
-        aiTranslation: {
-          ...prev.aiTranslation,
-          ...update,
-          providers: {
-            ...prev.aiTranslation.providers,
-            ...(update.providers || {}),
-          },
+    setSettings((prev) => ({
+      ...prev,
+      aiTranslation: {
+        ...prev.aiTranslation,
+        ...update,
+        providers: {
+          ...prev.aiTranslation.providers,
+          ...(update.providers || {}),
         },
-      }))
+      },
+    }))
+
+    if (!window.electronAPI?.updateAiTranslationSettings) {
       setIsSettingsSaving(false)
       return
     }
 
     try {
-      const updated = await window.electronAPI.updateAiTranslationSettings(update)
-      setSettings(updated)
+      const updated = (await window.electronAPI.updateAiTranslationSettings(update)) as AppSettings
+      if (updated && typeof updated === 'object') {
+        setSettings(updated)
+      }
     } catch (err) {
       setSettingsSaveError(
         err instanceof Error ? err.message : 'Failed to save settings.'
@@ -1295,41 +1440,83 @@ export const App: React.FC = () => {
     setIsSettingsSaving(true)
     setSettingsSaveError(null)
 
+    setSettings((prev) => ({
+      ...prev,
+      ...update,
+      aiTranslation: update.aiTranslation
+        ? {
+            ...prev.aiTranslation,
+            ...update.aiTranslation,
+            providers: {
+              ...(prev.aiTranslation?.providers || {}),
+              ...(update.aiTranslation.providers || {}),
+            },
+          }
+        : prev.aiTranslation,
+      freeTranslation: update.freeTranslation
+        ? {
+            ...(prev.freeTranslation || DEFAULT_APP_SETTINGS.freeTranslation!),
+            ...update.freeTranslation,
+            providers: {
+              ...(prev.freeTranslation?.providers || DEFAULT_APP_SETTINGS.freeTranslation!.providers),
+              ...(update.freeTranslation.providers || {}),
+            },
+          }
+        : prev.freeTranslation,
+      features: update.features
+        ? {
+            ...(prev.features || DEFAULT_APP_SETTINGS.features),
+            ...update.features,
+          }
+        : (prev.features || DEFAULT_APP_SETTINGS.features),
+    }))
+
     if (!window.electronAPI?.updateTranslationSettings) {
-      setSettings((prev) => ({
-        ...prev,
-        ...update,
-        aiTranslation: update.aiTranslation
-          ? {
-              ...prev.aiTranslation,
-              ...update.aiTranslation,
-              providers: {
-                ...(prev.aiTranslation?.providers || {}),
-                ...(update.aiTranslation.providers || {}),
-              },
-            }
-          : prev.aiTranslation,
-        freeTranslation: update.freeTranslation
-          ? {
-              ...prev.freeTranslation,
-              ...update.freeTranslation,
-              providers: {
-                ...(prev.freeTranslation?.providers || DEFAULT_APP_SETTINGS.freeTranslation!.providers),
-                ...(update.freeTranslation.providers || {}),
-              },
-            }
-          : prev.freeTranslation,
-      }))
       setIsSettingsSaving(false)
       return
     }
 
     try {
-      const updated = await window.electronAPI.updateTranslationSettings(update)
-      setSettings(updated)
+      const updated = (await window.electronAPI.updateTranslationSettings(update)) as AppSettings
+      if (updated && typeof updated === 'object') {
+        setSettings(updated)
+      }
     } catch (err) {
       setSettingsSaveError(
         err instanceof Error ? err.message : 'Failed to save translation settings.'
+      )
+    } finally {
+      setIsSettingsSaving(false)
+    }
+  }
+
+  const handleUpdateFeatureSettings = async (
+    update: Partial<import('./types/features').FeatureToggleState>
+  ) => {
+    setIsSettingsSaving(true)
+    setSettingsSaveError(null)
+
+    setSettings((prev) => ({
+      ...prev,
+      features: {
+        ...(prev.features || DEFAULT_APP_SETTINGS.features),
+        ...update,
+      },
+    }))
+
+    if (!window.electronAPI?.updateFeatureSettings) {
+      setIsSettingsSaving(false)
+      return
+    }
+
+    try {
+      const updated = (await window.electronAPI.updateFeatureSettings(update)) as AppSettings
+      if (updated && typeof updated === 'object') {
+        setSettings(updated)
+      }
+    } catch (err) {
+      setSettingsSaveError(
+        err instanceof Error ? err.message : 'Failed to save feature settings.'
       )
     } finally {
       setIsSettingsSaving(false)
@@ -1344,6 +1531,7 @@ export const App: React.FC = () => {
         settingsSaveError={settingsSaveError}
         onUpdateAiSettings={handleUpdateAiSettings}
         onUpdateTranslationSettings={handleUpdateTranslationSettings}
+        onUpdateFeatureSettings={handleUpdateFeatureSettings}
       />
     </I18nProvider>
   )

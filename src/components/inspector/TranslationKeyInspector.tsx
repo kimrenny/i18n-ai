@@ -11,6 +11,8 @@ export interface TranslationKeyInspectorProps {
   parsedFiles: readonly ParsedLocalizationFile[]
   qualityIssues?: readonly LocalizationQualityIssue[]
   keyUsageItem?: KeyUsageItem | null
+  isKeyUsageEnabled?: boolean
+  isQualityEnabled?: boolean
   onNavigateLanguage: (filename: string, key: string) => void
   onOpenKeyUsage?: (key: string) => void
   onClose: () => void
@@ -21,6 +23,8 @@ export const TranslationKeyInspector: React.FC<TranslationKeyInspectorProps> = (
   parsedFiles,
   qualityIssues,
   keyUsageItem,
+  isKeyUsageEnabled = true,
+  isQualityEnabled = true,
   onNavigateLanguage,
   onOpenKeyUsage,
   onClose,
@@ -157,42 +161,44 @@ export const TranslationKeyInspector: React.FC<TranslationKeyInspectorProps> = (
             </div>
 
             {/* Key Usage Summary Card */}
-            <div className="inspector-usage-card" data-testid="inspector-usage-card">
-              <div className="inspector-usage-header">
-                <span className="inspector-section-label">{t('inspector.usage')}</span>
-                {onOpenKeyUsage && (
-                  <button
-                    type="button"
-                    className="inspector-usage-nav-btn"
-                    onClick={() => onOpenKeyUsage(inspectionResult.key)}
-                    title={t('keyUsage.openUsageTooltip')}
-                    data-testid="inspector-open-usage-btn"
-                  >
-                    {t('inspector.viewUsages')} →
-                  </button>
-                )}
-              </div>
-              <div className="inspector-usage-val">
-                {keyUsageItem ? (
-                  keyUsageItem.usageCount > 0 ? (
-                    <span className="stat-usage-badge used">
-                      ✓ {t('keyUsage.usagesCount', { count: keyUsageItem.usageCount })}
-                    </span>
+            {isKeyUsageEnabled && (
+              <div className="inspector-usage-card" data-testid="inspector-usage-card">
+                <div className="inspector-usage-header">
+                  <span className="inspector-section-label">{t('inspector.usage')}</span>
+                  {onOpenKeyUsage && (
+                    <button
+                      type="button"
+                      className="inspector-usage-nav-btn"
+                      onClick={() => onOpenKeyUsage(inspectionResult.key)}
+                      title={t('keyUsage.openUsageTooltip')}
+                      data-testid="inspector-open-usage-btn"
+                    >
+                      {t('inspector.viewUsages')} →
+                    </button>
+                  )}
+                </div>
+                <div className="inspector-usage-val">
+                  {keyUsageItem ? (
+                    keyUsageItem.usageCount > 0 ? (
+                      <span className="stat-usage-badge used">
+                        ✓ {t('keyUsage.usagesCount', { count: keyUsageItem.usageCount })}
+                      </span>
+                    ) : (
+                      <span className="stat-usage-badge unused">
+                        ℹ {t('keyUsage.statusUnused')} ({t('keyUsage.noStaticUsages')})
+                      </span>
+                    )
                   ) : (
-                    <span className="stat-usage-badge unused">
-                      ℹ {t('keyUsage.statusUnused')} ({t('keyUsage.noStaticUsages')})
+                    <span className="stat-usage-badge unknown">
+                      {t('keyUsage.notScanned')}
                     </span>
-                  )
-                ) : (
-                  <span className="stat-usage-badge unknown">
-                    {t('keyUsage.notScanned')}
-                  </span>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Quality Issues for Selected Key */}
-            {keyQualityIssues.length > 0 && (
+            {isQualityEnabled && keyQualityIssues.length > 0 && (
               <div className="inspector-quality-section" data-testid="inspector-quality-section">
                 <div className="inspector-quality-header">
                   <span className="inspector-section-label">{t('quality.inspectorTitle')}</span>

@@ -221,7 +221,13 @@
     "apiKey": "API Key",
     "apiKeyPlaceholder": "Enter your API key...",
     "showApiKey": "Show",
-    "hideApiKey": "Hide"
+    "hideApiKey": "Hide",
+    "tabTranslation": "Translation & General",
+    "tabFeatures": "Features",
+    "featuresHeader": "Built-in Features",
+    "featuresDescription": "Enable or disable application feature modules. All features are enabled by default.",
+    "featureOn": "ON",
+    "featureOff": "OFF"
   },
   "providers": {
     "mock": {

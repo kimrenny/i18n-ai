@@ -221,7 +221,13 @@
     "apiKey": "API 키",
     "apiKeyPlaceholder": "API 키를 입력하세요...",
     "showApiKey": "표시",
-    "hideApiKey": "숨기기"
+    "hideApiKey": "숨기기",
+    "tabTranslation": "번역 및 일반",
+    "tabFeatures": "기능",
+    "featuresHeader": "기본 제공 기능",
+    "featuresDescription": "애플리케이션 기능 모듈을 활성화하거나 비활성화합니다. 모든 기능은 기본적으로 활성화되어 있습니다.",
+    "featureOn": "켜짐",
+    "featureOff": "꺼짐"
   },
   "providers": {
     "mock": {

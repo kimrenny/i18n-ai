@@ -119,14 +119,16 @@ export const LocalizationSummary: React.FC<LocalizationSummaryProps> = ({
             {t('addKey.button')}
           </button>
         )}
-        <button
-          type="button"
-          className="add-missing-btn"
-          onClick={onOpenAddMissingModal}
-          disabled={!hasMissing}
-        >
-          {hasMissing ? t('nav.addMissingKeys') : t('nav.allKeysPresent')}
-        </button>
+        {onOpenAddMissingModal && (
+          <button
+            type="button"
+            className="add-missing-btn"
+            onClick={onOpenAddMissingModal}
+            disabled={!hasMissing}
+          >
+            {hasMissing ? t('nav.addMissingKeys') : t('nav.allKeysPresent')}
+          </button>
+        )}
       </div>
     </div>
   )
