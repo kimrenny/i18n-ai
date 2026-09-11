@@ -1,8 +1,21 @@
 # Localization AI
 
+[![Latest Release](https://img.shields.io/github/v/release/kimrenny/i18n-ai?color=blue&label=latest%20release)](https://github.com/kimrenny/i18n-ai/releases/tag/v0.1.0)
+[![License](https://img.shields.io/badge/license-Custom-green.svg)](LICENSE)
+
 Localization AI is a desktop developer tool for maintaining JSON localization dictionaries. It helps developers compare language files, find missing and extra keys, edit translations, validate localization consistency, and analyze whether localization keys are referenced by application source code.
 
 Repository: [https://github.com/kimrenny/i18n-ai](https://github.com/kimrenny/i18n-ai)
+
+---
+
+## Download
+
+The current release is **v0.1.0**.
+
+[**⬇ Download Windows Installer**](https://github.com/kimrenny/i18n-ai/releases/tag/v0.1.0)
+
+For release notes, file checksums, and all release artifacts (`.exe`, `.exe.blockmap`, `latest.yml`), visit the [GitHub Releases](https://github.com/kimrenny/i18n-ai/releases/tag/v0.1.0) page.
 
 ---
 
