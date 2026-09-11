@@ -221,7 +221,13 @@
     "apiKey": "API ключ",
     "apiKeyPlaceholder": "Введіть ваш API ключ...",
     "showApiKey": "Показати",
-    "hideApiKey": "Приховати"
+    "hideApiKey": "Приховати",
+    "tabTranslation": "Переклад та загальні",
+    "tabFeatures": "Функції",
+    "featuresHeader": "Вбудовані функції",
+    "featuresDescription": "Увімкнення або вимкнення модулів функцій програми. Усі функції ввімкнено за замовчуванням.",
+    "featureOn": "УВІМК",
+    "featureOff": "ВИМК"
   },
   "providers": {
     "mock": {

@@ -221,7 +221,13 @@
     "apiKey": "Klíč API",
     "apiKeyPlaceholder": "Zadejte svůj klíč API...",
     "showApiKey": "Zobrazit",
-    "hideApiKey": "Skrýt"
+    "hideApiKey": "Skrýt",
+    "tabTranslation": "Překlad a obecné",
+    "tabFeatures": "Funkce",
+    "featuresHeader": "Vestavěné funkce",
+    "featuresDescription": "Povolení nebo zakázání modulů funkcí aplikace. Všechny funkce jsou ve výchozím nastavení povoleny.",
+    "featureOn": "ZAP",
+    "featureOff": "VYP"
   },
   "providers": {
     "mock": {

@@ -221,7 +221,13 @@
     "apiKey": "API Anahtarı",
     "apiKeyPlaceholder": "API anahtarınızı girin...",
     "showApiKey": "Göster",
-    "hideApiKey": "Gizle"
+    "hideApiKey": "Gizle",
+    "tabTranslation": "Çeviri ve Genel",
+    "tabFeatures": "Özellikler",
+    "featuresHeader": "Yerleşik Özellikler",
+    "featuresDescription": "Uygulama özellik modüllerini etkinleştirin veya devre dışı bırakın. Tüm özellikler varsayılan olarak etkindir.",
+    "featureOn": "AÇIK",
+    "featureOff": "KAPALI"
   },
   "providers": {
     "mock": {

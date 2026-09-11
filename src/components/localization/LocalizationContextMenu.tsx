@@ -16,10 +16,10 @@ interface LocalizationContextMenuProps {
   canUndo: boolean
   canRedo: boolean
   onRenameKey?: (fullKey: string) => void
-  onDeleteKey: (fullKey: string) => void
-  onDeleteSection: (sectionPath: string, node: LocalizationTreeNode) => void
-  onUndo: () => void
-  onRedo: () => void
+  onDeleteKey?: (fullKey: string) => void
+  onDeleteSection?: (sectionPath: string, node: LocalizationTreeNode) => void
+  onUndo?: () => void
+  onRedo?: () => void
   onClose: () => void
 }
 
@@ -100,28 +100,30 @@ export const LocalizationContextMenu: React.FC<LocalizationContextMenuProps> = (
         <div className="context-menu-divider" />
 
         {isFolder ? (
-          <button
-            type="button"
-            className="context-menu-item danger-item"
-            role="menuitem"
-            disabled={!canDelete}
-            onClick={(e) => {
-              if (!canDelete) return
-              e.stopPropagation()
-              onDeleteSection(state.node.fullKey, state.node)
-              onClose()
-            }}
-            title={
-              !canDelete
-                ? t('contextMenu.sectionEmpty')
-                : t('contextMenu.deleteSection', { count: presentLeafCount || leafCount })
-            }
-          >
-            <span className="menu-icon">🗑</span>
-            <span className="menu-label">
-              {t('contextMenu.deleteSection', { count: presentLeafCount || leafCount })}
-            </span>
-          </button>
+          onDeleteSection && (
+            <button
+              type="button"
+              className="context-menu-item danger-item"
+              role="menuitem"
+              disabled={!canDelete}
+              onClick={(e) => {
+                if (!canDelete) return
+                e.stopPropagation()
+                onDeleteSection(state.node.fullKey, state.node)
+                onClose()
+              }}
+              title={
+                !canDelete
+                  ? t('contextMenu.sectionEmpty')
+                  : t('contextMenu.deleteSection', { count: presentLeafCount || leafCount })
+              }
+            >
+              <span className="menu-icon">🗑</span>
+              <span className="menu-label">
+                {t('contextMenu.deleteSection', { count: presentLeafCount || leafCount })}
+              </span>
+            </button>
+          )
         ) : (
           <>
             {onRenameKey && (
@@ -143,58 +145,64 @@ export const LocalizationContextMenu: React.FC<LocalizationContextMenuProps> = (
                 <span className="menu-label">{t('contextMenu.renameKey')}</span>
               </button>
             )}
-            <button
-              type="button"
-              className="context-menu-item danger-item"
-              role="menuitem"
-              disabled={!canDelete}
-              onClick={(e) => {
-                if (!canDelete) return
-                e.stopPropagation()
-                onDeleteKey(state.node.fullKey)
-                onClose()
-              }}
-              title={!canDelete ? t('contextMenu.alreadyMissing') : t('contextMenu.deleteEntry')}
-            >
-              <span className="menu-icon">🗑</span>
-              <span className="menu-label">{t('contextMenu.deleteEntry')}</span>
-            </button>
+            {onDeleteKey && (
+              <button
+                type="button"
+                className="context-menu-item danger-item"
+                role="menuitem"
+                disabled={!canDelete}
+                onClick={(e) => {
+                  if (!canDelete) return
+                  e.stopPropagation()
+                  onDeleteKey(state.node.fullKey)
+                  onClose()
+                }}
+                title={!canDelete ? t('contextMenu.alreadyMissing') : t('contextMenu.deleteEntry')}
+              >
+                <span className="menu-icon">🗑</span>
+                <span className="menu-label">{t('contextMenu.deleteEntry')}</span>
+              </button>
+            )}
           </>
         )}
 
-        <div className="context-menu-divider" />
+        {(onUndo || onRedo) && <div className="context-menu-divider" />}
 
-        <button
-          type="button"
-          className="context-menu-item"
-          role="menuitem"
-          onClick={() => {
-            onUndo()
-            onClose()
-          }}
-          disabled={!canUndo}
-          title={t('tree.undo')}
-        >
-          <span className="menu-icon">↶</span>
-          <span className="menu-label">{t('tree.undo')}</span>
-          <span className="menu-shortcut">Ctrl+Z</span>
-        </button>
+        {onUndo && (
+          <button
+            type="button"
+            className="context-menu-item"
+            role="menuitem"
+            onClick={() => {
+              onUndo()
+              onClose()
+            }}
+            disabled={!canUndo}
+            title={t('tree.undo')}
+          >
+            <span className="menu-icon">↶</span>
+            <span className="menu-label">{t('tree.undo')}</span>
+            <span className="menu-shortcut">Ctrl+Z</span>
+          </button>
+        )}
 
-        <button
-          type="button"
-          className="context-menu-item"
-          role="menuitem"
-          onClick={() => {
-            onRedo()
-            onClose()
-          }}
-          disabled={!canRedo}
-          title={t('tree.redo')}
-        >
-          <span className="menu-icon">↷</span>
-          <span className="menu-label">{t('tree.redo')}</span>
-          <span className="menu-shortcut">Ctrl+Y</span>
-        </button>
+        {onRedo && (
+          <button
+            type="button"
+            className="context-menu-item"
+            role="menuitem"
+            onClick={() => {
+              onRedo()
+              onClose()
+            }}
+            disabled={!canRedo}
+            title={t('tree.redo')}
+          >
+            <span className="menu-icon">↷</span>
+            <span className="menu-label">{t('tree.redo')}</span>
+            <span className="menu-shortcut">Ctrl+Y</span>
+          </button>
+        )}
       </div>
     </>,
     document.body

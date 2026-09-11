@@ -29,6 +29,7 @@ export interface ElectronAPI {
   getSettings: () => Promise<AppSettings>
   updateAiTranslationSettings: (settings: Partial<AiTranslationSettings>) => Promise<AppSettings>
   updateTranslationSettings?: (settings: Partial<AppSettings>) => Promise<AppSettings>
+  updateFeatureSettings?: (features: Partial<import('./features').FeatureToggleState>) => Promise<AppSettings>
   translateWithAi: (
     request: AiTranslationRequest,
     settings: AiTranslationSettings | AppSettings

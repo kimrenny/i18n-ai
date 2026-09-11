@@ -221,7 +221,13 @@
     "apiKey": "API キー",
     "apiKeyPlaceholder": "API キーを入力...",
     "showApiKey": "表示",
-    "hideApiKey": "非表示"
+    "hideApiKey": "非表示",
+    "tabTranslation": "翻訳と一般",
+    "tabFeatures": "機能",
+    "featuresHeader": "組み込み機能",
+    "featuresDescription": "アプリケーションの機能モジュールを有効または無効にします。すべての機能はデフォルトで有効になっています。",
+    "featureOn": "オン",
+    "featureOff": "オフ"
   },
   "providers": {
     "mock": {

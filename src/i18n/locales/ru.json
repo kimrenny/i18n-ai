@@ -221,7 +221,13 @@
     "apiKey": "API ключ",
     "apiKeyPlaceholder": "Введите ваш API ключ...",
     "showApiKey": "Показать",
-    "hideApiKey": "Скрыть"
+    "hideApiKey": "Скрыть",
+    "tabTranslation": "Перевод и общее",
+    "tabFeatures": "Функции",
+    "featuresHeader": "Встроенные функции",
+    "featuresDescription": "Включение или отключение модулей функций приложения. Все функции включены по умолчанию.",
+    "featureOn": "ВКЛ",
+    "featureOff": "ВЫКЛ"
   },
   "providers": {
     "mock": {

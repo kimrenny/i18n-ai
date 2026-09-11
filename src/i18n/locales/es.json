@@ -221,7 +221,13 @@
     "apiKey": "Clave de API",
     "apiKeyPlaceholder": "Introduzca su clave de API...",
     "showApiKey": "Mostrar",
-    "hideApiKey": "Ocultar"
+    "hideApiKey": "Ocultar",
+    "tabTranslation": "Traducción y general",
+    "tabFeatures": "Características",
+    "featuresHeader": "Características integradas",
+    "featuresDescription": "Activar o desactivar módulos de funciones de la aplicación. Todas las funciones están activadas de forma predeterminada.",
+    "featureOn": "ACTIVADO",
+    "featureOff": "DESACTIVADO"
   },
   "providers": {
     "mock": {

@@ -221,7 +221,13 @@
     "apiKey": "API 密钥",
     "apiKeyPlaceholder": "输入您的 API 密钥...",
     "showApiKey": "显示",
-    "hideApiKey": "隐藏"
+    "hideApiKey": "隐藏",
+    "tabTranslation": "翻译与常规",
+    "tabFeatures": "功能特性",
+    "featuresHeader": "内置功能特性",
+    "featuresDescription": "启用或禁用应用程序功能模块。默认情况下启用所有功能。",
+    "featureOn": "开",
+    "featureOff": "关"
   },
   "providers": {
     "mock": {

@@ -221,7 +221,13 @@
     "apiKey": "API-Schlüssel",
     "apiKeyPlaceholder": "Geben Sie Ihren API-Schlüssel ein...",
     "showApiKey": "Anzeigen",
-    "hideApiKey": "Verbergen"
+    "hideApiKey": "Verbergen",
+    "tabTranslation": "Übersetzung & Allgemein",
+    "tabFeatures": "Funktionen",
+    "featuresHeader": "Integrierte Funktionen",
+    "featuresDescription": "Aktivieren oder Deaktivieren von Funktionsmodulen der Anwendung. Alle Funktionen sind standardmäßig aktiviert.",
+    "featureOn": "EIN",
+    "featureOff": "AUS"
   },
   "providers": {
     "mock": {

@@ -221,7 +221,13 @@
     "apiKey": "Chave de API",
     "apiKeyPlaceholder": "Introduza a sua chave de API...",
     "showApiKey": "Mostrar",
-    "hideApiKey": "Ocultar"
+    "hideApiKey": "Ocultar",
+    "tabTranslation": "Tradução e geral",
+    "tabFeatures": "Recursos",
+    "featuresHeader": "Recursos integrados",
+    "featuresDescription": "Ativar ou desativar módulos de recursos do aplicativo. Todos os recursos estão ativados por padrão.",
+    "featureOn": "LIGADO",
+    "featureOff": "DESLIGADO"
   },
   "providers": {
     "mock": {

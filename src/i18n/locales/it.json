@@ -221,7 +221,13 @@
     "apiKey": "Chiave API",
     "apiKeyPlaceholder": "Inserisci la tua chiave API...",
     "showApiKey": "Mostra",
-    "hideApiKey": "Nascondi"
+    "hideApiKey": "Nascondi",
+    "tabTranslation": "Traduzione e generale",
+    "tabFeatures": "Funzionalità",
+    "featuresHeader": "Funzionalità integrate",
+    "featuresDescription": "Abilita o disabilita i moduli di funzionalità dell'applicazione. Tutte le funzionalità sono abilitate per impostazione predefinita.",
+    "featureOn": "ATTIVO",
+    "featureOff": "NON ATTIVO"
   },
   "providers": {
     "mock": {

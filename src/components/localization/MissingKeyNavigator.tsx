@@ -76,7 +76,11 @@ export const MissingKeyNavigator: React.FC<MissingKeyNavigatorProps> = ({
   }, [canGoNext, canGoPrevious, handleNext, handlePrevious])
 
   return (
-    <div className="missing-navigator-bar" aria-label={t('nav.navigatorAria')}>
+    <div
+      className="missing-navigator-bar"
+      aria-label={t('nav.navigatorAria')}
+      data-testid="missing-key-navigator"
+    >
       <div className="navigator-modes">
         <button
           type="button"
