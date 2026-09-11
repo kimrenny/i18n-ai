@@ -163,6 +163,14 @@ describe('Comprehensive Real Git Repository End-to-End Verification', () => {
     expect(info.isGitAvailable).toBe(true)
     expect(info.isRepository).toBe(true)
     expect(info.rootPath).toBeDefined()
+
+    const [expectedRealPath, actualRealPath] = await Promise.all([
+      fs.realpath(tempRepoDir),
+      fs.realpath(info.rootPath!),
+    ])
+    expect(path.resolve(actualRealPath).toLowerCase()).toBe(
+      path.resolve(expectedRealPath).toLowerCase()
+    )
     expect(info.currentBranch).toBeDefined()
   })
 
@@ -171,7 +179,15 @@ describe('Comprehensive Real Git Repository End-to-End Verification', () => {
     const info = await getRepositoryInfo(nestedWorkspaceDir)
     expect(info.isGitAvailable).toBe(true)
     expect(info.isRepository).toBe(true)
-    expect(info.rootPath).toBe(path.normalize(tempRepoDir!))
+    expect(info.rootPath).toBeDefined()
+
+    const [expectedRealPath, actualRealPath] = await Promise.all([
+      fs.realpath(tempRepoDir!),
+      fs.realpath(info.rootPath!),
+    ])
+    expect(path.resolve(actualRealPath).toLowerCase()).toBe(
+      path.resolve(expectedRealPath).toLowerCase()
+    )
   })
 
   it('3. gracefully handles non-Git folder', async () => {
@@ -287,5 +303,20 @@ describe('Comprehensive Real Git Repository End-to-End Verification', () => {
 
     const parsedLines = parseDiffContent(workingDiff.diff)
     expect(parsedLines.some((l) => l.type === 'addition')).toBe(true)
+  })
+
+  it('9. verifies Windows-safe canonical path comparison against alternate representations', async () => {
+    if (!isGitAvailable || !tempRepoDir) return
+    const info = await getRepositoryInfo(tempRepoDir)
+    expect(info.isRepository).toBe(true)
+    expect(info.rootPath).toBeDefined()
+
+    // Test with alternate slash formats and casing
+    const alternateSlashPath = tempRepoDir.replace(/\\/g, '/')
+    const [realInfo, realAlternate] = await Promise.all([
+      fs.realpath(info.rootPath!),
+      fs.realpath(alternateSlashPath),
+    ])
+    expect(path.resolve(realInfo).toLowerCase()).toBe(path.resolve(realAlternate).toLowerCase())
   })
 })
